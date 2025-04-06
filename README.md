@@ -14,22 +14,6 @@ A modern, responsive financial dashboard built with React, TypeScript, and Tailw
 
 ⚡ Powered by Tailwind CSS for rapid styling
 
-📁 Project Structure
-
-src/
-├── components/
-│   └── layout/
-│       ├── Header.tsx
-│       └── Sidebar.tsx
-├── features/
-│   ├── dashboard/
-│   │   └── DashboardCards.tsx
-│   └── transactions/
-│       └── TransactionList.tsx
-├── index.css
-├── App.tsx
-└── main.tsx
-
 🚀 Getting Started
 
 Prerequisites
@@ -40,7 +24,7 @@ npm or pnpm
 
 Setup
 
-git clone https://github.com/your-username/smart-finance-dashboard.git
+git clone https://github.com/amitrazz/smart-finance-dashboard.git
 cd smart-finance-dashboard
 npm install
 npm run dev
