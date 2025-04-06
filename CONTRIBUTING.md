@@ -1,3 +1,7 @@
+# Contributors
+
+- [@amitrazz](https://github.com/amitrazz)
+
 # Contributing to Smart Finance Dashboard
 
 Thanks for your interest in contributing! Please follow these guidelines:
