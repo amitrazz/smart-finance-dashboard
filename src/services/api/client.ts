@@ -1,4 +1,4 @@
-const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/+$/, "");
 const API_BASE_URL = rawBaseUrl.endsWith("/api/v1") ? rawBaseUrl : `${rawBaseUrl}/api/v1`;
 
 let accessToken: string | null = localStorage.getItem("pf_access_token");
@@ -50,8 +50,8 @@ export async function fetchWithAuth<T>(endpoint: string, options: RequestInit = 
   const path = endpoint.startsWith("/api/v1")
     ? endpoint.replace("/api/v1", "")
     : endpoint.startsWith("/")
-    ? endpoint
-    : `/${endpoint}`;
+      ? endpoint
+      : `/${endpoint}`;
 
   const url = `${API_BASE_URL}${path}`;
 
