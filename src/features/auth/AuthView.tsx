@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
+import pkg from "../../../package.json";
 import {
   Sparkles,
   Lock,
@@ -22,6 +23,7 @@ import { SecurityTrustBadges } from "./components/SecurityTrustBadges";
 export const AuthView: React.FC = () => {
   const { login, isLoading } = useAuthStore();
   const { theme, toggleTheme } = useSettingsStore();
+  const appVersion = pkg.version || "2.5.0";
 
   // Form State
   const [email, setEmail] = useState("");
@@ -115,7 +117,7 @@ export const AuthView: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-100">Welcome Back</h2>
                 <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  v2.5 OS
+                  v{appVersion} OS
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium">
