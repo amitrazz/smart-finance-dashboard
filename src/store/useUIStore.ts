@@ -32,6 +32,7 @@ interface UIState {
   toastMessage: { id: string; text: string; type: "success" | "error" | "info" } | null;
   showToast: (text: string, type?: "success" | "error" | "info") => void;
   hideToast: () => void;
+  resetUIState: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -57,4 +58,13 @@ export const useUIStore = create<UIState>((set) => ({
     }, 4000);
   },
   hideToast: () => set({ toastMessage: null }),
+  resetUIState: () =>
+    set({
+      activeTab: "dashboard",
+      isSearchOpen: false,
+      isAddTransactionOpen: false,
+      isAddAccountOpen: false,
+      isImportModalOpen: false,
+      selectedAccountId: null,
+    }),
 }));

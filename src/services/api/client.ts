@@ -43,6 +43,10 @@ export async function fetchWithAuth<T>(endpoint: string, options: RequestInit = 
     }
   }
 
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
@@ -56,6 +60,7 @@ export async function fetchWithAuth<T>(endpoint: string, options: RequestInit = 
   const url = `${API_BASE_URL}${path}`;
 
   const res = await fetch(url, {
+    cache: "no-store",
     ...options,
     headers,
   });

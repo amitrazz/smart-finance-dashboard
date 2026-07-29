@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { api, setAccessToken, getAccessToken, setOnUnauthorizedCallback } from "../services/api";
 import { parseJwt, isTokenValid } from "../utils/jwt";
+import { clearAppDataOnAuthChange } from "../lib/queryClient";
+import { useUIStore } from "./useUIStore";
 
 export interface User {
   id: string;
@@ -17,6 +19,11 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => void;
 }
+
+const resetAllState = () => {
+  clearAppDataOnAuthChange();
+  useUIStore.getState().resetUIState();
+};
 
 const getUserFromToken = (token: string | null): User | null => {
   if (!token || !isTokenValid(token)) return null;
@@ -35,11 +42,13 @@ const initialUser = getUserFromToken(initialToken);
 if (initialToken && !initialUser) {
   // Token was invalid or expired
   setAccessToken(null);
+  resetAllState();
 }
 
 export const useAuthStore = create<AuthState>((set) => {
   // Register unauthorized listener to log out automatically on 401
   setOnUnauthorizedCallback(() => {
+    resetAllState();
     set({ user: null, isAuthenticated: false });
   });
 
@@ -53,6 +62,7 @@ export const useAuthStore = create<AuthState>((set) => {
       const user = getUserFromToken(token);
       if (!user) {
         setAccessToken(null);
+        resetAllState();
         set({ user: null, isAuthenticated: false });
       } else {
         set({ user, isAuthenticated: true });
@@ -66,6 +76,7 @@ export const useAuthStore = create<AuthState>((set) => {
         if (!res.accessToken) {
           throw new Error("No access token returned from API");
         }
+        resetAllState();
         setAccessToken(res.accessToken);
         const user = getUserFromToken(res.accessToken) || {
           id: "user",
@@ -93,6 +104,7 @@ export const useAuthStore = create<AuthState>((set) => {
         if (!res.accessToken) {
           throw new Error("No access token returned after registration");
         }
+        resetAllState();
         setAccessToken(res.accessToken);
         const user = getUserFromToken(res.accessToken) || {
           id: "user",
@@ -117,6 +129,7 @@ export const useAuthStore = create<AuthState>((set) => {
       } catch {
         // ignore network error on logout call
       } finally {
+        resetAllState();
         setAccessToken(null);
         set({ user: null, isAuthenticated: false });
       }
