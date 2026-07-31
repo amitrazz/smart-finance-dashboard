@@ -195,6 +195,7 @@ export const api = {
     fetchWithAuth<ImportJob>(`/finance/imports/${encodeURIComponent(id)}/column-mapping`, {
       method: "POST",
       body: JSON.stringify(mapping),
+      timeoutMs: 300000,
     }),
   updateImportRow: (jobId: string, rowId: string, data: Partial<ImportRowStaging>) =>
     fetchWithAuth<ImportRowStaging>(`/finance/imports/${encodeURIComponent(jobId)}/rows/${encodeURIComponent(rowId)}`, {
