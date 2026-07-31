@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useTransactions, useCreateTransaction, useBulkCategorize, useAccounts, useCategories } from "../../hooks/useFinanceQueries";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useTransactionsInfinite, useCreateTransaction, useBulkCategorize, useAccounts, useCategories } from "../../hooks/useFinanceQueries";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { Transaction, TransactionDirection } from "../../types";
 import { Search, Plus, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw, Tag, X, Check, AlertTriangle, RefreshCw } from "lucide-react";
-import { Pagination } from "../../components/common/Pagination";
 import { useUIStore } from "../../store/useUIStore";
 
 export const TransactionsView: React.FC = () => {
@@ -26,11 +26,16 @@ export const TransactionsView: React.FC = () => {
     setAddTransactionOpen(false);
   };
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const { data: txnsResponse, isLoading, isError, error, refetch } = useTransactions();
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useTransactionsInfinite();
   const { data: accounts = [] } = useAccounts();
   const { data: categories = [] } = useCategories();
   const createTxnMutation = useCreateTransaction();
@@ -50,12 +55,13 @@ export const TransactionsView: React.FC = () => {
     }
   }, [accounts, accountId]);
 
+  // Flatten all loaded pages into a single list
+  const allTxns = useMemo<Transaction[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
+  const totalCount = data?.pages[0]?.totalCount ?? data?.pages[0]?.total;
+
   // Memoize filtered transactions to avoid recomputing on every render
   const filteredTxns = useMemo(() => {
-    const transactions: Transaction[] = Array.isArray(txnsResponse)
-      ? (txnsResponse as Transaction[])
-      : (txnsResponse as unknown as { data: Transaction[] })?.data || [];
-    return transactions.filter((t: Transaction) => {
+    return allTxns.filter((t: Transaction) => {
       const matchesDirection = filterDirection === "ALL" || t.direction === filterDirection;
       const matchesSearch =
         searchQuery.trim() === "" ||
@@ -64,11 +70,28 @@ export const TransactionsView: React.FC = () => {
         (t.merchantName && t.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesDirection && matchesSearch;
     });
-  }, [txnsResponse, filterDirection, searchQuery]);
+  }, [allTxns, filterDirection, searchQuery]);
 
-  const totalPages = Math.ceil(filteredTxns.length / pageSize) || 1;
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedTxns = filteredTxns.slice(startIndex, startIndex + pageSize);
+  // Virtualize the (potentially large) loaded row set
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredTxns.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 72,
+    overscan: 8,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end : 0;
+
+  // Auto-fetch the next page once the user scrolls near the end of what's loaded
+  useEffect(() => {
+    const lastRow = virtualRows[virtualRows.length - 1];
+    if (!lastRow) return;
+    if (lastRow.index >= filteredTxns.length - 5 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [virtualRows, filteredTxns.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const toggleSelectTxn = (id: string) => {
     setSelectedTxnIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
@@ -202,9 +225,9 @@ export const TransactionsView: React.FC = () => {
 
       {/* Transaction Table */}
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        <div ref={scrollRef} className="overflow-auto max-h-[640px]">
           <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 sticky top-0 z-10">
               <tr>
                 <th className="p-4 w-10">
                   <input
@@ -231,77 +254,108 @@ export const TransactionsView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedTxns.map((txn) => (
-                  <tr
-                    key={txn.id}
-                    onClick={() => setSelectedTxnDrawer(txn)}
-                    className="hover:bg-slate-800/40 cursor-pointer transition-colors"
-                  >
-                    <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedTxnIds.includes(txn.id)}
-                        onChange={() => toggleSelectTxn(txn.id)}
-                        className="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0"
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            txn.direction === "INFLOW"
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : txn.direction === "TRANSFER"
-                              ? "bg-indigo-500/10 text-indigo-400"
-                              : "bg-slate-800 text-slate-300"
-                          }`}
-                        >
-                          {txn.direction === "INFLOW" ? (
-                            <ArrowDownLeft className="w-4 h-4" />
-                          ) : txn.direction === "TRANSFER" ? (
-                            <RefreshCcw className="w-4 h-4" />
-                          ) : (
-                            <ArrowUpRight className="w-4 h-4" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-100">{txn.description}</p>
-                          {txn.merchantName && <p className="text-xs text-slate-400">{txn.merchantName}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/50 text-xs font-medium text-slate-300">
-                        <Tag className="w-3 h-3 text-emerald-400" />
-                        {txn.categoryName || "Uncategorized"}
-                      </span>
-                    </td>
-                    <td className="p-4 text-xs font-medium text-slate-400">{txn.accountName || "Bank Account"}</td>
-                    <td className="p-4 text-xs text-slate-400">{formatDate(txn.date)}</td>
-                    <td className="p-4 text-right font-bold text-sm">
-                      <span className={txn.direction === "INFLOW" ? "text-emerald-400" : "text-slate-100"}>
-                        {txn.direction === "INFLOW" ? "+" : "-"}{formatCurrency(txn.amount)}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                <>
+                  {paddingTop > 0 && (
+                    <tr style={{ height: `${paddingTop}px` }}>
+                      <td colSpan={6} />
+                    </tr>
+                  )}
+                  {virtualRows.map((virtualRow) => {
+                    const txn = filteredTxns[virtualRow.index];
+                    return (
+                      <tr
+                        key={txn.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        onClick={() => setSelectedTxnDrawer(txn)}
+                        className="hover:bg-slate-800/40 cursor-pointer transition-colors"
+                      >
+                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTxnIds.includes(txn.id)}
+                            onChange={() => toggleSelectTxn(txn.id)}
+                            className="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`p-2.5 rounded-xl ${
+                                txn.direction === "INFLOW"
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : txn.direction === "TRANSFER"
+                                  ? "bg-indigo-500/10 text-indigo-400"
+                                  : "bg-slate-800 text-slate-300"
+                              }`}
+                            >
+                              {txn.direction === "INFLOW" ? (
+                                <ArrowDownLeft className="w-4 h-4" />
+                              ) : txn.direction === "TRANSFER" ? (
+                                <RefreshCcw className="w-4 h-4" />
+                              ) : (
+                                <ArrowUpRight className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-100">{txn.description}</p>
+                              {txn.merchantName && <p className="text-xs text-slate-400">{txn.merchantName}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/50 text-xs font-medium text-slate-300">
+                            <Tag className="w-3 h-3 text-emerald-400" />
+                            {txn.categoryName || "Uncategorized"}
+                          </span>
+                        </td>
+                        <td className="p-4 text-xs font-medium text-slate-400">{txn.accountName || "Bank Account"}</td>
+                        <td className="p-4 text-xs text-slate-400">{formatDate(txn.date)}</td>
+                        <td className="p-4 text-right font-bold text-sm">
+                          <span className={txn.direction === "INFLOW" ? "text-emerald-400" : "text-slate-100"}>
+                            {txn.direction === "INFLOW" ? "+" : "-"}{formatCurrency(txn.amount)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {paddingBottom > 0 && (
+                    <tr style={{ height: `${paddingBottom}px` }}>
+                      <td colSpan={6} />
+                    </tr>
+                  )}
+                </>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Controls */}
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={filteredTxns.length}
-          pageSize={pageSize}
-          onPageChange={(page) => setCurrentPage(page)}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setCurrentPage(1);
-          }}
-        />
+        {/* Load More / Status Footer */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-t border-slate-800 text-xs text-slate-400">
+          <span>
+            Loaded <span className="font-bold text-slate-200">{allTxns.length}</span>
+            {typeof totalCount === "number" && (
+              <>
+                {" "}of <span className="font-bold text-slate-200">{totalCount}</span> total
+              </>
+            )}
+          </span>
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all disabled:opacity-50 self-start sm:self-auto"
+            >
+              {isFetchingNextPage ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                </>
+              ) : (
+                "Load More"
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Detail Drawer */}

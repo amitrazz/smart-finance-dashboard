@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
 import { Money, UserSettings, Account, Transaction, CreateTransactionInput, Budget, Goal, Loan, Trade, Category, FinancialInstitution, CreditCard, ImportRowStaging, Holding, Portfolio, EmiSchedule, Insight, FinancialHealthScore, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload } from "../types";
@@ -269,6 +269,16 @@ export function useTransactions(params?: Record<string, string | number | boolea
   });
 }
 
+export function useTransactionsInfinite(params?: Record<string, string | number | boolean | undefined>) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.transactions(params), "infinite"],
+    queryFn: ({ pageParam }: { pageParam?: string }) => api.getTransactions({ ...params, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
+  });
+}
+
 export function useTransaction(id: string) {
   return useQuery({
     queryKey: QUERY_KEYS.transaction(id),
@@ -387,6 +397,16 @@ export function useImportPreview(id: string, params?: { limit?: number }) {
     queryFn: () => api.getImportPreview(id, params),
     enabled: isAuth() && Boolean(id),
     select: (res) => unwrapList<ImportRowStaging>(res),
+  });
+}
+
+export function useImportPreviewInfinite(id: string, params?: { limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.importPreview(id, params), "infinite"],
+    queryFn: ({ pageParam }: { pageParam?: string }) => api.getImportPreview(id, { ...params, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth() && Boolean(id),
   });
 }
 

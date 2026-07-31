@@ -180,16 +180,26 @@ export const api = {
 
   // Imports
   getImportJobs: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<ImportJob>>(`/finance/imports${buildQuery(params)}`),
+    fetchWithAuth<PaginatedResponse<ImportJob>>(`/finance/imports${buildQuery(params)}`, {
+      timeoutMs: 300000,
+    }),
   getReviewQueue: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<ImportRowStaging>>(`/finance/imports/review-queue${buildQuery(params)}`),
-  getImportJob: (id: string) => fetchWithAuth<ImportJob>(`/finance/imports/${encodeURIComponent(id)}`),
-  getImportPreview: (id: string, params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<ImportRowStaging>>(`/finance/imports/${encodeURIComponent(id)}/preview${buildQuery(params)}`),
+    fetchWithAuth<PaginatedResponse<ImportRowStaging>>(`/finance/imports/review-queue${buildQuery(params)}`, {
+      timeoutMs: 300000,
+    }),
+  getImportJob: (id: string) =>
+    fetchWithAuth<ImportJob>(`/finance/imports/${encodeURIComponent(id)}`, {
+      timeoutMs: 300000,
+    }),
+  getImportPreview: (id: string, params?: { limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<ImportRowStaging>>(`/finance/imports/${encodeURIComponent(id)}/preview${buildQuery(params)}`, {
+      timeoutMs: 300000,
+    }),
   uploadImportFile: (formData: FormData) =>
     fetchWithAuth<ImportJob>("/finance/imports", {
       method: "POST",
       body: formData,
+      timeoutMs: 300000,
     }),
   confirmColumnMapping: (id: string, mapping: Record<string, string>) =>
     fetchWithAuth<ImportJob>(`/finance/imports/${encodeURIComponent(id)}/column-mapping`, {
@@ -201,18 +211,22 @@ export const api = {
     fetchWithAuth<ImportRowStaging>(`/finance/imports/${encodeURIComponent(jobId)}/rows/${encodeURIComponent(rowId)}`, {
       method: "POST",
       body: JSON.stringify(data),
+      timeoutMs: 300000,
     }),
   commitImport: (id: string) =>
     fetchWithAuth<{ success: boolean; importedCount: number }>(`/finance/imports/${encodeURIComponent(id)}/commit`, {
       method: "POST",
+      timeoutMs: 300000,
     }),
   retryImport: (id: string) =>
     fetchWithAuth<ImportJob>(`/finance/imports/${encodeURIComponent(id)}/retry`, {
       method: "POST",
+      timeoutMs: 300000,
     }),
   rollbackImport: (id: string) =>
     fetchWithAuth<{ success: boolean }>(`/finance/imports/${encodeURIComponent(id)}/rollback`, {
       method: "POST",
+      timeoutMs: 300000,
     }),
 
   // Documents

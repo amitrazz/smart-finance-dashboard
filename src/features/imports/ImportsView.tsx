@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   useImports,
   useReviewQueue,
@@ -11,6 +12,7 @@ import {
   useUpdateImportRow,
   useRetryImport,
   useRollbackImport,
+  useImportPreviewInfinite,
 } from "../../hooks/useFinanceQueries";
 import { api } from "../../services/api";
 import { ImportJob, ImportRowStaging, Account, Category } from "../../types";
@@ -71,15 +73,41 @@ export const ImportsView: React.FC = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [documentType, setDocumentType] = useState<string>("BANK_STATEMENT");
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [stagedRows, setStagedRows] = useState<ImportRowStaging[]>([]);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-
-  // Pagination States
-  const [stagedPage, setStagedPage] = useState(1);
-  const [stagedPageSize, setStagedPageSize] = useState(10);
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(5);
+
+  const {
+    data: previewData,
+    isLoading: isLoadingPreview,
+    fetchNextPage: fetchNextPreviewPage,
+    hasNextPage: hasNextPreviewPage,
+    isFetchingNextPage: isFetchingNextPreviewPage,
+  } = useImportPreviewInfinite(currentJobId || "");
+
+  const stagedRows = useMemo<ImportRowStaging[]>(() => previewData?.pages.flatMap((p) => p.data) ?? [], [previewData]);
+  const totalStagedCount = previewData?.pages[0]?.totalCount ?? previewData?.pages[0]?.total;
+
+  // Virtualize the (potentially large) loaded staged-row set
+  const stagedScrollRef = useRef<HTMLDivElement>(null);
+  const stagedRowVirtualizer = useVirtualizer({
+    count: stagedRows.length,
+    getScrollElement: () => stagedScrollRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+  const stagedVirtualRows = stagedRowVirtualizer.getVirtualItems();
+  const stagedPaddingTop = stagedVirtualRows.length > 0 ? stagedVirtualRows[0].start : 0;
+  const stagedPaddingBottom =
+    stagedVirtualRows.length > 0 ? stagedRowVirtualizer.getTotalSize() - stagedVirtualRows[stagedVirtualRows.length - 1].end : 0;
+
+  useEffect(() => {
+    const lastRow = stagedVirtualRows[stagedVirtualRows.length - 1];
+    if (!lastRow) return;
+    if (lastRow.index >= stagedRows.length - 5 && hasNextPreviewPage && !isFetchingNextPreviewPage) {
+      fetchNextPreviewPage();
+    }
+  }, [stagedVirtualRows, stagedRows.length, hasNextPreviewPage, isFetchingNextPreviewPage, fetchNextPreviewPage]);
 
   useEffect(() => {
     if (!selectedAccountId && combinedAccounts.length > 0) {
@@ -215,24 +243,12 @@ export const ImportsView: React.FC = () => {
     }
 
     uploadMutation.mutate(formData, {
-      onSuccess: async (job: ImportJob) => {
+      onSuccess: (job: ImportJob) => {
         setCurrentJobId(job.id);
-        setIsLoadingPreview(true);
-        try {
-          const preview = await api.getImportPreview(job.id);
-          const previewObj = preview as unknown as { stagedRows?: ImportRowStaging[]; data?: ImportRowStaging[] };
-          const rows = Array.isArray(preview) ? preview : previewObj?.stagedRows || previewObj?.data || [];
-          setStagedRows(rows);
-          if (selectedFile.name.endsWith(".csv") || selectedFile.name.endsWith(".txt")) {
-            setActiveStep("MAPPING");
-          } else {
-            setActiveStep("PREVIEW");
-          }
-        } catch {
-          setStagedRows([]);
+        if (selectedFile.name.endsWith(".csv") || selectedFile.name.endsWith(".txt")) {
+          setActiveStep("MAPPING");
+        } else {
           setActiveStep("PREVIEW");
-        } finally {
-          setIsLoadingPreview(false);
         }
       },
     });
@@ -254,17 +270,8 @@ export const ImportsView: React.FC = () => {
     columnMappingMutation.mutate(
       { id: currentJobId, mapping: dtoPayload as unknown as Record<string, string> },
       {
-        onSuccess: async () => {
-          setIsLoadingPreview(true);
-          try {
-            const preview = await api.getImportPreview(currentJobId);
-            const previewObj = preview as unknown as { stagedRows?: ImportRowStaging[]; data?: ImportRowStaging[] };
-            const rows = Array.isArray(preview) ? preview : previewObj?.stagedRows || previewObj?.data || [];
-            setStagedRows(rows);
-            setActiveStep("PREVIEW");
-          } finally {
-            setIsLoadingPreview(false);
-          }
+        onSuccess: () => {
+          setActiveStep("PREVIEW");
         },
       }
     );
@@ -275,21 +282,11 @@ export const ImportsView: React.FC = () => {
     action: { categoryId?: string; direction?: "INFLOW" | "OUTFLOW"; confirmNotDuplicate?: boolean; reject?: boolean }
   ) => {
     if (!currentJobId) return;
-    updateRowMutation.mutate(
-      {
-        jobId: currentJobId,
-        rowId,
-        data: action as Partial<ImportRowStaging>,
-      },
-      {
-        onSuccess: async () => {
-          const preview = await api.getImportPreview(currentJobId);
-          const previewObj = preview as unknown as { stagedRows?: ImportRowStaging[]; data?: ImportRowStaging[] };
-          const rows = Array.isArray(preview) ? preview : previewObj?.stagedRows || previewObj?.data || [];
-          setStagedRows(rows);
-        },
-      }
-    );
+    updateRowMutation.mutate({
+      jobId: currentJobId,
+      rowId,
+      data: action as Partial<ImportRowStaging>,
+    });
   };
 
   const handleReviewQueueAction = (
@@ -311,23 +308,13 @@ export const ImportsView: React.FC = () => {
         setActiveStep("UPLOAD");
         setSelectedFile(null);
         setCurrentJobId(null);
-        setStagedRows([]);
       },
     });
   };
 
-  const handleViewPreviewForJob = async (jobId: string) => {
+  const handleViewPreviewForJob = (jobId: string) => {
     setCurrentJobId(jobId);
-    setIsLoadingPreview(true);
-    try {
-      const preview = await api.getImportPreview(jobId);
-      const previewObj = preview as unknown as { stagedRows?: ImportRowStaging[]; data?: ImportRowStaging[] };
-      const rows = Array.isArray(preview) ? preview : previewObj?.stagedRows || previewObj?.data || [];
-      setStagedRows(rows);
-      setActiveStep("PREVIEW");
-    } finally {
-      setIsLoadingPreview(false);
-    }
+    setActiveStep("PREVIEW");
   };
 
   if (isLoading) {
@@ -672,7 +659,7 @@ export const ImportsView: React.FC = () => {
             <div>
               <h3 className="text-lg font-bold text-slate-100">Staged Row Mapping Preview</h3>
               <p className="text-xs text-slate-400">
-                Job ID: <span className="font-mono text-slate-300">{currentJobId}</span> • {stagedRows.length} rows staged
+                Job ID: <span className="font-mono text-slate-300">{currentJobId}</span> • {totalStagedCount ?? stagedRows.length} rows staged
               </p>
             </div>
 
@@ -706,9 +693,9 @@ export const ImportsView: React.FC = () => {
               No staged rows available for preview.
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-800 overflow-x-auto scrollbar-thin">
+            <div ref={stagedScrollRef} className="rounded-xl border border-slate-800 overflow-auto max-h-[560px] scrollbar-thin">
               <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-950/80 text-xs font-semibold text-slate-400 border-b border-slate-800">
+                <thead className="bg-slate-950/80 text-xs font-semibold text-slate-400 border-b border-slate-800 sticky top-0 z-10">
                   <tr>
                     <th className="p-3">Date</th>
                     <th className="p-3">Description</th>
@@ -720,9 +707,13 @@ export const ImportsView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {stagedRows
-                    .slice((stagedPage - 1) * stagedPageSize, stagedPage * stagedPageSize)
-                    .map((row: ImportRowStaging) => {
+                  {stagedPaddingTop > 0 && (
+                    <tr style={{ height: `${stagedPaddingTop}px` }}>
+                      <td colSpan={7} />
+                    </tr>
+                  )}
+                  {stagedVirtualRows.map((virtualRow) => {
+                    const row = stagedRows[virtualRow.index];
                     const rowObj = row as unknown as Record<string, unknown>;
                     const norm = (rowObj.normalizedData as Record<string, string>) || {};
                     const raw = rowObj.rawData;
@@ -737,7 +728,7 @@ export const ImportsView: React.FC = () => {
                     const isReview = row.status === "NEEDS_REVIEW";
 
                     return (
-                      <tr key={row.id} className="hover:bg-slate-800/30">
+                      <tr key={row.id} data-index={virtualRow.index} ref={stagedRowVirtualizer.measureElement} className="hover:bg-slate-800/30">
                         <td className="p-3 text-xs text-slate-300 font-mono">{dateVal}</td>
                         <td className="p-3 font-semibold text-slate-100 max-w-xs truncate">{descVal}</td>
                         <td className="p-3">
@@ -811,23 +802,44 @@ export const ImportsView: React.FC = () => {
                       </tr>
                     );
                   })}
+                  {stagedPaddingBottom > 0 && (
+                    <tr style={{ height: `${stagedPaddingBottom}px` }}>
+                      <td colSpan={7} />
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Staged Rows Pagination */}
-          <Pagination
-            currentPage={stagedPage}
-            totalPages={Math.ceil(stagedRows.length / stagedPageSize) || 1}
-            totalItems={stagedRows.length}
-            pageSize={stagedPageSize}
-            onPageChange={(page) => setStagedPage(page)}
-            onPageSizeChange={(size) => {
-              setStagedPageSize(size);
-              setStagedPage(1);
-            }}
-          />
+          {/* Staged Rows Load More / Status Footer */}
+          {stagedRows.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-slate-400">
+              <span>
+                Loaded <span className="font-bold text-slate-200">{stagedRows.length}</span>
+                {typeof totalStagedCount === "number" && (
+                  <>
+                    {" "}of <span className="font-bold text-slate-200">{totalStagedCount}</span> total
+                  </>
+                )}
+              </span>
+              {hasNextPreviewPage && (
+                <button
+                  onClick={() => fetchNextPreviewPage()}
+                  disabled={isFetchingNextPreviewPage}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all disabled:opacity-50 self-start sm:self-auto"
+                >
+                  {isFetchingNextPreviewPage ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                    </>
+                  ) : (
+                    "Load More"
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
