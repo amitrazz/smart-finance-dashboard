@@ -106,7 +106,7 @@ export const AuthView: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 mx-auto">
               <Sparkles className="w-6 h-6 text-slate-950" />
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">PFOS</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">Smart Finance OS</h1>
             <p className="text-xs text-slate-400 font-medium">Personal Finance Operating System</p>
           </div>
 

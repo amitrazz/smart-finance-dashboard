@@ -2,6 +2,29 @@
   "name": "smart-finance-dashboard",
   "private": true,
   "version": "1.0.0",
+  "description": "Comprehensive personal finance management and wealth tracking dashboard built with React 19, TypeScript, Tailwind CSS, Zustand, and Recharts.",
+  "author": "Amit Kumar <https://github.com/amitrazz>",
+  "license": "MIT",
+  "homepage": "https://cashflow.amitrazz.in",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amitrazz/smart-finance-dashboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/amitrazz/smart-finance-dashboard/issues"
+  },
+  "keywords": [
+    "finance",
+    "dashboard",
+    "personal-finance",
+    "expense-tracker",
+    "budgeting",
+    "wealth-management",
+    "react",
+    "typescript",
+    "recharts",
+    "zustand"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",

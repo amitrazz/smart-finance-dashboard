@@ -27,7 +27,7 @@ export const DashboardPreview: React.FC = () => {
             ◉
           </div>
           <span className="text-xs font-bold tracking-widest uppercase text-slate-300">
-            PFOS <span className="text-slate-500 font-normal">| Financial Operating System</span>
+            Smart Finance OS <span className="text-slate-500 font-normal">| Financial Operating System</span>
           </span>
         </div>
 

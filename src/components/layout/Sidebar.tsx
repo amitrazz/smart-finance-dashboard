@@ -77,7 +77,7 @@ export const Sidebar: React.FC = () => {
           <Sparkles className="w-6 h-6 text-slate-950 font-bold" />
         </div>
         <div>
-          <h1 className="font-bold text-lg text-slate-100 tracking-tight leading-tight">Monarch OS</h1>
+          <h1 className="font-bold text-lg text-slate-100 tracking-tight leading-tight">Smart Finance OS</h1>
           <p className="text-xs text-emerald-400 font-medium">Personal Finance Platform</p>
         </div>
       </div>

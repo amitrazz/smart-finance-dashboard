@@ -1,0 +1,17 @@
+{
+  "name": "Smart Finance Dashboard",
+  "short_name": "Smart Finance",
+  "description": "Comprehensive personal finance management, budgeting, and wealth tracking platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
