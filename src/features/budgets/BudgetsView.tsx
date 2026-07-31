@@ -1,27 +1,82 @@
 import React, { useState } from "react";
-import { useBudgets, useCreateBudget } from "../../hooks/useFinanceQueries";
+import { useBudgets, useCreateBudget, useCategories } from "../../hooks/useFinanceQueries";
+import { api } from "../../services/api";
 import { formatCurrency } from "../../utils/formatters";
-import { BudgetLine } from "../../types";
+import { Budget, BudgetLine, BudgetPeriod } from "../../types";
 import { Plus, Check, X, AlertTriangle, RefreshCw, PieChart } from "lucide-react";
 
 export const BudgetsView: React.FC = () => {
   const { data: budgets = [], isLoading, isError, error, refetch } = useBudgets();
+  const { data: categories = [] } = useCategories();
   const createBudgetMutation = useCreateBudget();
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [budgetName, setBudgetName] = useState("");
+  const [period, setPeriod] = useState<BudgetPeriod>("MONTHLY");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().substring(0, 10));
   const [totalLimit, setTotalLimit] = useState("50000");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const isValidUUID = (id?: string) =>
+      Boolean(id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+
+    let targetCategoryId = selectedCategoryId;
+    let targetCategoryName = "General Spend";
+
+    let categoryLabel = "General Spend";
+    if (selectedCategoryId === "dining_food") categoryLabel = "Dining & Food";
+    else if (selectedCategoryId === "groceries") categoryLabel = "Groceries";
+    else if (selectedCategoryId === "shopping") categoryLabel = "Shopping & Household";
+    else if (selectedCategoryId === "bills") categoryLabel = "Bills & Utilities";
+    else if (selectedCategoryId === "investments") categoryLabel = "Investments & Savings";
+
+    const foundCategory = categories.find((c) => c.id === targetCategoryId) || categories.find((c) => isValidUUID(c.id));
+
+    if (foundCategory && isValidUUID(foundCategory.id)) {
+      targetCategoryId = foundCategory.id;
+      targetCategoryName = foundCategory.name;
+    } else {
+      try {
+        // Auto-provision chosen category on backend to obtain a valid DB UUID
+        const newCat = await api.createCategory({ name: categoryLabel, type: "EXPENSE", kind: "EXPENSE" });
+        if (newCat && newCat.id) {
+          targetCategoryId = newCat.id;
+          targetCategoryName = newCat.name;
+        }
+      } catch {
+        if (categories[0]?.id && isValidUUID(categories[0]?.id)) {
+          targetCategoryId = categories[0].id;
+          targetCategoryName = categories[0].name || categoryLabel;
+        }
+      }
+    }
+
+    const numericLimit = Math.abs(parseFloat(totalLimit) || 50000);
+    const formattedLimit = numericLimit.toFixed(2);
+
+    const budgetLines = [
+      {
+        categoryId: targetCategoryId,
+        categoryName: targetCategoryName,
+        limitAmount: formattedLimit,
+        spentAmount: "0.00",
+      },
+    ];
+
+    const isoStartDate = new Date(startDate).toISOString();
+
     createBudgetMutation.mutate(
       {
         name: budgetName,
-        period: new Date().toISOString().substring(0, 7),
-        totalLimit: { amount: totalLimit, currency: "INR" },
-        totalSpent: { amount: "0", currency: "INR" },
-        lines: [],
-      },
+        period,
+        startDate: isoStartDate,
+        totalLimit: formattedLimit,
+        totalSpent: "0.00",
+        lines: budgetLines,
+      } as unknown as Partial<Budget>,
       {
         onSuccess: () => {
           setModalOpen(false);
@@ -106,10 +161,26 @@ export const BudgetsView: React.FC = () => {
 
             {/* Overall Progress Bar */}
             {(() => {
-              const spent = parseFloat(activeBudget.totalSpent?.amount || "0");
-              const limit = parseFloat(activeBudget.totalLimit?.amount || "1");
-              const pct = Math.min(Math.round((spent / limit) * 100), 100);
-              const isOver = spent > limit;
+              const parseAmount = (val: unknown): number => {
+                if (val === null || val === undefined) return 0;
+                if (typeof val === "number") return val;
+                if (typeof val === "string") return parseFloat(val) || 0;
+                if (typeof val === "object" && "amount" in val) return parseFloat(String(val.amount)) || 0;
+                return 0;
+              };
+
+              // Fallback to lines sum if totalLimit is 0
+              const linesLimit = activeBudget.lines?.reduce((sum, line) => sum + parseAmount(line.limitAmount), 0) || 0;
+              const linesSpent = activeBudget.lines?.reduce((sum, line) => sum + parseAmount(line.spentAmount), 0) || 0;
+
+              const rawLimit = parseAmount(activeBudget.totalLimit);
+              const rawSpent = parseAmount(activeBudget.totalSpent);
+
+              const limit = rawLimit > 0 ? rawLimit : linesLimit;
+              const spent = rawSpent > 0 ? rawSpent : linesSpent;
+
+              const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
+              const isOver = spent > limit && limit > 0;
 
               return (
                 <div className="space-y-2">
@@ -125,8 +196,8 @@ export const BudgetsView: React.FC = () => {
                     <span className="text-slate-400">{pct}% Utilized</span>
                     <span className={isOver ? "text-rose-400 font-bold" : "text-emerald-400"}>
                       {isOver
-                        ? `Over Budget by ${formatCurrency({ amount: (spent - limit).toFixed(2), currency: "INR" })}`
-                        : `${formatCurrency({ amount: (limit - spent).toFixed(2), currency: "INR" })} Remaining`}
+                        ? `Over Budget by ${formatCurrency((spent - limit).toFixed(2))}`
+                        : `${formatCurrency(Math.max(limit - spent, 0).toFixed(2))} Remaining`}
                     </span>
                   </div>
                 </div>
@@ -140,18 +211,26 @@ export const BudgetsView: React.FC = () => {
               <h4 className="font-bold text-lg text-slate-100">Category Caps & Progress</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeBudget.lines.map((line: BudgetLine) => {
-                  const spent = parseFloat(line.spentAmount?.amount || "0");
-                  const limit = parseFloat(line.limitAmount?.amount || "1");
-                  const pct = Math.min(Math.round((spent / limit) * 100), 100);
-                  const isOver = spent > limit;
+                  const parseAmount = (val: unknown): number => {
+                    if (val === null || val === undefined) return 0;
+                    if (typeof val === "number") return val;
+                    if (typeof val === "string") return parseFloat(val) || 0;
+                    if (typeof val === "object" && "amount" in val) return parseFloat(String(val.amount)) || 0;
+                    return 0;
+                  };
+
+                  const spent = parseAmount(line.spentAmount);
+                  const limit = parseAmount(line.limitAmount);
+                  const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
+                  const isOver = spent > limit && limit > 0;
 
                   return (
-                    <div key={line.id} className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                    <div key={line.id || line.categoryId} className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
                       <div className="flex items-center justify-between">
-                        <h5 className="font-bold text-sm text-slate-100">{line.categoryName}</h5>
+                        <h5 className="font-bold text-sm text-slate-100">{line.categoryName || "General Spend"}</h5>
                         <span className="text-xs font-bold text-slate-300">
-                          {formatCurrency(line.spentAmount)} /{" "}
-                          <span className="text-slate-500">{formatCurrency(line.limitAmount)}</span>
+                          {formatCurrency(spent)} /{" "}
+                          <span className="text-slate-500">{formatCurrency(limit)}</span>
                         </span>
                       </div>
 
@@ -169,7 +248,7 @@ export const BudgetsView: React.FC = () => {
                         <span className={isOver ? "text-rose-400 font-semibold" : "text-slate-300 font-medium"}>
                           {isOver
                             ? `Over limit`
-                            : `${formatCurrency({ amount: (limit - spent).toFixed(2), currency: "INR" })} left`}
+                            : `${formatCurrency(Math.max(limit - spent, 0).toFixed(2))} left`}
                         </span>
                       </div>
                     </div>
@@ -204,11 +283,55 @@ export const BudgetsView: React.FC = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Period</label>
+                  <select
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value as BudgetPeriod)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="QUARTERLY">Quarterly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Primary Spend Category</label>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Total Target Spend Limit (₹)</label>
                 <input
                   type="number"
                   required
+                  min="0"
+                  step="0.01"
                   value={totalLimit}
                   onChange={(e) => setTotalLimit(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"

@@ -1,13 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { useHoldings, useTrades, usePortfolios } from "../../hooks/useFinanceQueries";
 import { formatCurrency, formatPercent } from "../../utils/formatters";
-import { Holding, Trade } from "../../types";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Holding, Trade, Portfolio } from "../../types";
+import { AlertTriangle, RefreshCw, Plus } from "lucide-react";
+import { AddTradeModal } from "./components/AddTradeModal";
 
 export const InvestmentsView: React.FC = () => {
-  const { data: holdings = [], isLoading: loadingHoldings, isError, error, refetch } = useHoldings();
-  const { data: trades = [] } = useTrades();
-  const { data: portfolios = [] } = usePortfolios();
+  const { data: holdingsResponse = [], isLoading: loadingHoldings, isError, error, refetch } = useHoldings();
+  const { data: tradesResponse = [] } = useTrades();
+  const { data: portfoliosResponse = [] } = usePortfolios();
+  const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
+
+  const holdings: Holding[] = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as unknown as { data: Holding[] })?.data || [];
+  const trades: Trade[] = Array.isArray(tradesResponse) ? tradesResponse : (tradesResponse as unknown as { data: Trade[] })?.data || [];
+  const portfolios: Portfolio[] = Array.isArray(portfoliosResponse) ? portfoliosResponse : (portfoliosResponse as unknown as { data: Portfolio[] })?.data || [];
 
   if (loadingHoldings) {
     return (
@@ -48,9 +54,17 @@ export const InvestmentsView: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-100">Investment Portfolio & Holdings</h2>
-        <p className="text-xs text-slate-400">Unified tracking across Mutual Funds, Indian Equities, Gold, SGBs, PPF & FDs</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-100">Investment Portfolio & Holdings</h2>
+          <p className="text-xs text-slate-400">Unified tracking across Mutual Funds, Indian Equities, Gold, SGBs, PPF & FDs</p>
+        </div>
+        <button
+          onClick={() => setIsAddTradeOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" /> Record Trade
+        </button>
       </div>
 
       {/* Hero Stats */}
@@ -157,6 +171,8 @@ export const InvestmentsView: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Add Trade Modal */}
+      <AddTradeModal isOpen={isAddTradeOpen} onClose={() => setIsAddTradeOpen(false)} />
     </div>
   );
 };

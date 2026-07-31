@@ -5,7 +5,10 @@ import { CalendarItem } from "../../types";
 import { Calendar as CalendarIcon, AlertTriangle, RefreshCw } from "lucide-react";
 
 export const NotificationsView: React.FC = () => {
-  const { data: calendarItems = [], isLoading, isError, error, refetch } = useCalendar();
+  const { data: calendarResponse = [], isLoading, isError, error, refetch } = useCalendar();
+  const calendarItems: CalendarItem[] = Array.isArray(calendarResponse)
+    ? calendarResponse
+    : (calendarResponse as unknown as { data: CalendarItem[] })?.data || [];
 
   if (isLoading) {
     return (

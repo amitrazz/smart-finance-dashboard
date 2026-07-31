@@ -1,14 +1,21 @@
 import { Money } from "../types";
 
-export function formatCurrency(money?: Money | { amount: string | number; currency?: string } | number | null, locale = "en-IN"): string {
+type MoneyLike = Money | { amount: string | number; currency?: string };
+
+export function formatCurrency(
+  money?: MoneyLike | number | string | null,
+  locale = "en-IN"
+): string {
   if (money === undefined || money === null) return "₹0.00";
-  
+
   let val = 0;
   let curr = "INR";
 
   if (typeof money === "number") {
     val = money;
-  } else if (typeof money === "object") {
+  } else if (typeof money === "string") {
+    val = parseFloat(money) || 0;
+  } else if (typeof money === "object" && "amount" in money) {
     val = parseFloat(String(money.amount || "0"));
     curr = money.currency || "INR";
   }
@@ -20,9 +27,15 @@ export function formatCurrency(money?: Money | { amount: string | number; curren
   }).format(val);
 }
 
-export function formatPercent(value: number, decimals = 1): string {
-  const formatted = value.toFixed(decimals);
-  return `${value >= 0 ? "+" : ""}${formatted}%`;
+export function formatPercent(
+  value?: number | string | null,
+  decimals = 1
+): string {
+  if (value === undefined || value === null) return "0%";
+  const num = typeof value === "number" ? value : parseFloat(String(value)) || 0;
+  if (isNaN(num)) return "0%";
+  const formatted = num.toFixed(decimals);
+  return `${num >= 0 ? "+" : ""}${formatted}%`;
 }
 
 export function formatDate(dateString: string): string {
@@ -45,4 +58,67 @@ export function formatRelativeTime(dateString: string): string {
   if (diffInDays === 1) return "Yesterday";
   if (diffInDays < 7) return `${diffInDays} days ago`;
   return formatDate(dateString);
+}
+
+export function formatLastSyncedAt(dateString?: string | null): string {
+  if (!dateString) return "recently";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "recently";
+
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  if (diffInMs < 0) {
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const diffInSecs = Math.floor(diffInMs / 1000);
+  const diffInMins = Math.floor(diffInSecs / 60);
+
+  if (diffInSecs < 60) {
+    return "just now";
+  }
+
+  if (diffInMins < 60) {
+    return `${diffInMins} min${diffInMins === 1 ? "" : "s"} ago`;
+  }
+
+  const isToday =
+    now.getDate() === date.getDate() &&
+    now.getMonth() === date.getMonth() &&
+    now.getFullYear() === date.getFullYear();
+
+  const timeStr = date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (isToday) {
+    return `Today at ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    yesterday.getDate() === date.getDate() &&
+    yesterday.getMonth() === date.getMonth() &&
+    yesterday.getFullYear() === date.getFullYear();
+
+  if (isYesterday) {
+    return `Yesterday at ${timeStr}`;
+  }
+
+  const isSameYear = now.getFullYear() === date.getFullYear();
+  const dateStr = date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(isSameYear ? {} : { year: "numeric" }),
+  });
+
+  return `${dateStr} at ${timeStr}`;
 }

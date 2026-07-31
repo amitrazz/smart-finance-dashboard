@@ -151,7 +151,7 @@ export const GoalsView: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => addContributionMutation.mutate({ id: g.id, amount: { amount: "10000", currency: "INR" } })}
+                    onClick={() => addContributionMutation.mutate({ goalId: g.id, data: { amount: "10000" } })}
                     disabled={addContributionMutation.isPending}
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 disabled:opacity-50"
                   >

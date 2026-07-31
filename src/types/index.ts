@@ -7,12 +7,17 @@ export interface Money {
 
 export type AccountType =
   | "SAVINGS"
+  | "CURRENT"
+  | "CASH"
+  | "WALLET"
+  | "BROKERAGE_CASH"
+  | "FIXED_DEPOSIT"
+  | "RECURRING_DEPOSIT"
+  | "OTHER"
   | "CHECKING"
   | "CREDIT_CARD"
   | "LOAN"
-  | "INVESTMENT"
-  | "WALLET"
-  | "CASH";
+  | "INVESTMENT";
 
 export type AccountStatus = "ACTIVE" | "INACTIVE" | "CLOSED" | "FROZEN";
 
@@ -25,13 +30,39 @@ export interface Account {
     name: string;
     logoUrl?: string;
   };
+  institutionId?: string;
   currentBalance: Money;
   status: AccountStatus;
   isManual: boolean;
   maskedNumber?: string;
   openingBalance?: string;
   currency: CurrencyCode;
-  updatedAt: string;
+  updatedAt?: string;
+  lastSyncedAt?: string;
+}
+
+export interface FinancialInstitution {
+  id: string;
+  name: string;
+  type?: string;
+  countryCode?: string;
+  logoUrl?: string;
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  currency: string;
+  creditLimit: string | number;
+  currentBalance?: Money | string;
+  statementDay?: number;
+  dueDay?: number;
+  institutionId?: string;
+  institutionName?: string;
+  maskedNumber?: string;
+  status?: string;
+  lastSyncedAt?: string;
+  updatedAt?: string;
 }
 
 export type TransactionDirection = "INFLOW" | "OUTFLOW" | "TRANSFER";
@@ -67,12 +98,26 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface CreateTransactionInput {
+  accountId: string;
+  description: string;
+  amount: string | Money;
+  direction: TransactionDirection;
+  categoryName?: string;
+  categoryId?: string;
+  merchantName?: string;
+  transactionDate?: string;
+  date?: string;
+  createdAt?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
   icon?: string;
   color?: string;
   type: "INCOME" | "EXPENSE" | "TRANSFER";
+  kind?: "INCOME" | "EXPENSE" | "TRANSFER";
   parentCategoryId?: string;
 }
 
@@ -111,17 +156,21 @@ export type ImportRowStatus =
 export interface ImportRowStaging {
   id: string;
   importJobId: string;
-  rawData: Record<string, unknown>;
-  normalizedData: {
+  rawData?: Record<string, unknown>;
+  normalizedData?: {
     date: string;
     amount: string;
     direction: TransactionDirection;
     description: string;
   };
-  status: ImportRowStatus;
-  confidenceScore: number;
+  status?: ImportRowStatus;
+  confidenceScore?: number;
   duplicateOfId?: string;
   targetCategoryId?: string;
+  categoryId?: string;
+  direction?: TransactionDirection;
+  confirmNotDuplicate?: boolean;
+  reject?: boolean;
   targetMerchantId?: string;
   committedEntityType?: string;
   committedEntityId?: string;
@@ -143,20 +192,23 @@ export interface ImportJob {
   createdAt: string;
 }
 
+export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+
 export interface BudgetLine {
-  id: string;
+  id?: string;
   categoryId: string;
-  categoryName: string;
+  categoryName?: string;
   limitAmount: Money;
-  spentAmount: Money;
+  spentAmount?: Money;
 }
 
 export interface Budget {
   id: string;
   name: string;
-  period: string;
+  period: BudgetPeriod;
+  startDate: string;
   totalLimit: Money;
-  totalSpent: Money;
+  totalSpent?: Money;
   lines: BudgetLine[];
 }
 
@@ -316,6 +368,98 @@ export interface SearchResultItem {
   metadata?: Record<string, string>;
 }
 
+export interface PhysicalAsset {
+  id?: string;
+  name: string;
+  type: "REAL_ESTATE" | "VEHICLE" | "JEWELRY" | "ELECTRONICS" | "OTHER";
+  estimatedValue: number;
+  purchaseYear?: number;
+  notes?: string;
+}
+
+export interface InsurancePolicy {
+  id?: string;
+  provider: string;
+  policyName: string;
+  policyType: "HEALTH" | "LIFE" | "VEHICLE" | "PROPERTY" | "TRAVEL";
+  coverageAmount: number;
+  premiumAmount: number;
+  renewalDate: string;
+  notes?: string;
+}
+
+export interface BootstrapOnboardingPayload {
+  cashAccounts?: Array<{
+    bank: string;
+    name: string;
+    type: string;
+    currentBalance: number;
+    balanceAsOfDate?: string;
+  }>;
+  creditCards?: Array<{
+    issuer: string;
+    name: string;
+    creditLimit: number;
+    currentOutstanding: number;
+    statementDay: number;
+    dueDay: number;
+    autoPay?: boolean;
+  }>;
+  loans?: Array<{
+    name: string;
+    lender: string;
+    type: string;
+    originalAmount: number;
+    currentBalance: number;
+    interestRate: number;
+    emiAmount: number;
+    emiFrequency: string;
+    nextEmiDate: string;
+    startDate?: string;
+    remainingTenure?: number;
+    notes?: string;
+  }>;
+  investments?: Array<{
+    type: string;
+    name: string;
+    quantity?: number;
+    currentValue: number;
+  }>;
+  physicalAssets?: Array<{
+    name: string;
+    type: string;
+    estimatedValue: number;
+    purchaseYear?: number;
+    notes?: string;
+  }>;
+  insurancePolicies?: Array<{
+    provider: string;
+    policyName: string;
+    policyType: string;
+    coverageAmount: number;
+    premiumAmount: number;
+    renewalDate: string;
+    notes?: string;
+  }>;
+  income?: {
+    primaryIncome: number;
+    salaryFrequency: string;
+    otherIncomeSources?: Array<{ name: string; amount: number; frequency: string }>;
+  };
+  monthlyExpenses?: Array<{
+    category: string;
+    estimatedAmount: number;
+  }>;
+  goals?: Array<{
+    name: string;
+    category: string;
+    targetAmount: number;
+    targetDate: string;
+    currentSavedAmount?: number;
+  }>;
+  dataImportChoice?: string;
+}
+
 export interface OnboardingStep {
   id: string;
   title: string;
@@ -330,3 +474,34 @@ export interface OnboardingProgress {
   isComplete: boolean;
   steps: OnboardingStep[];
 }
+
+export interface InvestmentReturnsResponse {
+  totalInvested?: Money;
+  totalValue?: Money;
+  unrealizedGain?: Money;
+  returnsPercentage?: number;
+  holdings?: Array<{ id: string; name: string; returns: number; value: Money }>;
+}
+
+export interface AssetAllocationResponse {
+  allocations?: Array<{ assetClass: string; amount: Money; percentage: number }>;
+}
+
+export interface DebtBreakdownResponse {
+  totalDebt?: Money;
+  items?: Array<{ id: string; name: string; type: string; amount: Money; interestRate?: number }>;
+}
+
+export interface IncomeTrendResponse {
+  points?: Array<{ date: string; amount: Money }>;
+}
+
+export interface RetirementForecastResponse {
+  currentAge?: number;
+  retirementAge?: number;
+  expectedReturnPercent?: number;
+  projectedCorpus?: Money;
+  monthlySavingsNeeded?: Money;
+}
+
+

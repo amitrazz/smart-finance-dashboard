@@ -1,9 +1,12 @@
 import { useTransactions } from "../../hooks/useFinanceQueries";
 import { formatCurrency } from "../../utils/formatters";
+import { Transaction } from "../../types";
 
 export default function TransactionList() {
   const { data: response, isLoading, isError } = useTransactions();
-  const transactions = response?.data || [];
+  const transactions: Transaction[] = Array.isArray(response)
+    ? (response as Transaction[])
+    : (response as unknown as { data: Transaction[] })?.data || [];
 
   if (isLoading) {
     return (
@@ -30,7 +33,7 @@ export default function TransactionList() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {transactions.slice(0, 5).map((txn) => (
+          {transactions.slice(0, 5).map((txn: Transaction) => (
             <li
               key={txn.id}
               className="flex justify-between items-center p-3 rounded-xl bg-slate-900/60 border border-slate-800 shadow-sm"

@@ -5,9 +5,19 @@ import { useFinancialHealth } from "../../hooks/useFinanceQueries";
 import { Search, Plus, UploadCloud, Sun, Moon, ShieldCheck } from "lucide-react";
 
 export const Navbar: React.FC = () => {
-  const { toggleSearch, setAddTransactionOpen, setImportModalOpen } = useUIStore();
+  const { toggleSearch, setActiveTab, setAddTransactionOpen, setImportModalOpen } = useUIStore();
   const { theme, toggleTheme } = useSettingsStore();
   const { data: health } = useFinancialHealth();
+
+  const handleTransactionClick = () => {
+    setActiveTab("transactions");
+    setAddTransactionOpen(true);
+  };
+
+  const handleImportClick = () => {
+    setActiveTab("imports");
+    setImportModalOpen(true);
+  };
 
   return (
     <header className="h-16 bg-slate-900/60 border-b border-slate-800 backdrop-blur-xl px-6 flex items-center justify-between sticky top-0 z-20">
@@ -35,7 +45,7 @@ export const Navbar: React.FC = () => {
 
         {/* Action Buttons */}
         <button
-          onClick={() => setAddTransactionOpen(true)}
+          onClick={handleTransactionClick}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-all shadow-md shadow-emerald-500/20"
         >
           <Plus className="w-4 h-4" />
@@ -43,7 +53,7 @@ export const Navbar: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setImportModalOpen(true)}
+          onClick={handleImportClick}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700/60 transition-all"
         >
           <UploadCloud className="w-4 h-4 text-teal-400" />

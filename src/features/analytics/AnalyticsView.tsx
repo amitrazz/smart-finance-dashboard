@@ -1,13 +1,81 @@
-import React from "react";
-import { useCashFlow, useNetWorthHistory } from "../../hooks/useFinanceQueries";
+import React, { useMemo, useState } from "react";
+import {
+  useCashFlow,
+  useNetWorthHistory,
+  useTransactions,
+  useInvestmentReturns,
+  useAssetAllocation,
+  useDebtBreakdown,
+  useExpenseTrendAnalytics,
+  useRetirementForecast,
+} from "../../hooks/useFinanceQueries";
 import { formatCurrency, formatPercent } from "../../utils/formatters";
-import { Money } from "../../types";
+import { Money, Transaction, CashFlowSnapshot } from "../../types";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
-import { AlertTriangle, RefreshCw } from "lucide-react";
 
 export const AnalyticsView: React.FC = () => {
-  const { data: cashFlow, isLoading: loadingCashFlow, isError: isErrorCashFlow, error: errCashFlow, refetch: refetchCashFlow } = useCashFlow();
+  const { data: cashFlow, isLoading: loadingCashFlow, isError: errorCashFlow, refetch: refetchCashFlow } = useCashFlow();
   const { data: netWorthHistory = [] } = useNetWorthHistory();
+  const { data: txnsResponse } = useTransactions();
+
+  const { data: investmentReturns } = useInvestmentReturns();
+  const { data: assetAllocation } = useAssetAllocation();
+  const { data: debtBreakdown } = useDebtBreakdown();
+  const { data: expenseTrend } = useExpenseTrendAnalytics();
+
+  const [currentAgeInput, setCurrentAgeInput] = useState<number>(30);
+  const [retirementAgeInput, setRetirementAgeInput] = useState<number>(60);
+  const [expectedReturnInput, setExpectedReturnInput] = useState<string>("8");
+
+  const { data: retirementForecast } = useRetirementForecast({
+    currentAge: currentAgeInput,
+    retirementAge: retirementAgeInput,
+    expectedReturnPercent: expectedReturnInput,
+  });
+
+  // Dynamic fallback calculation if precomputed cash flow snapshot is null
+  const activeCashFlow = useMemo<CashFlowSnapshot>(() => {
+    if (cashFlow && !Array.isArray(cashFlow)) return cashFlow;
+    if (Array.isArray(cashFlow) && cashFlow.length > 0) return cashFlow[0];
+
+    const transactions: Transaction[] = Array.isArray(txnsResponse)
+      ? (txnsResponse as Transaction[])
+      : [];
+
+    let incomeAcc = 0;
+    let expenseAcc = 0;
+    const catMap: Record<string, number> = {};
+
+    transactions.forEach((t) => {
+      const val = Math.abs(parseFloat(t.amount?.amount || "0") || 0);
+      if (t.direction === "INFLOW") {
+        incomeAcc += val;
+      } else if (t.direction === "OUTFLOW") {
+        expenseAcc += val;
+        const cat = t.categoryName || "Uncategorized";
+        catMap[cat] = (catMap[cat] || 0) + val;
+      }
+    });
+
+    const netSavingsVal = incomeAcc - expenseAcc;
+    const savingsRateVal = incomeAcc > 0 ? (netSavingsVal / incomeAcc) * 100 : 0;
+
+    const categoryBreakdown: Array<{ categoryId: string; categoryName: string; amount: Money; percentage: number }> = Object.entries(catMap).map(([categoryName, amt], idx) => ({
+      categoryId: `cat_${idx}`,
+      categoryName,
+      amount: { amount: amt.toFixed(2), currency: "INR" },
+      percentage: expenseAcc > 0 ? Math.round((amt / expenseAcc) * 100) : 0,
+    }));
+
+    return {
+      period: "Current Month",
+      totalIncome: { amount: incomeAcc.toFixed(2), currency: "INR" },
+      totalExpense: { amount: expenseAcc.toFixed(2), currency: "INR" },
+      netSavings: { amount: netSavingsVal.toFixed(2), currency: "INR" },
+      savingsRate: savingsRateVal,
+      categoryBreakdown,
+    };
+  }, [cashFlow, txnsResponse]);
 
   if (loadingCashFlow) {
     return (
@@ -23,82 +91,175 @@ export const AnalyticsView: React.FC = () => {
     );
   }
 
-  if (isErrorCashFlow || !cashFlow) {
+  if (errorCashFlow) {
     return (
-      <div className="p-8 rounded-3xl bg-slate-900/60 border border-rose-500/20 text-center space-y-4">
-        <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
-        <h3 className="text-lg font-bold text-slate-100">Failed to Load Analytics</h3>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
-          {(errCashFlow as Error)?.message || "Could not retrieve cash flow analytics."}
-        </p>
+      <div className="p-8 rounded-3xl bg-rose-950/30 border border-rose-800/50 text-center space-y-4">
+        <p className="text-rose-300 font-semibold">Failed to load financial analytics</p>
         <button
           onClick={() => refetchCashFlow()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all"
+          className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-medium text-xs transition"
         >
-          <RefreshCw className="w-4 h-4" /> Retry
+          Retry Loading
         </button>
       </div>
     );
   }
 
-  // Derive trend series from historical snapshots if available
+  const cfSnapshot = activeCashFlow;
+
   const monthlyTrendData = netWorthHistory.length > 0
     ? netWorthHistory.map((h) => ({
         month: new Date(h.date).toLocaleDateString("en-IN", { month: "short" }),
-        Income: parseFloat(cashFlow.totalIncome?.amount || "0"),
-        Expense: parseFloat(cashFlow.totalExpense?.amount || "0"),
-        Savings: parseFloat(cashFlow.netSavings?.amount || "0"),
+        Income: parseFloat(cfSnapshot.totalIncome?.amount || "0"),
+        Expense: parseFloat(cfSnapshot.totalExpense?.amount || "0"),
+        Savings: parseFloat(cfSnapshot.netSavings?.amount || "0"),
       }))
     : [
         {
-          month: cashFlow.period || "Current",
-          Income: parseFloat(cashFlow.totalIncome?.amount || "0"),
-          Expense: parseFloat(cashFlow.totalExpense?.amount || "0"),
-          Savings: parseFloat(cashFlow.netSavings?.amount || "0"),
+          month: cfSnapshot.period || "Current",
+          Income: parseFloat(cfSnapshot.totalIncome?.amount || "0"),
+          Expense: parseFloat(cfSnapshot.totalExpense?.amount || "0"),
+          Savings: parseFloat(cfSnapshot.netSavings?.amount || "0"),
         },
       ];
 
-  const categoryBreakdown = cashFlow.categoryBreakdown || [];
+  const categoryBreakdown = cfSnapshot.categoryBreakdown || [];
 
-  const pieData = categoryBreakdown.map((c: { categoryName: string; amount?: { amount: string } }, idx: number) => ({
+  const pieData = categoryBreakdown.map((c, idx) => ({
     name: c.categoryName,
     value: parseFloat(c.amount?.amount || "0"),
     color: ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"][idx % 6],
   }));
+
+  const assetAllocData = assetAllocation?.allocations?.map((a, idx) => ({
+    name: a.assetClass,
+    value: parseFloat(a.amount?.amount || "0"),
+    color: ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"][idx % 5],
+  })) || [];
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-slate-100">Financial Analytics & Cash Flow Trends</h2>
-        <p className="text-xs text-slate-400">Precomputed snapshot analytics over cash flow, income vs expenses, and category trends</p>
+        <p className="text-xs text-slate-400">Comprehensive snapshot analytics over cash flow, asset allocation, investment returns & debt</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Total Income</p>
-          <p className="text-2xl font-extrabold text-emerald-400 mt-1">{formatCurrency(cashFlow.totalIncome)}</p>
+          <p className="text-2xl font-extrabold text-emerald-400 mt-1">{formatCurrency(cfSnapshot.totalIncome)}</p>
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Total Expenses</p>
-          <p className="text-2xl font-extrabold text-rose-400 mt-1">{formatCurrency(cashFlow.totalExpense)}</p>
+          <p className="text-2xl font-extrabold text-rose-400 mt-1">{formatCurrency(cfSnapshot.totalExpense)}</p>
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Net Savings Surplus</p>
-          <p className="text-2xl font-extrabold text-teal-400 mt-1">{formatCurrency(cashFlow.netSavings)}</p>
-          <p className="text-xs text-teal-400 font-semibold">{formatPercent(cashFlow.savingsRate)} Savings Rate</p>
+          <p className="text-2xl font-extrabold text-teal-400 mt-1">{formatCurrency(cfSnapshot.netSavings)}</p>
+          <p className="text-xs text-teal-400 font-semibold">{formatPercent(cfSnapshot.savingsRate)} Savings Rate</p>
         </div>
       </div>
 
-      {/* Bar Chart */}
+      {/* Backend Analytics Widgets Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Investment Returns Card */}
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <h3 className="font-bold text-base text-slate-100">Investment Returns</h3>
+          {investmentReturns ? (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Total Value</span>
+                <span className="font-bold text-slate-200">{formatCurrency(investmentReturns.totalValue)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Unrealized Gain</span>
+                <span className="font-bold text-emerald-400">{formatCurrency(investmentReturns.unrealizedGain)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Returns Rate</span>
+                <span className="font-bold text-indigo-400">{formatPercent(investmentReturns.returnsPercentage || 0)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">Live portfolio returns calculated from active holdings.</p>
+          )}
+        </div>
+
+        {/* Debt Breakdown Card */}
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <h3 className="font-bold text-base text-slate-100">Debt Breakdown</h3>
+          {debtBreakdown ? (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Total Outstanding Debt</span>
+                <span className="font-bold text-rose-400">{formatCurrency(debtBreakdown.totalDebt)}</span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">Active loans & credit obligations tracked</p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">Debt analysis across active loans and credit cards.</p>
+          )}
+        </div>
+
+        {/* Retirement Forecast Card */}
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <h3 className="font-bold text-base text-slate-100">Retirement Projection</h3>
+          <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+            <div>
+              <label className="text-[10px] text-slate-400 block">Age</label>
+              <input
+                type="number"
+                value={currentAgeInput}
+                onChange={(e) => setCurrentAgeInput(Number(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 block">Target</label>
+              <input
+                type="number"
+                value={retirementAgeInput}
+                onChange={(e) => setRetirementAgeInput(Number(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 block">Return %</label>
+              <input
+                type="text"
+                value={expectedReturnInput}
+                onChange={(e) => setExpectedReturnInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-slate-200"
+              />
+            </div>
+          </div>
+          {retirementForecast?.projectedCorpus && (
+            <div className="text-xs flex justify-between items-center pt-1 border-t border-slate-800/60">
+              <span className="text-slate-400">Projected Corpus:</span>
+              <span className="font-bold text-emerald-400 text-sm">{formatCurrency(retirementForecast.projectedCorpus)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Income vs Expense Trend */}
       <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
         <h3 className="font-bold text-base text-slate-100">Income vs Expense Trend</h3>
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyTrendData}>
+            <BarChart data={expenseTrend && expenseTrend.length > 0 ? expenseTrend.map(e => ({ month: e.month, Expense: parseFloat(e.amount?.amount || "0") })) : monthlyTrendData}>
               <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} />
-              <YAxis stroke="#64748b" fontSize={12} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+              <YAxis
+                stroke="#64748b"
+                fontSize={12}
+                tickLine={false}
+                tickFormatter={(v) => {
+                  const n = typeof v === "number" ? v : parseFloat(String(v || "0")) || 0;
+                  return `₹${(n / 1000).toFixed(0)}k`;
+                }}
+              />
               <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px" }} />
               <Legend wrapperStyle={{ paddingTop: "10px" }} />
               <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -109,7 +270,7 @@ export const AnalyticsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Breakdown */}
+      {/* Asset Allocation & Category Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
           <h3 className="font-bold text-base text-slate-100">Category Spend Distribution</h3>
@@ -122,7 +283,7 @@ export const AnalyticsView: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={4}>
-                    {pieData.map((entry: { name: string; value: number; color: string }, index: number) => (
+                    {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -133,21 +294,24 @@ export const AnalyticsView: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
-          <h3 className="font-bold text-base text-slate-100">Top Spend Categories</h3>
-          <div className="space-y-3">
-            {categoryBreakdown.length === 0 ? (
-              <p className="text-xs text-slate-500 py-4 text-center">No categories recorded.</p>
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+          <h3 className="font-bold text-base text-slate-100">Asset Allocation Breakdown</h3>
+          <div className="h-56 w-full my-2">
+            {assetAllocData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                Asset allocation precomputed per asset class.
+              </div>
             ) : (
-              categoryBreakdown.map((cat: { categoryId: string; categoryName: string; amount: Money; percentage: number }) => (
-                <div key={cat.categoryId} className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center justify-between">
-                  <span className="font-semibold text-slate-200 text-sm">{cat.categoryName}</span>
-                  <div className="text-right">
-                    <span className="font-bold text-slate-100 text-sm">{formatCurrency(cat.amount)}</span>
-                    <p className="text-xs text-slate-400">{cat.percentage}% of total</p>
-                  </div>
-                </div>
-              ))
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={assetAllocData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={4}>
+                    {assetAllocData.map((entry, index) => (
+                      <Cell key={`cell-alloc-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px" }} />
+                </PieChart>
+              </ResponsiveContainer>
             )}
           </div>
         </div>

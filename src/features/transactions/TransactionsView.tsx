@@ -1,39 +1,74 @@
-import React, { useState } from "react";
-import { useTransactions, useCreateTransaction, useBulkCategorize, useAccounts } from "../../hooks/useFinanceQueries";
+import React, { useState, useMemo, useEffect } from "react";
+import { useTransactions, useCreateTransaction, useBulkCategorize, useAccounts, useCategories } from "../../hooks/useFinanceQueries";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { Transaction, TransactionDirection } from "../../types";
 import { Search, Plus, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw, Tag, X, Check, AlertTriangle, RefreshCw } from "lucide-react";
+import { Pagination } from "../../components/common/Pagination";
+import { useUIStore } from "../../store/useUIStore";
 
 export const TransactionsView: React.FC = () => {
+  const { isAddTransactionOpen, setAddTransactionOpen } = useUIStore();
   const [filterDirection, setFilterDirection] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedTxnDrawer, setSelectedTxnDrawer] = useState<Transaction | null>(null);
 
+  // Sync isAddTransactionOpen from global store
+  useEffect(() => {
+    if (isAddTransactionOpen) {
+      setModalOpen(true);
+    }
+  }, [isAddTransactionOpen]);
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setAddTransactionOpen(false);
+  };
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const { data: txnsResponse, isLoading, isError, error, refetch } = useTransactions();
   const { data: accounts = [] } = useAccounts();
+  const { data: categories = [] } = useCategories();
   const createTxnMutation = useCreateTransaction();
   const bulkCategorizeMutation = useBulkCategorize();
 
-  // Form State
-  const [accountId, setAccountId] = useState(accounts[0]?.id || "");
+  // Form State — accountId synced from loaded accounts to avoid stale "" closure
+  const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [direction, setDirection] = useState<TransactionDirection>("OUTFLOW");
   const [categoryName, setCategoryName] = useState("Dining & Food");
 
-  const transactions = txnsResponse?.data || [];
+  // Sync accountId when accounts data loads
+  useEffect(() => {
+    if (accounts.length > 0 && !accountId) {
+      setAccountId(accounts[0].id);
+    }
+  }, [accounts, accountId]);
 
-  const filteredTxns = transactions.filter((t) => {
-    const matchesDirection = filterDirection === "ALL" || t.direction === filterDirection;
-    const matchesSearch =
-      searchQuery.trim() === "" ||
-      t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.categoryName && t.categoryName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.merchantName && t.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesDirection && matchesSearch;
-  });
+  // Memoize filtered transactions to avoid recomputing on every render
+  const filteredTxns = useMemo(() => {
+    const transactions: Transaction[] = Array.isArray(txnsResponse)
+      ? (txnsResponse as Transaction[])
+      : (txnsResponse as unknown as { data: Transaction[] })?.data || [];
+    return transactions.filter((t: Transaction) => {
+      const matchesDirection = filterDirection === "ALL" || t.direction === filterDirection;
+      const matchesSearch =
+        searchQuery.trim() === "" ||
+        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.categoryName && t.categoryName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (t.merchantName && t.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesDirection && matchesSearch;
+    });
+  }, [txnsResponse, filterDirection, searchQuery]);
+
+  const totalPages = Math.ceil(filteredTxns.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedTxns = filteredTxns.slice(startIndex, startIndex + pageSize);
 
   const toggleSelectTxn = (id: string) => {
     setSelectedTxnIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
@@ -43,17 +78,16 @@ export const TransactionsView: React.FC = () => {
     e.preventDefault();
     createTxnMutation.mutate(
       {
-        accountId: accountId || accounts[0]?.id || "acc_1",
+        accountId: accountId || accounts[0]?.id || "",
         description,
-        amount: { amount, currency: "INR" },
+        amount,
         direction,
         categoryName,
-        date: new Date().toISOString().split("T")[0],
-        createdAt: new Date().toISOString(),
+        transactionDate: new Date().toISOString(),
       },
       {
         onSuccess: () => {
-          setModalOpen(false);
+          handleCloseModal();
           setDescription("");
           setAmount("");
         },
@@ -122,8 +156,15 @@ export const TransactionsView: React.FC = () => {
           )}
 
           <button
+            onClick={() => useUIStore.getState().showToast("Categories are managed in master settings", "info")}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-all border border-slate-700"
+          >
+            <Tag className="w-4 h-4 text-purple-400" /> Categories
+          </button>
+
+          <button
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-emerald-500/20"
           >
             <Plus className="w-4 h-4" /> Add Transaction
           </button>
@@ -190,7 +231,7 @@ export const TransactionsView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredTxns.map((txn) => (
+                paginatedTxns.map((txn) => (
                   <tr
                     key={txn.id}
                     onClick={() => setSelectedTxnDrawer(txn)}
@@ -248,6 +289,19 @@ export const TransactionsView: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredTxns.length}
+          pageSize={pageSize}
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </div>
 
       {/* Detail Drawer */}
@@ -298,7 +352,7 @@ export const TransactionsView: React.FC = () => {
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-lg text-slate-100">Log Manual Transaction</h3>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={handleCloseModal} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -359,12 +413,17 @@ export const TransactionsView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Category</label>
-                <input
-                  type="text"
+                <select
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none"
-                />
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -387,6 +446,7 @@ export const TransactionsView: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -23,29 +23,19 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
   theme: "dark",
 
-  setTheme: (theme) => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    set((state) => ({ theme, settings: { ...state.settings, theme } }));
-  },
+  // Pure state updates only — DOM class sync is handled by AppShell.tsx useEffect
+  setTheme: (theme) =>
+    set((state) => ({ theme, settings: { ...state.settings, theme } })),
 
-  toggleTheme: () => {
+  toggleTheme: () =>
     set((state) => {
       const nextTheme = state.theme === "dark" ? "light" : "dark";
-      if (nextTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
       return { theme: nextTheme, settings: { ...state.settings, theme: nextTheme } };
-    });
-  },
+    }),
 
   updateSettings: (newSettings) =>
     set((state) => ({
       settings: { ...state.settings, ...newSettings },
     })),
 }));
+
