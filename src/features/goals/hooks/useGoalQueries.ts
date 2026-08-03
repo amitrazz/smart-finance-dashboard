@@ -1,40 +1,45 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../../services/api/endpoints";
-import { useAuthStore } from "../../../store/useAuthStore";
-import { useUIStore } from "../../../store/useUIStore";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../../services/api/endpoints';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { useUIStore } from '../../../store/useUIStore';
 import {
+  CreateContributionInput,
+  CreateGoalInput,
+  CreateMilestoneInput,
   Goal,
-  GoalDashboardData,
+  GoalAnalytics,
+  GoalBeneficiary,
   GoalContribution,
-  GoalMilestone,
+  GoalDashboardData,
+  GoalDocument,
   GoalForecast,
   GoalForecastSummary,
-  GoalAnalytics,
+  GoalMilestone,
   GoalProjection,
-  GoalDocument,
-  GoalBeneficiary,
   GoalTemplate,
-  CreateGoalInput,
   UpdateGoalInput,
-  CreateContributionInput,
-  CreateMilestoneInput,
-} from "../../../types";
+} from '../../../types';
 
 const isAuth = () => useAuthStore.getState().isAuthenticated;
 
 const getErrorMessage = (err: unknown): string => {
-  if (err !== null && typeof err === "object") {
-    if ("userMessage" in err) return String((err as { userMessage: unknown }).userMessage);
-    if ("message" in err) return String((err as { message: unknown }).message);
-    if ("error" in err) return String((err as { error: unknown }).error);
+  if (err !== null && typeof err === 'object') {
+    if ('userMessage' in err) return String((err as { userMessage: unknown }).userMessage);
+    if ('message' in err) return String((err as { message: unknown }).message);
+    if ('error' in err) return String((err as { error: unknown }).error);
   }
-  return "An unexpected error occurred. Please try again.";
+  return 'An unexpected error occurred. Please try again.';
 };
 
 const unwrapList = <T>(res: unknown): T[] => {
   if (!res) return [];
   if (Array.isArray(res)) return res as T[];
-  if (typeof res === "object" && res !== null && "data" in res && Array.isArray((res as { data: unknown }).data)) {
+  if (
+    typeof res === 'object' &&
+    res !== null &&
+    'data' in res &&
+    Array.isArray((res as { data: unknown }).data)
+  ) {
     return (res as { data: T[] }).data;
   }
   return [];
@@ -48,17 +53,23 @@ const unwrapList = <T>(res: unknown): T[] => {
 // `inflationRate` stored as 0-1 decimals instead of whole percents). These
 // mappers translate the wire shape once, here, so every component can keep
 // using the app-facing field names.
-const toMoney = (amount: string | number | null | undefined, currency = "INR"): { amount: string; currency: string } => ({
-  amount: amount != null ? String(amount) : "0",
+const toMoney = (
+  amount: string | number | null | undefined,
+  currency = 'INR',
+): { amount: string; currency: string } => ({
+  amount: amount != null ? String(amount) : '0',
   currency,
 });
 
 const toPercent = (ratio: string | number | null | undefined): number => {
-  const n = typeof ratio === "number" ? ratio : parseFloat(String(ratio ?? ""));
+  const n = typeof ratio === 'number' ? ratio : parseFloat(String(ratio ?? ''));
   return !isNaN(n) ? n * 100 : 0;
 };
 
-interface RawGoal extends Omit<Goal, "expectedReturnRate" | "inflationRate" | "currentAmount" | "targetAmount"> {
+interface RawGoal extends Omit<
+  Goal,
+  'expectedReturnRate' | 'inflationRate' | 'currentAmount' | 'targetAmount'
+> {
   expectedReturnRate: string | number | null;
   inflationRate: string | number | null;
   currentAmount?: { amount: string; currency: string };
@@ -95,7 +106,7 @@ function mapGoalMilestone(raw: RawGoalMilestone): GoalMilestone {
     thresholdPercent: raw.thresholdPercent ?? null,
     targetAmount: raw.targetAmount ? toMoney(raw.targetAmount) : null,
     targetDate: raw.targetDate ?? null,
-    status: raw.status === "ACHIEVED" ? "ACHIEVED" : "PENDING",
+    status: raw.status === 'ACHIEVED' ? 'ACHIEVED' : 'PENDING',
     isStandard: raw.isStandard,
     achievedDate: raw.achievedDate ?? null,
     version: raw.version,
@@ -148,14 +159,18 @@ function mapGoalForecast(raw: RawGoalForecast): GoalForecast {
     goalId: raw.goalId,
     goalName: raw.name,
     expectedCompletionDate: raw.projectedCompletionDate,
-    monthlyRequiredContribution: raw.requiredMonthlyContribution ? toMoney(raw.requiredMonthlyContribution) : null,
+    monthlyRequiredContribution: raw.requiredMonthlyContribution
+      ? toMoney(raw.requiredMonthlyContribution)
+      : null,
     fundingGap: toMoney(raw.remainingAmount),
     monthlyContributionRate: toMoney(raw.monthlyContributionRate),
     monthsRemaining: raw.monthsRemaining,
     targetDate: raw.targetDate,
     isBehindSchedule: raw.isBehindSchedule,
     projectedFutureValue: toMoney(raw.projectedFutureValue),
-    inflationAdjustedTarget: raw.inflationAdjustedTarget ? toMoney(raw.inflationAdjustedTarget) : null,
+    inflationAdjustedTarget: raw.inflationAdjustedTarget
+      ? toMoney(raw.inflationAdjustedTarget)
+      : null,
   };
 }
 
@@ -182,8 +197,8 @@ interface RawGoalProjection {
   expectedProgressRatio: string | number;
   actualProgressRatio: string | number;
   delayMonths: number | null;
-  contributionTrend: "INCREASING" | "STABLE" | "DECREASING";
-  riskLevel: GoalProjection["riskLevel"];
+  contributionTrend: 'INCREASING' | 'STABLE' | 'DECREASING';
+  riskLevel: GoalProjection['riskLevel'];
 }
 
 function mapGoalProjection(raw: RawGoalProjection): GoalProjection {
@@ -202,7 +217,11 @@ interface RawGoalAnalytics {
   corpus: { corpusValue: string; contributionValue: string; investmentValue: string };
   forecast: RawGoalForecastSummary;
   projection: RawGoalProjection;
-  health: { score: number; band: GoalAnalytics["health"]["band"]; components: { contributionConsistency: number; progressAlignment: number; fundingGap: number } };
+  health: {
+    score: number;
+    band: GoalAnalytics['health']['band'];
+    components: { contributionConsistency: number; progressAlignment: number; fundingGap: number };
+  };
   contributionTrend: Array<{ month: string; total: string }>;
   corpusGrowth: Array<{ date: string; corpusValue: string }>;
   milestoneProgress: { achieved: number; total: number };
@@ -226,8 +245,14 @@ function mapGoalAnalytics(raw: RawGoalAnalytics): GoalAnalytics {
       progressAlignment: raw.health.components.progressAlignment,
       fundingGap: raw.health.components.fundingGap,
     },
-    contributionTrend: raw.contributionTrend.map((p) => ({ month: p.month, amount: toMoney(p.total) })),
-    corpusGrowth: raw.corpusGrowth.map((p) => ({ date: p.date, corpusValue: toMoney(p.corpusValue) })),
+    contributionTrend: raw.contributionTrend.map((p) => ({
+      month: p.month,
+      amount: toMoney(p.total),
+    })),
+    corpusGrowth: raw.corpusGrowth.map((p) => ({
+      date: p.date,
+      corpusValue: toMoney(p.corpusValue),
+    })),
     milestoneProgress: raw.milestoneProgress,
     investmentAllocation: {
       linkedHoldingCount: raw.investmentAllocation.linkedHoldingCount,
@@ -253,11 +278,15 @@ function mapGoalTemplate(raw: RawGoalTemplate): GoalTemplate {
   return {
     id: raw.id,
     name: raw.name,
-    goalType: raw.goalType as GoalTemplate["goalType"],
+    goalType: raw.goalType as GoalTemplate['goalType'],
     description: raw.description ?? undefined,
-    suggestedTargetAmount: raw.suggestedTargetAmount ? toMoney(raw.suggestedTargetAmount) : undefined,
+    suggestedTargetAmount: raw.suggestedTargetAmount
+      ? toMoney(raw.suggestedTargetAmount)
+      : undefined,
     suggestedDurationMonths: raw.suggestedDurationMonths ?? undefined,
-    suggestedMonthlyContribution: raw.suggestedMonthlyContribution ? toMoney(raw.suggestedMonthlyContribution) : undefined,
+    suggestedMonthlyContribution: raw.suggestedMonthlyContribution
+      ? toMoney(raw.suggestedMonthlyContribution)
+      : undefined,
     icon: raw.icon ?? undefined,
     color: raw.color ?? undefined,
     isPlatformCurated: raw.isPlatformCurated,
@@ -281,7 +310,7 @@ function mapGoalBeneficiary(raw: RawGoalBeneficiary): GoalBeneficiary {
     id: raw.id,
     goalId: raw.goalId,
     name: raw.name,
-    relationship: raw.relationship as GoalBeneficiary["relationship"],
+    relationship: raw.relationship as GoalBeneficiary['relationship'],
     allocationPercentage: parseFloat(raw.allocationPercentage) || 0,
     email: raw.email ?? undefined,
     phone: raw.phone ?? undefined,
@@ -292,21 +321,31 @@ function mapGoalBeneficiary(raw: RawGoalBeneficiary): GoalBeneficiary {
 
 // Request-side counterparts: the API only accepts `contributedAt`/`note` and
 // `title` — translate the app-facing field names back before sending.
-function toContributionPayload(data: { amount?: string | { amount: string }; date?: string; notes?: string }): Record<string, unknown> {
+function toContributionPayload(data: {
+  amount?: string | { amount: string };
+  date?: string;
+  notes?: string;
+}): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   if (data.amount !== undefined) {
-    payload.amount = typeof data.amount === "object" ? data.amount.amount : data.amount;
+    payload.amount = typeof data.amount === 'object' ? data.amount.amount : data.amount;
   }
   if (data.date) payload.contributedAt = data.date;
   if (data.notes) payload.note = data.notes;
   return payload;
 }
 
-function toMilestonePayload(data: { name?: string; targetAmount?: string | { amount: string }; targetDate?: string; thresholdPercent?: string | null }): Record<string, unknown> {
+function toMilestonePayload(data: {
+  name?: string;
+  targetAmount?: string | { amount: string };
+  targetDate?: string;
+  thresholdPercent?: string | null;
+}): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   if (data.name !== undefined) payload.title = data.name;
   if (data.targetAmount !== undefined) {
-    payload.targetAmount = typeof data.targetAmount === "object" ? data.targetAmount.amount : data.targetAmount;
+    payload.targetAmount =
+      typeof data.targetAmount === 'object' ? data.targetAmount.amount : data.targetAmount;
   }
   if (data.targetDate !== undefined) payload.targetDate = data.targetDate;
   if (data.thresholdPercent !== undefined) payload.thresholdPercent = data.thresholdPercent;
@@ -314,18 +353,19 @@ function toMilestonePayload(data: { name?: string; targetAmount?: string | { amo
 }
 
 export const GOAL_QUERY_KEYS = {
-  all: ["goals"] as const,
-  list: (params?: Record<string, unknown>) => ["goals", "list", params] as const,
-  dashboard: ["goals", "dashboard"] as const,
-  detail: (id: string) => ["goals", "detail", id] as const,
-  projection: (goalId: string) => ["goals", "projection", goalId] as const,
-  contributions: (goalId: string, params?: Record<string, unknown>) => ["goals", "contributions", goalId, params] as const,
-  milestones: (goalId: string) => ["goals", "milestones", goalId] as const,
-  forecast: (goalId: string) => ["goals", "forecast", goalId] as const,
-  analytics: (goalId: string) => ["goals", "analytics", goalId] as const,
-  documents: (goalId: string) => ["goals", "documents", goalId] as const,
-  beneficiaries: (goalId: string) => ["goals", "beneficiaries", goalId] as const,
-  templates: ["goals", "templates"] as const,
+  all: ['goals'] as const,
+  list: (params?: Record<string, unknown>) => ['goals', 'list', params] as const,
+  dashboard: ['goals', 'dashboard'] as const,
+  detail: (id: string) => ['goals', 'detail', id] as const,
+  projection: (goalId: string) => ['goals', 'projection', goalId] as const,
+  contributions: (goalId: string, params?: Record<string, unknown>) =>
+    ['goals', 'contributions', goalId, params] as const,
+  milestones: (goalId: string) => ['goals', 'milestones', goalId] as const,
+  forecast: (goalId: string) => ['goals', 'forecast', goalId] as const,
+  analytics: (goalId: string) => ['goals', 'analytics', goalId] as const,
+  documents: (goalId: string) => ['goals', 'documents', goalId] as const,
+  beneficiaries: (goalId: string) => ['goals', 'beneficiaries', goalId] as const,
+  templates: ['goals', 'templates'] as const,
 };
 
 // Goals Queries
@@ -362,48 +402,56 @@ export function useCreateGoal() {
     mutationFn: (data: CreateGoalInput | Partial<Goal>) => api.createGoal(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["netWorth"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar"] });
-      useUIStore.getState().showToast("Goal created successfully", "success");
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['netWorth'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      useUIStore.getState().showToast('Goal created successfully', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useUpdateGoal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data, version = 1 }: { id: string; data: UpdateGoalInput | Partial<Goal>; version?: number }) =>
-      api.updateGoal(id, data, version),
+    mutationFn: ({
+      id,
+      data,
+      version = 1,
+    }: {
+      id: string;
+      data: UpdateGoalInput | Partial<Goal>;
+      version?: number;
+    }) => api.updateGoal(id, data, version),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.id) });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      useUIStore.getState().showToast("Goal updated successfully", "success");
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      useUIStore.getState().showToast('Goal updated successfully', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useDeleteGoal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, version = 1 }: { id: string; version?: number }) => api.deleteGoal(id, version),
+    mutationFn: ({ id, version = 1 }: { id: string; version?: number }) =>
+      api.deleteGoal(id, version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar"] });
-      useUIStore.getState().showToast("Goal deleted successfully", "info");
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      useUIStore.getState().showToast('Goal deleted successfully', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 // Status transitions
 function useGoalStatusTransition(
   apiFn: (id: string, version: number) => Promise<Goal>,
-  successMessage: string
+  successMessage: string,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -411,31 +459,34 @@ function useGoalStatusTransition(
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.id) });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      useUIStore.getState().showToast(successMessage, "success");
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      useUIStore.getState().showToast(successMessage, 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useActivateGoal() {
-  return useGoalStatusTransition(api.activateGoal, "Goal activated");
+  return useGoalStatusTransition(api.activateGoal, 'Goal activated');
 }
 export function usePauseGoal() {
-  return useGoalStatusTransition(api.pauseGoal, "Goal paused");
+  return useGoalStatusTransition(api.pauseGoal, 'Goal paused');
 }
 export function useResumeGoal() {
-  return useGoalStatusTransition(api.resumeGoal, "Goal resumed");
+  return useGoalStatusTransition(api.resumeGoal, 'Goal resumed');
 }
 export function useCancelGoal() {
-  return useGoalStatusTransition(api.cancelGoal, "Goal cancelled");
+  return useGoalStatusTransition(api.cancelGoal, 'Goal cancelled');
 }
 export function useArchiveGoal() {
-  return useGoalStatusTransition(api.archiveGoal, "Goal archived");
+  return useGoalStatusTransition(api.archiveGoal, 'Goal archived');
 }
 
 // Contributions Queries & Mutations — per-goal only, no cross-goal aggregate.
-export function useGoalContributions(goalId: string, params?: Record<string, string | number | boolean | undefined>) {
+export function useGoalContributions(
+  goalId: string,
+  params?: Record<string, string | number | boolean | undefined>,
+) {
   return useQuery({
     queryKey: GOAL_QUERY_KEYS.contributions(goalId, params),
     queryFn: async (): Promise<GoalContribution[]> => {
@@ -449,17 +500,22 @@ export function useGoalContributions(goalId: string, params?: Record<string, str
 export function useRecordGoalContribution() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, data }: { goalId: string; data: CreateContributionInput | { amount: string; date?: string; notes?: string } }) =>
-      api.recordGoalContribution(goalId, toContributionPayload(data)),
+    mutationFn: ({
+      goalId,
+      data,
+    }: {
+      goalId: string;
+      data: CreateContributionInput | { amount: string; date?: string; notes?: string };
+    }) => api.recordGoalContribution(goalId, toContributionPayload(data)),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.contributions(variables.goalId) });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      useUIStore.getState().showToast("Contribution recorded successfully", "success");
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      useUIStore.getState().showToast('Contribution recorded successfully', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -468,30 +524,54 @@ export const useAddGoalContribution = useRecordGoalContribution;
 export function useUpdateGoalContribution() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, contributionId, data, expectedVersion }: { goalId: string; contributionId: string; data: Partial<GoalContribution>; expectedVersion: number }) =>
-      api.updateGoalContribution(goalId, contributionId, toContributionPayload(data as unknown as { amount?: string; date?: string; notes?: string }), expectedVersion),
+    mutationFn: ({
+      goalId,
+      contributionId,
+      data,
+      expectedVersion,
+    }: {
+      goalId: string;
+      contributionId: string;
+      data: Partial<GoalContribution>;
+      expectedVersion: number;
+    }) =>
+      api.updateGoalContribution(
+        goalId,
+        contributionId,
+        toContributionPayload(
+          data as unknown as { amount?: string; date?: string; notes?: string },
+        ),
+        expectedVersion,
+      ),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.contributions(variables.goalId) });
-      useUIStore.getState().showToast("Contribution updated", "success");
+      useUIStore.getState().showToast('Contribution updated', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useDeleteGoalContribution() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, contributionId, version }: { goalId: string; contributionId: string; version: number }) =>
-      api.deleteGoalContribution(goalId, contributionId, version),
+    mutationFn: ({
+      goalId,
+      contributionId,
+      version,
+    }: {
+      goalId: string;
+      contributionId: string;
+      version: number;
+    }) => api.deleteGoalContribution(goalId, contributionId, version),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.contributions(variables.goalId) });
-      useUIStore.getState().showToast("Contribution deleted", "info");
+      useUIStore.getState().showToast('Contribution deleted', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -510,45 +590,76 @@ export function useGoalMilestones(goalId: string) {
 export function useAddGoalMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, data }: { goalId: string; data: CreateMilestoneInput | Partial<GoalMilestone> }) =>
-      api.addGoalMilestone(goalId, toMilestonePayload(data as { name?: string; targetAmount?: string; targetDate?: string })),
+    mutationFn: ({
+      goalId,
+      data,
+    }: {
+      goalId: string;
+      data: CreateMilestoneInput | Partial<GoalMilestone>;
+    }) =>
+      api.addGoalMilestone(
+        goalId,
+        toMilestonePayload(data as { name?: string; targetAmount?: string; targetDate?: string }),
+      ),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.milestones(variables.goalId) });
-      useUIStore.getState().showToast("Milestone added successfully", "success");
+      useUIStore.getState().showToast('Milestone added successfully', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useUpdateGoalMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, milestoneId, data, expectedVersion }: { goalId: string; milestoneId: string; data: Partial<GoalMilestone>; expectedVersion: number }) =>
-      api.updateGoalMilestone(goalId, milestoneId, toMilestonePayload(data as { name?: string; targetAmount?: string; targetDate?: string }), expectedVersion),
+    mutationFn: ({
+      goalId,
+      milestoneId,
+      data,
+      expectedVersion,
+    }: {
+      goalId: string;
+      milestoneId: string;
+      data: Partial<GoalMilestone>;
+      expectedVersion: number;
+    }) =>
+      api.updateGoalMilestone(
+        goalId,
+        milestoneId,
+        toMilestonePayload(data as { name?: string; targetAmount?: string; targetDate?: string }),
+        expectedVersion,
+      ),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.milestones(variables.goalId) });
-      useUIStore.getState().showToast("Milestone updated", "success");
+      useUIStore.getState().showToast('Milestone updated', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useDeleteGoalMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, milestoneId, version }: { goalId: string; milestoneId: string; version: number }) =>
-      api.deleteGoalMilestone(goalId, milestoneId, version),
+    mutationFn: ({
+      goalId,
+      milestoneId,
+      version,
+    }: {
+      goalId: string;
+      milestoneId: string;
+      version: number;
+    }) => api.deleteGoalMilestone(goalId, milestoneId, version),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.detail(variables.goalId) });
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.milestones(variables.goalId) });
-      useUIStore.getState().showToast("Milestone deleted", "info");
+      useUIStore.getState().showToast('Milestone deleted', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -557,7 +668,8 @@ export function useDeleteGoalMilestone() {
 export function useGoalForecast(goalId: string) {
   return useQuery({
     queryKey: GOAL_QUERY_KEYS.forecast(goalId),
-    queryFn: async (): Promise<GoalForecast> => mapGoalForecast((await api.getGoalForecast(goalId)) as unknown as RawGoalForecast),
+    queryFn: async (): Promise<GoalForecast> =>
+      mapGoalForecast((await api.getGoalForecast(goalId)) as unknown as RawGoalForecast),
     enabled: isAuth() && Boolean(goalId),
   });
 }
@@ -565,7 +677,8 @@ export function useGoalForecast(goalId: string) {
 export function useGoalAnalytics(goalId: string) {
   return useQuery({
     queryKey: GOAL_QUERY_KEYS.analytics(goalId),
-    queryFn: async (): Promise<GoalAnalytics> => mapGoalAnalytics((await api.getGoalAnalytics(goalId)) as unknown as RawGoalAnalytics),
+    queryFn: async (): Promise<GoalAnalytics> =>
+      mapGoalAnalytics((await api.getGoalAnalytics(goalId)) as unknown as RawGoalAnalytics),
     enabled: isAuth() && Boolean(goalId),
   });
 }
@@ -573,7 +686,8 @@ export function useGoalAnalytics(goalId: string) {
 export function useGoalProjection(goalId: string) {
   return useQuery({
     queryKey: GOAL_QUERY_KEYS.projection(goalId),
-    queryFn: async (): Promise<GoalProjection> => mapGoalProjection((await api.getGoalProjection(goalId)) as unknown as RawGoalProjection),
+    queryFn: async (): Promise<GoalProjection> =>
+      mapGoalProjection((await api.getGoalProjection(goalId)) as unknown as RawGoalProjection),
     enabled: isAuth() && Boolean(goalId),
   });
 }
@@ -596,9 +710,9 @@ export function useCreateGoalTemplate() {
     mutationFn: (data: Partial<GoalTemplate>) => api.createGoalTemplate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.templates });
-      useUIStore.getState().showToast("Goal template created", "success");
+      useUIStore.getState().showToast('Goal template created', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -608,9 +722,9 @@ export function useDeleteGoalTemplate() {
     mutationFn: (templateId: string) => api.deleteGoalTemplate(templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.templates });
-      useUIStore.getState().showToast("Template deleted", "info");
+      useUIStore.getState().showToast('Template deleted', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -621,9 +735,9 @@ export function useApplyGoalTemplate() {
       api.applyGoalTemplate(templateId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.all });
-      useUIStore.getState().showToast("Template applied to create goal", "success");
+      useUIStore.getState().showToast('Template applied to create goal', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -643,13 +757,25 @@ export function useGoalDocuments(goalId: string) {
 export function useRegisterGoalDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, data }: { goalId: string; data: { category: string; fileName: string; storageKey: string; mimeType: string; sizeBytes: number; notes?: string } }) =>
-      api.registerGoalDocument(goalId, data),
+    mutationFn: ({
+      goalId,
+      data,
+    }: {
+      goalId: string;
+      data: {
+        category: string;
+        fileName: string;
+        storageKey: string;
+        mimeType: string;
+        sizeBytes: number;
+        notes?: string;
+      };
+    }) => api.registerGoalDocument(goalId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.documents(variables.goalId) });
-      useUIStore.getState().showToast("Document added successfully", "success");
+      useUIStore.getState().showToast('Document added successfully', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -660,9 +786,9 @@ export function useDeleteGoalDocument() {
       api.deleteGoalDocument(goalId, documentId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.documents(variables.goalId) });
-      useUIStore.getState().showToast("Document deleted", "info");
+      useUIStore.getState().showToast('Document deleted', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
@@ -685,34 +811,50 @@ export function useAddGoalBeneficiary() {
       api.addGoalBeneficiary(goalId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.beneficiaries(variables.goalId) });
-      useUIStore.getState().showToast("Beneficiary added", "success");
+      useUIStore.getState().showToast('Beneficiary added', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useUpdateGoalBeneficiary() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, beneficiaryId, data, expectedVersion }: { goalId: string; beneficiaryId: string; data: Partial<GoalBeneficiary>; expectedVersion: number }) =>
-      api.updateGoalBeneficiary(goalId, beneficiaryId, data, expectedVersion),
+    mutationFn: ({
+      goalId,
+      beneficiaryId,
+      data,
+      expectedVersion,
+    }: {
+      goalId: string;
+      beneficiaryId: string;
+      data: Partial<GoalBeneficiary>;
+      expectedVersion: number;
+    }) => api.updateGoalBeneficiary(goalId, beneficiaryId, data, expectedVersion),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.beneficiaries(variables.goalId) });
-      useUIStore.getState().showToast("Beneficiary updated", "success");
+      useUIStore.getState().showToast('Beneficiary updated', 'success');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }
 
 export function useDeleteGoalBeneficiary() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ goalId, beneficiaryId, version }: { goalId: string; beneficiaryId: string; version: number }) =>
-      api.deleteGoalBeneficiary(goalId, beneficiaryId, version),
+    mutationFn: ({
+      goalId,
+      beneficiaryId,
+      version,
+    }: {
+      goalId: string;
+      beneficiaryId: string;
+      version: number;
+    }) => api.deleteGoalBeneficiary(goalId, beneficiaryId, version),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: GOAL_QUERY_KEYS.beneficiaries(variables.goalId) });
-      useUIStore.getState().showToast("Beneficiary removed", "info");
+      useUIStore.getState().showToast('Beneficiary removed', 'info');
     },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), 'error'),
   });
 }

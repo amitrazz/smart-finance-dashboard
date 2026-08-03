@@ -16,7 +16,8 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({
   onSelectEvent,
   onAction,
 }) => {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 7, 1)); // Default to August 2026
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
@@ -68,7 +69,8 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({
           </button>
           <button
             onClick={() => {
-              setCurrentDate(new Date(2026, 7, 1));
+              const now = new Date();
+              setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
               setSelectedDay(null);
             }}
             type="button"
@@ -108,7 +110,8 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
             const dayEvts = eventsByDateMap.get(dateStr) || [];
             const isSelected = selectedDay === dateStr;
-            const isTodayCell = dayNum === 1 && month === 7 && year === 2026;
+            const isTodayCell =
+              dayNum === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
             return (
               <div

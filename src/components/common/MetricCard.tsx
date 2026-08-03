@@ -45,8 +45,20 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     <motion.div
       whileHover={{ y: -2 }}
       onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       className={`p-5 rounded-3xl border backdrop-blur-xl transition-all duration-200 hover:border-slate-700 shadow-xl ${ACCENT_CLASSES[accentColor]} ${
-        onClick ? "cursor-pointer" : ""
+        onClick ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">

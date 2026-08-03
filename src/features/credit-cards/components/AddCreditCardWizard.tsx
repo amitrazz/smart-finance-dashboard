@@ -10,8 +10,9 @@ import {
 } from "lucide-react";
 import { useCreateCreditCard } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
-import { CardNetwork, CreditCardCategory, CreateCreditCardInput } from "../../../types";
+import { CardNetwork, CreditCardCategory, CreateCreditCardInput, FinancialInstitution } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface AddCreditCardWizardProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
 
   // Step 1: Basic Info
   const [issuer, setIssuer] = useState("");
+  const [institutionId, setInstitutionId] = useState<string | undefined>(undefined);
   const [nickname, setNickname] = useState("");
   const [network, setNetwork] = useState<CardNetwork>("VISA");
   const [category, setCategory] = useState<CreditCardCategory>("CREDIT_CARD");
@@ -56,9 +58,15 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
 
   if (!isOpen) return null;
 
+  const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
+    setInstitutionId(id);
+    if (institution?.name) setIssuer(institution.name);
+  };
+
   const resetForm = () => {
     setCurrentStep(1);
     setIssuer("");
+    setInstitutionId(undefined);
     setNickname("");
     setNetwork("VISA");
     setCategory("CREDIT_CARD");
@@ -118,6 +126,7 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
       paymentDueDay,
       nextDueDate,
       interestRate,
+      institutionId,
       paymentAccountId: paymentAccountId || undefined,
       autoPayEnabled,
       annualFee: annualFee || undefined,
@@ -198,14 +207,23 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
             <form id="step-1-form" onSubmit={handleNext} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Card Issuer / Bank *</label>
+                  <label htmlFor="card-issuer" className="block text-xs font-semibold text-slate-300 mb-1.5">Card Issuer / Bank *</label>
+                  <InstitutionPicker
+                    id="card-issuer"
+                    value={institutionId}
+                    valueLabel={issuer || undefined}
+                    onChange={handleInstitutionChange}
+                    placeholder="e.g. HDFC Bank, Amex, ICICI, Axis"
+                  />
+                  {/* Mirrors `issuer` so the browser still enforces selection before advancing, since the picker isn't a native input. */}
                   <input
                     type="text"
                     required
-                    placeholder="e.g. HDFC Bank, Amex, ICICI, Axis"
                     value={issuer}
-                    onChange={(e) => setIssuer(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                    readOnly
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="sr-only"
                   />
                 </div>
 

@@ -109,7 +109,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ onboardingSt
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {summaryItems.map((item) => {
-              const isDone = completedKeys.includes(item.key) || completedKeys.length === 0;
+              const isDone = completedKeys.includes(item.key);
               const isSkipped = skippedKeys.includes(item.key);
               const IconComp = item.icon;
 

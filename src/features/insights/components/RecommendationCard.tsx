@@ -2,14 +2,14 @@ import React from "react";
 import { SmartRecommendation } from "../types/insightsTypes";
 import { formatCurrency } from "../../../utils/formatters";
 import { ArrowRight, Zap, Target, Award } from "lucide-react";
-import { useUIStore } from "../../../store/useUIStore";
+import { useUIStore, NavTab } from "../../../store/useUIStore";
 
 interface RecommendationCardProps {
   recommendation: SmartRecommendation;
 }
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({ recommendation }) => {
-  const { setActiveSubTab } = useUIStore();
+  const { setActiveTab } = useUIStore();
 
   const impactConfig = {
     HIGH_IMPACT: {
@@ -32,9 +32,13 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ recommen
   const currentImpact = impactConfig[recommendation.impactType] || impactConfig.QUICK_WIN;
 
   const handleActionClick = () => {
-    if (recommendation.actionRoute) {
-      const sub = recommendation.actionRoute.replace("#insights/", "");
-      setActiveSubTab(sub);
+    // actionRoute is a bare top-level NavTab (e.g. "loans", "investments") per
+    // the same deepLink convention SmartActionCenter uses — falls back to the
+    // Insights recommendations tab when the backend didn't supply one.
+    if (recommendation.actionRoute && recommendation.actionRoute !== "#insights/recommendations") {
+      setActiveTab(recommendation.actionRoute as NavTab);
+    } else {
+      setActiveTab("insights", "recommendations");
     }
   };
 

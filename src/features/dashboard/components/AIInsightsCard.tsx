@@ -8,7 +8,7 @@ export const AIInsightsCard: React.FC = () => {
   const { data: actionsData } = useSmartActions({ status: "ACTIVE" });
   const dismissMutation = useDismissAction();
   const completeMutation = useCompleteAction();
-  const { setActiveTab, showToast } = useUIStore();
+  const { setActiveTab } = useUIStore();
 
   const actions = (Array.isArray(actionsData) ? actionsData : []).slice(0, 3);
 
@@ -20,8 +20,9 @@ export const AIInsightsCard: React.FC = () => {
     completeMutation.mutate({ id, version });
   };
 
-  const handleAskAI = (title: string) => {
-    showToast(`AI Assistant initialized for: "${title}"`, "info");
+  const handleAskAI = () => {
+    // There's no conversational AI backend to carry this action's context into
+    // — this just opens Insights, so the toast shouldn't imply otherwise.
     setActiveTab("insights");
   };
 
@@ -88,7 +89,7 @@ export const AIInsightsCard: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => handleAskAI(item.title)}
+                  onClick={handleAskAI}
                   className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-indigo-300 text-xs font-semibold border border-indigo-500/20 transition-all flex items-center gap-1 cursor-pointer"
                 >
                   <MessageSquare className="w-3 h-3" />

@@ -8,11 +8,12 @@ interface TransferMoneyModalProps {
 }
 
 /**
- * There is no real backend transfer endpoint (the existing useCreateTransfer /
- * useAccountTransfers hooks in useFinanceQueries.ts are mocked — they never
- * call `api.*` and return hardcoded fake data). Per the no-mock-data
- * requirement, this modal surfaces the gap instead of wiring up to that mock,
- * which would otherwise silently pretend a transfer happened.
+ * There is no real backend transfer endpoint (the useCreateTransfer /
+ * useAccountTransfers hooks in useFinanceQueries.ts correctly reject with a
+ * "not available yet" error rather than fabricating data, but there's still no
+ * working transfer flow to wire this modal up to). Per the no-mock-data
+ * requirement, this modal surfaces the gap instead of pretending a transfer
+ * happened.
  */
 export const TransferMoneyModal: React.FC<TransferMoneyModalProps> = ({ isOpen, onClose }) => {
   useEffect(() => {

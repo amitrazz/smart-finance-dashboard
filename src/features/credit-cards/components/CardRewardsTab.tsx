@@ -1,7 +1,6 @@
 import React from "react";
 import { Gift, Award, Clock, RefreshCw, AlertTriangle } from "lucide-react";
 import { useCardRewards } from "../hooks/useCreditCardQueries";
-import { useUIStore } from "../../../store/useUIStore";
 
 type RewardHistoryItem = { id: string; date: string; description: string; points: number; type: string };
 
@@ -11,7 +10,6 @@ interface CardRewardsTabProps {
 
 export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
   const { data: rewards, isLoading, isError, error, refetch } = useCardRewards(cardId);
-  const { showToast } = useUIStore();
 
   if (isLoading) {
     return (
@@ -61,8 +59,9 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
             </div>
           </div>
           <button
-            onClick={() => showToast("Redemption API integration ready.", "info")}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shrink-0"
+            disabled
+            title="Reward redemption isn't available yet — no backend endpoint exists"
+            className="px-4 py-2 rounded-xl bg-amber-500/30 text-amber-200/60 font-bold text-xs shrink-0 cursor-not-allowed"
           >
             Redeem Now
           </button>
@@ -99,8 +98,9 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
             <Award className="w-4 h-4 text-amber-400" /> Reward Points History
           </h3>
           <button
-            onClick={() => showToast("Reward Catalog & Redemption API ready.", "info")}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20"
+            disabled
+            title="Reward catalogue & redemption isn't available yet — no backend endpoint exists"
+            className="px-4 py-2 rounded-xl bg-indigo-600/30 text-indigo-200/50 font-bold text-xs cursor-not-allowed"
           >
             <Gift className="w-4 h-4 inline mr-1" /> Redeem Catalogue
           </button>

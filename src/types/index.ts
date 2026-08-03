@@ -965,6 +965,8 @@ export interface CreateLoanInput {
   currency: string;
   outstandingPrincipal: string;
   monthlyEmi: string;
+  /** Maps to the backend's `installmentAmount` — the user's real/fixed EMI, kept stable across rate changes and regenerates instead of being recomputed. */
+  installmentAmount?: string;
   remainingTenureMonths: number;
   nextDueDate: string;
   interestRate: string;

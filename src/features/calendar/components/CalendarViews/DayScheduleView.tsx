@@ -15,7 +15,7 @@ export const DayScheduleView: React.FC<DayScheduleViewProps> = ({
   onSelectEvent,
   onAction,
 }) => {
-  const [selectedDate, setSelectedDate] = useState("2026-08-01");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const dayEvents = events.filter((e) => e.date === selectedDate || e.status === "DUE_TODAY");
 

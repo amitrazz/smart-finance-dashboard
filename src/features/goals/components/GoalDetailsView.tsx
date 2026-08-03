@@ -18,13 +18,17 @@ import React, { useState } from 'react';
 import { useAccounts } from '../../../hooks/useFinanceQueries';
 import { GoalContribution, GoalMilestone, Money } from '../../../types';
 import { formatCurrency } from '../../../utils/formatters';
+import { EmptyState } from '../../../components/common/EmptyState';
 import {
   useAddGoalMilestone,
   useDeleteGoal,
   useDeleteGoalContribution,
+  useDeleteGoalDocument,
   useDeleteGoalMilestone,
   useGoal,
+  useGoalAnalytics,
   useGoalContributions,
+  useGoalDocuments,
   useGoalForecast,
   useGoalMilestones,
   useRecordGoalContribution,
@@ -75,6 +79,17 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
   const { data: milestones = [] } = useGoalMilestones(goalId);
   const { data: forecast } = useGoalForecast(goalId);
   const { data: accounts = [] } = useAccounts();
+  const {
+    data: analytics,
+    isLoading: analyticsLoading,
+    isError: analyticsError,
+  } = useGoalAnalytics(goalId);
+  const {
+    data: documents = [],
+    isLoading: documentsLoading,
+    isError: documentsError,
+  } = useGoalDocuments(goalId);
+  const deleteDocumentMutation = useDeleteGoalDocument();
 
   const recordContribMutation = useRecordGoalContribution();
   const deleteContribMutation = useDeleteGoalContribution();
@@ -727,6 +742,154 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {analyticsLoading ? (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-44 bg-slate-900/60 rounded-3xl border border-slate-800" />
+              <div className="h-44 bg-slate-900/60 rounded-3xl border border-slate-800" />
+            </div>
+          ) : analyticsError || !analytics ? (
+            <EmptyState
+              icon={<BarChart3 className="w-10 h-10 text-slate-600 mx-auto" aria-hidden="true" />}
+              title="Analytics Not Available"
+              message="Goal analytics could not be loaded right now. Please try again shortly."
+            />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Health Score</p>
+                  <p className="text-2xl font-extrabold text-emerald-400">{analytics.health.score}</p>
+                  <p className="text-[11px] text-slate-400">{analytics.health.band}</p>
+                </div>
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Contribution Consistency</p>
+                  <p className="text-2xl font-extrabold text-indigo-300">{analytics.health.contributionConsistency}%</p>
+                </div>
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Progress Alignment</p>
+                  <p className="text-2xl font-extrabold text-teal-300">{analytics.health.progressAlignment}%</p>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" /> Forecast
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <p className="text-slate-400">Monthly Contribution Rate</p>
+                    <p className="font-bold text-slate-100">{formatCurrency(analytics.forecast.monthlyContributionRate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">Funding Gap</p>
+                    <p className="font-bold text-rose-300">{formatCurrency(analytics.forecast.fundingGap)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">Expected Completion</p>
+                    <p className="font-bold text-slate-100">{analytics.forecast.expectedCompletionDate || '—'}</p>
+                  </div>
+                </div>
+                {analytics.forecast.isBehindSchedule && (
+                  <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> This goal is currently behind schedule.
+                  </p>
+                )}
+              </div>
+
+              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Flag className="w-4 h-4 text-indigo-400" /> Milestone Progress
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {analytics.milestoneProgress.achieved} of {analytics.milestoneProgress.total} milestones achieved
+                </p>
+              </div>
+
+              {analytics.contributionTrend.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-400" /> Contribution Trend
+                  </h3>
+                  <div className="space-y-2">
+                    {analytics.contributionTrend.map((point) => (
+                      <div key={point.month} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">{point.month}</span>
+                        <span className="font-bold text-slate-100">{formatCurrency(point.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'documents' && (
+        <div className="space-y-6">
+          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400">
+            Uploading new documents isn't available yet — there's no file storage endpoint wired up for goal
+            documents. Existing documents registered against this goal can still be viewed and removed below.
+          </div>
+
+          {documentsLoading ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-16 bg-slate-900/60 rounded-2xl border border-slate-800" />
+              <div className="h-16 bg-slate-900/60 rounded-2xl border border-slate-800" />
+            </div>
+          ) : documentsError ? (
+            <EmptyState
+              icon={<FileText className="w-10 h-10 text-slate-600 mx-auto" aria-hidden="true" />}
+              title="Documents Not Available"
+              message="Goal documents could not be loaded right now. Please try again shortly."
+            />
+          ) : documents.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+              <FileText className="w-10 h-10 text-slate-500 mx-auto" />
+              <h3 className="text-base font-semibold text-slate-200">No Documents Yet</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                No documents have been registered against this goal.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-100">{doc.fileName}</p>
+                      <p className="text-[11px] text-slate-400">{doc.category} • {doc.uploadedAt}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteDocumentMutation.mutate({ goalId, documentId: doc.id })}
+                    disabled={deleteDocumentMutation.isPending}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
+                    title="Delete Document"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'activity' && (
+        <EmptyState
+          icon={<ActivityIcon className="w-10 h-10 text-slate-600 mx-auto" aria-hidden="true" />}
+          title="Activity Log Not Available"
+          message="There is no backend endpoint that tracks an audit/activity trail for goals yet."
+        />
       )}
 
       {/* Record Contribution Modal */}

@@ -1,12 +1,9 @@
 import React from "react";
-import { useGenerateAnalyticsReport } from "../hooks/useInsightsQueries";
 import { AnalyticsHeader } from "../components/AnalyticsHeader";
 import { AnalyticsReportType } from "../types/insightsTypes";
 import { FileText, Download, Printer } from "lucide-react";
 
 export const ReportsPage: React.FC = () => {
-  const generateReport = useGenerateAnalyticsReport();
-
   const reportTypes: { id: AnalyticsReportType; label: string; desc: string }[] = [
     { id: "MONTHLY_REVIEW", label: "Monthly Executive Financial Review", desc: "Comprehensive summary of cash flow, savings rate & budget adherence" },
     { id: "QUARTERLY_REVIEW", label: "Quarterly Wealth & Investment Review", desc: "CAGR, XIRR returns, net worth growth, and asset class rebalancing" },
@@ -17,16 +14,17 @@ export const ReportsPage: React.FC = () => {
     { id: "CASH_FLOW_REPORT", label: "Detailed Inflow vs Outflow Cash Report", desc: "Category level expenditures, recurring subscriptions, income sources" },
   ];
 
-  const handleGenerate = (type: AnalyticsReportType) => {
-    generateReport.mutate(type);
-  };
-
   return (
     <div className="space-y-6">
       <AnalyticsHeader
         title="Custom Financial Reports & PDF Export"
         description="Generate, print, and export executive PDF reports or raw data spreadsheets"
       />
+
+      <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400">
+        PDF/print report generation from live account data isn't available yet — there's no backend endpoint for
+        it. Downloads below are disabled instead of producing an empty or fabricated report.
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {reportTypes.map((r) => (
@@ -41,16 +39,18 @@ export const ReportsPage: React.FC = () => {
 
             <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
               <button
-                onClick={() => handleGenerate(r.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all"
+                disabled
+                title="Report generation isn't available yet — no backend endpoint exists"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/30 text-indigo-200/50 text-xs font-bold cursor-not-allowed"
               >
                 <Download className="w-3.5 h-3.5" /> Download PDF
               </button>
               <button
-                onClick={() => handleGenerate(r.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                disabled
+                title="Report generation isn't available yet — no backend endpoint exists"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/50 text-slate-500 text-xs font-bold cursor-not-allowed"
               >
-                <Printer className="w-3.5 h-3.5 text-slate-400" /> Print Report
+                <Printer className="w-3.5 h-3.5 text-slate-500" /> Print Report
               </button>
             </div>
           </div>

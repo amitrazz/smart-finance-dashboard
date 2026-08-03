@@ -33,7 +33,10 @@ export const InsightsView: React.FC = () => {
   };
 
   const handleExportPdf = () => {
-    showToast("Generating PDF analytics report download...", "info");
+    // There's no backend PDF/print generation yet (see ReportsPage), so this
+    // takes the user to the Reports tab where that gap is explained honestly,
+    // instead of claiming a download started.
+    useUIStore.getState().setActiveSubTab("reports");
   };
 
   const renderActiveSubModule = () => {
@@ -41,7 +44,7 @@ export const InsightsView: React.FC = () => {
       case "financial-health":
         return <FinancialHealthPage />;
       case "net-worth":
-        return <NetWorthPage />;
+        return <NetWorthPage horizon={horizon} onHorizonChange={setHorizon} />;
       case "cash-flow":
         return <CashFlowPage />;
       case "spending":
@@ -61,7 +64,7 @@ export const InsightsView: React.FC = () => {
       case "trends":
         return <TrendsPage />;
       case "forecasts":
-        return <ForecastsPage />;
+        return <ForecastsPage horizon={horizon} onHorizonChange={setHorizon} />;
       case "recommendations":
         return <RecommendationsPage />;
       case "risks":
@@ -78,8 +81,6 @@ export const InsightsView: React.FC = () => {
     <div className="space-y-6">
       {/* Level 1 & Level 2 Hierarchical SubNav + Persistent Filter Toolbar */}
       <InsightsSubNav
-        horizon={horizon}
-        onHorizonChange={setHorizon}
         onExportPdf={handleExportPdf}
         onRefresh={handleRefresh}
       />

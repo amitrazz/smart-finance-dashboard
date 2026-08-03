@@ -15,7 +15,6 @@ interface AccountHeaderProps {
   onBack?: () => void;
   onTransfer?: () => void;
   onStatement?: () => void;
-  onSettings?: () => void;
 }
 
 export const AccountHeader: React.FC<AccountHeaderProps> = ({
@@ -25,7 +24,6 @@ export const AccountHeader: React.FC<AccountHeaderProps> = ({
   onBack,
   onTransfer,
   onStatement,
-  onSettings,
 }) => {
   const balance = parseFloat(account.currentBalance?.amount || "0");
   const currency = account.currency || "INR";
@@ -77,7 +75,12 @@ export const AccountHeader: React.FC<AccountHeaderProps> = ({
             <FileText className="w-4 h-4" />
             <span>Statement</span>
           </button>
-          <button onClick={onSettings} className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors">
+          <button
+            disabled
+            title="Account editing isn't available yet — no backend endpoint exists"
+            aria-label="Account settings (not available yet)"
+            className="p-2.5 rounded-xl bg-slate-800/60 text-slate-600 cursor-not-allowed opacity-50"
+          >
             <Settings className="w-5 h-5" />
           </button>
         </div>

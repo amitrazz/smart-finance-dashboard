@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "../../../utils/formatters";
 import { useCreateLoan } from "../hooks/useLoanQueries";
-import { useAccounts, useInstitutions } from "../../../hooks/useFinanceQueries";
-import { CreateLoanInput, LoanType, LoanInterestType } from "../../../types";
+import { useAccounts } from "../../../hooks/useFinanceQueries";
+import { CreateLoanInput, LoanType, LoanInterestType, FinancialInstitution } from "../../../types";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface CreateLoanWizardModalProps {
   isOpen: boolean;
@@ -53,9 +54,16 @@ export const CreateLoanWizardModal: React.FC<CreateLoanWizardModalProps> = ({
 
   const createLoanMutation = useCreateLoan();
   const { data: accounts = [] } = useAccounts();
-  const { data: institutions = [] } = useInstitutions();
 
   if (!isOpen) return null;
+
+  const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
+    setFormData((prev) => ({
+      ...prev,
+      institutionId: id || "",
+      lenderName: institution?.name ?? prev.lenderName,
+    }));
+  };
 
   const handleChange = (key: keyof CreateLoanInput, value: CreateLoanInput[keyof CreateLoanInput]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -89,6 +97,10 @@ export const CreateLoanWizardModal: React.FC<CreateLoanWizardModalProps> = ({
       principalAmount: principalAmt,
       tenureMonths: tenure,
       startDate: startDt,
+      // The backend's fixed-EMI field is `installmentAmount`, not `monthlyEmi` —
+      // without this mapping the schedule silently falls back to a freshly
+      // computed textbook EMI instead of the user's real bank EMI.
+      installmentAmount: formData.monthlyEmi || undefined,
       // Clean optional empty strings
       lenderName: formData.lenderName || undefined,
       institutionId: formData.institutionId || undefined,
@@ -180,48 +192,14 @@ export const CreateLoanWizardModal: React.FC<CreateLoanWizardModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-400 font-semibold block mb-1.5">Lender Institution</label>
-                  <select
-                    value={formData.institutionId || formData.lenderName || ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const matchedInst = institutions.find((inst) => inst.id === val || inst.name === val);
-                      if (matchedInst) {
-                        setFormData((prev) => ({
-                          ...prev,
-                          institutionId: matchedInst.id,
-                          lenderName: matchedInst.name,
-                        }));
-                      } else {
-                        setFormData((prev) => ({
-                          ...prev,
-                          institutionId: "",
-                          lenderName: val,
-                        }));
-                      }
-                    }}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:border-indigo-500 outline-none cursor-pointer"
-                  >
-                    <option value="">-- Select Lender Bank / Institution --</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.name}
-                      </option>
-                    ))}
-                    <optgroup label="Popular Lenders">
-                      <option value="HDFC Bank">HDFC Bank</option>
-                      <option value="State Bank of India (SBI)">State Bank of India (SBI)</option>
-                      <option value="ICICI Bank">ICICI Bank</option>
-                      <option value="Axis Bank">Axis Bank</option>
-                      <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
-                      <option value="Bank of Baroda">Bank of Baroda</option>
-                      <option value="Punjab National Bank (PNB)">Punjab National Bank (PNB)</option>
-                      <option value="Tata Capital">Tata Capital</option>
-                      <option value="Bajaj Finance">Bajaj Finance</option>
-                      <option value="L&T Finance">L&T Finance</option>
-                      <option value="Aditya Birla Capital">Aditya Birla Capital</option>
-                    </optgroup>
-                  </select>
+                  <label htmlFor="loan-institution" className="text-slate-400 font-semibold block mb-1.5">Lender Institution</label>
+                  <InstitutionPicker
+                    id="loan-institution"
+                    value={formData.institutionId || undefined}
+                    valueLabel={formData.lenderName || undefined}
+                    onChange={handleInstitutionChange}
+                    placeholder="-- Select Lender Bank / Institution --"
+                  />
                 </div>
 
                 <div>

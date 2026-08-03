@@ -10,6 +10,59 @@ import {
   FinancialCalendarEventCategory,
 } from "../types";
 
+// Calendar events are a derived read model recomputed from live loan/card/SIP/
+// subscription/goal data on every fetch — there's no backend record to mark
+// "dismissed". Dismiss/Snooze/Archive persist here instead, keyed by the
+// event's deterministic id, so the toast claiming the reminder is hidden is
+// actually true on the next render/refetch rather than the event reappearing.
+const DISMISSED_EVENTS_KEY = "financialCalendar.dismissedEvents";
+
+interface DismissedEventRecord {
+  until?: string; // ISO date; snoozed events reappear once today >= until
+}
+
+function readDismissedEvents(): Record<string, DismissedEventRecord> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_EVENTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDismissedEvents(map: Record<string, DismissedEventRecord>) {
+  try {
+    localStorage.setItem(DISMISSED_EVENTS_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage failures (e.g. private browsing quota) — worst case the
+    // reminder reappears on next load instead of crashing the app.
+  }
+}
+
+export function dismissCalendarEventLocally(id: string, action: "DISMISS" | "SNOOZE" | "ARCHIVE") {
+  const map = readDismissedEvents();
+  if (action === "SNOOZE") {
+    const until = new Date();
+    until.setDate(until.getDate() + 1);
+    map[id] = { until: until.toISOString().split("T")[0] };
+  } else {
+    map[id] = {};
+  }
+  writeDismissedEvents(map);
+}
+
+function filterLocallyDismissed(events: FinancialCalendarEvent[]): FinancialCalendarEvent[] {
+  const map = readDismissedEvents();
+  if (Object.keys(map).length === 0) return events;
+  const todayStr = new Date().toISOString().split("T")[0];
+  return events.filter((evt) => {
+    const record = map[evt.id];
+    if (!record) return true;
+    if (record.until) return todayStr >= record.until;
+    return false;
+  });
+}
+
 export function mapCalendarItemToEvent(item: CalendarEventItem): FinancialCalendarEvent {
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -174,7 +227,7 @@ export function useFinancialCalendar(params?: {
         // Sort ascending by date
         filtered.sort((a, b) => a.date.localeCompare(b.date));
 
-        return filtered;
+        return filterLocallyDismissed(filtered);
       } catch {
         return [];
       }
@@ -210,7 +263,7 @@ export function useUpcomingEvents(
       try {
         const rawItems = await api.getCalendar({ from, to });
         if (Array.isArray(rawItems)) {
-          const mapped = rawItems.map(mapCalendarItemToEvent);
+          const mapped = filterLocallyDismissed(rawItems.map(mapCalendarItemToEvent));
           return limit ? mapped.slice(0, limit) : mapped;
         }
         return [];
@@ -280,9 +333,11 @@ export function useFinancialCalendarSummary() {
 
 // Calendar events are derived read models (not persisted records), so the
 // only action here with a real, no-extra-input backend endpoint is
-// confirming a subscription renewal. Everything else (EMI/credit-card
-// payments) needs an amount/account the compact action buttons don't
-// collect, so we're honest about that instead of faking a persisted state.
+// confirming a subscription renewal. EMI/credit-card payments need an
+// amount/account the compact action buttons don't collect, so those stay
+// honest about not recording a payment. DISMISS/SNOOZE/ARCHIVE persist to
+// localStorage (see dismissCalendarEventLocally) so "hidden" is actually true
+// on the next render instead of the event reappearing after refetch.
 export function useMarkEventAction() {
   const queryClient = useQueryClient();
 
@@ -295,6 +350,14 @@ export function useMarkEventAction() {
       if (sourceEntityType === "Subscription" && (action === "PAY" || action === "COMPLETE") && sourceEntityId) {
         await api.confirmSubscription(sourceEntityId);
         return { id, action, persisted: true };
+      }
+
+      if (action === "DISMISS" || action === "SNOOZE" || action === "ARCHIVE") {
+        dismissCalendarEventLocally(id, action);
+      } else if (action === "PAY" || action === "COMPLETE") {
+        // Not a real payment record, but the toast tells the user the
+        // reminder itself is hidden — make that true for this instance too.
+        dismissCalendarEventLocally(id, "ARCHIVE");
       }
 
       return { id, action, persisted: false };
@@ -311,6 +374,8 @@ export function useMarkEventAction() {
           "Reminder hidden here — open the related module to record the actual payment.",
           "info",
         );
+      } else if (action === "SNOOZE") {
+        useUIStore.getState().showToast("Reminder snoozed until tomorrow", "info");
       } else {
         useUIStore.getState().showToast("Reminder hidden", "info");
       }

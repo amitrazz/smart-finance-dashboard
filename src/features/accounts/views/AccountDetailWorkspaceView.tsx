@@ -10,17 +10,32 @@ import { ArrowUpRight, ArrowDownLeft, AlertTriangle } from "lucide-react";
 interface AccountDetailWorkspaceViewProps {
   account: Account;
   onBack: () => void;
+  onTransfer?: () => void;
+  onStatement?: () => void;
 }
 
-export const AccountDetailWorkspaceView: React.FC<AccountDetailWorkspaceViewProps> = ({ account, onBack }) => {
+export const AccountDetailWorkspaceView: React.FC<AccountDetailWorkspaceViewProps> = ({
+  account,
+  onBack,
+  onTransfer,
+  onStatement,
+}) => {
   const { data: fullAccount } = useAccount(account.id);
   const { data: historyData } = useAccountBalanceHistory(account.id, { limit: 30 });
-  const { data: txns = [] } = useTransactions({ accountId: account.id, limit: 10 });
+  // Fetched wide enough to compute a real 30-day inflow/outflow total below, not just for the list.
+  const { data: txns = [] } = useTransactions({ accountId: account.id, limit: 100 });
 
   const displayAccount = fullAccount || account;
 
-  const income30d = 125000;
-  const expenses30d = 78400;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentTxns = txns.filter((txn) => new Date(txn.date) >= thirtyDaysAgo);
+  const income30d = recentTxns
+    .filter((txn) => txn.direction === "INFLOW")
+    .reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount?.amount || "0")), 0);
+  const expenses30d = recentTxns
+    .filter((txn) => txn.direction !== "INFLOW")
+    .reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount?.amount || "0")), 0);
 
   return (
     <div className="space-y-6">
@@ -29,9 +44,8 @@ export const AccountDetailWorkspaceView: React.FC<AccountDetailWorkspaceViewProp
         income30d={income30d}
         expenses30d={expenses30d}
         onBack={onBack}
-        onTransfer={() => {}}
-        onStatement={() => {}}
-        onSettings={() => {}}
+        onTransfer={onTransfer}
+        onStatement={onStatement}
       />
 
       {/* Recent Transactions */}

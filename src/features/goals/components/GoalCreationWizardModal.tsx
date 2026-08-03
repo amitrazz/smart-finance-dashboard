@@ -89,8 +89,12 @@ export const GoalCreationWizardModal: React.FC<GoalCreationWizardModalProps> = (
         targetDate,
         currentCorpus,
         monthlyContribution,
-        expectedReturnRate,
-        inflationRate,
+        // The form collects whole percents (e.g. "12" for 12%), but the
+        // backend stores these as 0-1 decimal ratios (see mapGoal's toPercent
+        // in useGoalQueries.ts, which multiplies by 100 for display) — sending
+        // the whole-percent string as-is was producing 1200%/600% goals.
+        expectedReturnRate: String(parseFloat(expectedReturnRate || "0") / 100),
+        inflationRate: String(parseFloat(inflationRate || "0") / 100),
         riskProfile,
         autoContributionEnabled,
         linkedAssetIds: selectedAssetIds,
@@ -473,8 +477,8 @@ export const GoalCreationWizardModal: React.FC<GoalCreationWizardModalProps> = (
     targetDate,
     currentCorpus,
     monthlyContribution,
-    expectedReturnRate,
-    inflationRate,
+    expectedReturnRate: String(parseFloat(expectedReturnRate || "0") / 100),
+    inflationRate: String(parseFloat(inflationRate || "0") / 100),
     riskProfile,
     autoContributionEnabled,
     linkedAssetIds: selectedAssetIds,

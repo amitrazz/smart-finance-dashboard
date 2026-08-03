@@ -11,7 +11,6 @@ import {
 import { InsightsBreadcrumbs } from "./InsightsBreadcrumbs";
 import { InsightsAnalyticsToolbar } from "./InsightsAnalyticsToolbar";
 import { InsightsMobileNavDrawer, InsightsSectionConfig } from "./InsightsMobileNavDrawer";
-import { TimeHorizon } from "../types/insightsTypes";
 
 export const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
   {
@@ -69,15 +68,11 @@ export const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
 ];
 
 interface InsightsSubNavProps {
-  horizon?: TimeHorizon;
-  onHorizonChange?: (horizon: TimeHorizon) => void;
   onExportPdf?: () => void;
   onRefresh?: () => void;
 }
 
 export const InsightsSubNav: React.FC<InsightsSubNavProps> = ({
-  horizon,
-  onHorizonChange,
   onExportPdf,
   onRefresh,
 }) => {
@@ -169,10 +164,8 @@ export const InsightsSubNav: React.FC<InsightsSubNavProps> = ({
         subTabLabel={activeSubTabItem?.label}
       />
 
-      {/* Persistent Global Analytics Filter Toolbar */}
+      {/* Persistent Global Analytics Toolbar */}
       <InsightsAnalyticsToolbar
-        horizon={horizon}
-        onHorizonChange={onHorizonChange}
         onExportPdf={onExportPdf}
         onRefresh={onRefresh}
       />

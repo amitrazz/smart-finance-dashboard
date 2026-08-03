@@ -37,17 +37,23 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {actions.map((action) => (
-        <button
-          key={action.label}
-          onClick={action.onClick}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-semibold transition-all duration-200 ${action.accent}`}
-          title={action.label}
-        >
-          {action.icon}
-          <span className="hidden sm:inline">{action.label}</span>
-        </button>
-      ))}
+      {actions.map((action) => {
+        const isDisabled = !action.onClick;
+        return (
+          <button
+            key={action.label}
+            onClick={action.onClick}
+            disabled={isDisabled}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-semibold transition-all duration-200 ${
+              isDisabled ? "text-slate-600 cursor-not-allowed opacity-50" : action.accent
+            }`}
+            title={isDisabled ? `${action.label} isn't available yet — no backend endpoint exists` : action.label}
+          >
+            {action.icon}
+            <span className="hidden sm:inline">{action.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };

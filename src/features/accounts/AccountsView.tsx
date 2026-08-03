@@ -22,6 +22,7 @@ import {
 } from "./components/AccountsNavigation";
 import { AccountsGlobalToolbar } from "./components/AccountsGlobalToolbar";
 import { QuickActions } from "./components/QuickActions";
+import { AddAccountModal } from "./components/AddAccountModal";
 
 // ─── Lazy Sub-Views ──────────────────────────────────────────────────────────
 
@@ -103,14 +104,11 @@ function parseSubTabToRoute(subTab: string | null): ActiveRoute {
 // ─── AccountsView ─────────────────────────────────────────────────────────────
 
 export const AccountsView: React.FC = () => {
-  const { activeSubTab, setActiveSubTab } = useUIStore();
+  const { activeSubTab, setActiveSubTab, isAddAccountOpen, setAddAccountOpen } = useUIStore();
   const { refetch } = useAccounts();
 
   /** The currently open Account in the detail workspace */
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
-  /** Filter toolbar state — persists while navigating between sub-views */
-  const [searchQuery, setSearchQuery] = useState("");
 
   /**
    * The active route — resolved from:
@@ -198,7 +196,12 @@ export const AccountsView: React.FC = () => {
         return <StatementsSubView activeTab={activeRoute} />;
       case "details":
         return selectedAccount ? (
-          <AccountDetailWorkspaceView account={selectedAccount} onBack={handleBack} />
+          <AccountDetailWorkspaceView
+            account={selectedAccount}
+            onBack={handleBack}
+            onTransfer={() => navigate("transfers")}
+            onStatement={() => navigate("statements-overview")}
+          />
         ) : null;
       default:
         return (
@@ -228,7 +231,6 @@ export const AccountsView: React.FC = () => {
           onImport={() => navigate("statements-imports")}
           onReconcile={() => navigate("reconciliation")}
           onRefresh={() => refetch()}
-          onExport={() => {}}
         />
       </div>
 
@@ -241,12 +243,7 @@ export const AccountsView: React.FC = () => {
 
       {/* ── Global Toolbar (hidden on detail page) ── */}
       {activeRoute !== "details" && (
-        <AccountsGlobalToolbar
-          searchQuery={searchQuery}
-          onSearch={setSearchQuery}
-          onRefresh={() => refetch()}
-          onExport={() => {}}
-        />
+        <AccountsGlobalToolbar onRefresh={() => refetch()} />
       )}
 
       {/* ── Sub-View Content ── */}
@@ -261,6 +258,8 @@ export const AccountsView: React.FC = () => {
           <Suspense fallback={<SubviewSkeleton />}>{renderSubView()}</Suspense>
         </motion.div>
       </AnimatePresence>
+
+      <AddAccountModal isOpen={isAddAccountOpen} onClose={() => setAddAccountOpen(false)} />
     </div>
   );
 };

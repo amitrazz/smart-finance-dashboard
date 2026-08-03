@@ -3,7 +3,6 @@ import { Layers, RefreshCw, AlertTriangle } from "lucide-react";
 import { useCardEmis } from "../hooks/useCreditCardQueries";
 import { CreditCardEmi } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
-import { useUIStore } from "../../../store/useUIStore";
 
 interface CardEmisTabProps {
   cardId: string;
@@ -11,7 +10,6 @@ interface CardEmisTabProps {
 
 export const CardEmisTab: React.FC<CardEmisTabProps> = ({ cardId }) => {
   const { data: emis = [], isLoading, isError, error, refetch } = useCardEmis(cardId);
-  const { showToast } = useUIStore();
 
   if (isLoading) {
     return (
@@ -89,8 +87,9 @@ export const CardEmisTab: React.FC<CardEmisTabProps> = ({ cardId }) => {
           </p>
         </div>
         <button
-          onClick={() => showToast("EMI Conversion API Ready - Select an eligible transaction from the Transactions tab.", "info")}
-          className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-all shrink-0"
+          disabled
+          title="Converting a transaction to EMI isn't available yet — no backend endpoint exists"
+          className="px-4 py-2 rounded-xl bg-teal-600/30 text-teal-200/50 font-bold text-xs cursor-not-allowed shrink-0"
         >
           + Convert to EMI
         </button>

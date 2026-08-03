@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNetWorthAnalytics } from "../hooks/useInsightsQueries";
 import { AnalyticsHeader } from "../components/AnalyticsHeader";
 import { MetricCard } from "../components/MetricCard";
@@ -7,8 +7,12 @@ import { formatCurrency } from "../../../utils/formatters";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Wallet, TrendingUp, Award, Layers } from "lucide-react";
 
-export const NetWorthPage: React.FC = () => {
-  const [horizon, setHorizon] = useState<TimeHorizon>("1Y");
+interface NetWorthPageProps {
+  horizon: TimeHorizon;
+  onHorizonChange: (horizon: TimeHorizon) => void;
+}
+
+export const NetWorthPage: React.FC<NetWorthPageProps> = ({ horizon, onHorizonChange }) => {
   const { data: netWorth, isLoading } = useNetWorthAnalytics(horizon);
 
   if (isLoading || !netWorth) return null;
@@ -44,7 +48,7 @@ export const NetWorthPage: React.FC = () => {
         title="Net Worth & Wealth Growth"
         description="Historical wealth trajectory, growth drivers, asset allocations, and debt liabilities"
         horizon={horizon}
-        onHorizonChange={(h) => setHorizon(h)}
+        onHorizonChange={onHorizonChange}
       />
 
       {/* Hero Stats */}

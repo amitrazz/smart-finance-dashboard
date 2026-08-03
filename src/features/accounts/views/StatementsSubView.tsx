@@ -64,7 +64,11 @@ export const StatementsSubView: React.FC<StatementsSubViewProps> = ({
             Bank, credit card, wallet, and investment account statements
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-colors">
+        <button
+          disabled
+          title="Statement import isn't available yet — no backend endpoint exists"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/50 text-slate-600 font-semibold text-sm cursor-not-allowed opacity-60"
+        >
           <Upload className="w-4 h-4" />
           <span>Import Statement</span>
         </button>

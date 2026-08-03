@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Check, CreditCard as CreditCardIcon } from "lucide-react";
 import { useUpdateCreditCard } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
-import { CreditCard, CardStatus, UpdateCreditCardInput } from "../../../types";
+import { CreditCard, CardStatus, UpdateCreditCardInput, FinancialInstitution } from "../../../types";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface EditCreditCardModalProps {
   card: CreditCard | null;
@@ -16,6 +17,7 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
 
   const [nickname, setNickname] = useState("");
   const [issuer, setIssuer] = useState("");
+  const [institutionId, setInstitutionId] = useState<string | undefined>(undefined);
   const [lastFourDigits, setLastFourDigits] = useState("");
   const [interestRate, setInterestRate] = useState("42.0");
   const [paymentAccountId, setPaymentAccountId] = useState("");
@@ -27,6 +29,7 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
     if (card) {
       setNickname(card.nickname || "");
       setIssuer(card.issuer || "");
+      setInstitutionId(card.institutionId || undefined);
       setLastFourDigits(card.lastFourDigits || "");
       setInterestRate(String(card.interestRate || "42.0"));
       setPaymentAccountId(card.paymentAccountId || "");
@@ -38,12 +41,18 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
 
   if (!isOpen || !card) return null;
 
+  const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
+    setInstitutionId(id);
+    if (institution?.name) setIssuer(institution.name);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const payload: UpdateCreditCardInput = {
       nickname,
       issuer,
+      institutionId,
       lastFourDigits,
       interestRate,
       paymentAccountId: paymentAccountId || undefined,
@@ -105,13 +114,13 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Issuer Bank</label>
-              <input
-                type="text"
-                required
-                value={issuer}
-                onChange={(e) => setIssuer(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+              <label htmlFor="edit-card-issuer" className="block text-xs font-semibold text-slate-300 mb-1.5">Issuer Bank</label>
+              <InstitutionPicker
+                id="edit-card-issuer"
+                value={institutionId}
+                valueLabel={issuer || undefined}
+                onChange={handleInstitutionChange}
+                placeholder="e.g. HDFC Bank"
               />
             </div>
           </div>

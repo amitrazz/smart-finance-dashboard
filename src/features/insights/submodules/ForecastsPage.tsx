@@ -1,12 +1,16 @@
-import React, { useState } from "react";
+import React from "react";
 import { useForecastAnalytics } from "../hooks/useInsightsQueries";
 import { AnalyticsHeader } from "../components/AnalyticsHeader";
 import { ForecastChart } from "../components/ForecastChart";
 import { TimeHorizon } from "../types/insightsTypes";
 import { CheckCircle2 } from "lucide-react";
 
-export const ForecastsPage: React.FC = () => {
-  const [horizon, setHorizon] = useState<TimeHorizon>("1Y");
+interface ForecastsPageProps {
+  horizon: TimeHorizon;
+  onHorizonChange: (horizon: TimeHorizon) => void;
+}
+
+export const ForecastsPage: React.FC<ForecastsPageProps> = ({ horizon, onHorizonChange }) => {
   const { data: forecast, isLoading } = useForecastAnalytics(horizon);
 
   if (isLoading || !forecast) return null;
@@ -17,7 +21,7 @@ export const ForecastsPage: React.FC = () => {
         title="Predictive Wealth & Cash Flow Forecasts"
         description="Statistical model projections across 30 Days, 90 Days, 6 Months, 1 Year, and 3 Years"
         horizon={horizon}
-        onHorizonChange={(h) => setHorizon(h)}
+        onHorizonChange={onHorizonChange}
       />
 
       <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">

@@ -4,7 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { creditCardSchema, CreditCardFormValues } from "../schemas/onboardingSchemas";
 import { useSubmitCreditCard, useSkipStep } from "../hooks/useOnboarding";
 import { CreditCard, Calendar, DollarSign, ArrowRight, Check, FastForward } from "lucide-react";
-import { OnboardingCreditCardInput } from "../../../types";
+import { OnboardingCreditCardInput, FinancialInstitution } from "../../../types";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface CreditCardStepProps {
   initialData?: OnboardingCreditCardInput;
@@ -49,6 +50,14 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
 
   const creditLimit = watch("creditLimit");
   const currentOutstanding = watch("currentOutstanding");
+  const institutionId = watch("institutionId");
+  const [institutionName, setInstitutionName] = useState<string | undefined>(initialData?.issuer);
+
+  const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
+    setValue("institutionId", id);
+    setInstitutionName(institution?.name);
+    if (institution?.name) setValue("issuer", institution.name);
+  };
 
   const handleLimitOrOutstandingChange = (limit: string, outstanding: string) => {
     const avail = Math.max(0, parseFloat(limit || "0") - parseFloat(outstanding || "0"));
@@ -130,12 +139,12 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
               <label htmlFor="issuer" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
                 Issuing Bank
               </label>
-              <input
+              <InstitutionPicker
                 id="issuer"
-                type="text"
+                value={institutionId}
+                valueLabel={institutionName}
+                onChange={handleInstitutionChange}
                 placeholder="e.g. HDFC Bank"
-                {...register("issuer")}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
               />
               {errors.issuer && <p className="text-xs text-rose-400">{errors.issuer.message}</p>}
             </div>

@@ -322,7 +322,7 @@ export const insightsApi = {
       totalIncomeThisMonth: latest.totalIncome,
       totalExpensesThisMonth: latest.totalExpense,
       netCashFlowThisMonth: latest.netSavings,
-      savingsRatePercent: latest.savingsRate,
+      savingsRatePercent: n(latest.savingsRate),
       history,
       largestIncomeSource: largestIncomeSourceRaw
         ? { name: largestIncomeSourceRaw.name, amount: largestIncomeSourceRaw.expectedAmount }
@@ -350,7 +350,7 @@ export const insightsApi = {
       categoryId: c.categoryId,
       categoryName: c.categoryName,
       amount: c.amount,
-      percentage: c.percentage,
+      percentage: n(c.percentage),
       needsVsWants: isNeedCategory(c.categoryName) ? "NEEDS" : "WANTS",
       previousMonthAmount: c.amount,
       monthOverMonthPercent: 0,
@@ -519,7 +519,7 @@ export const insightsApi = {
         name: g.name,
         targetAmount: g.targetAmount,
         currentAmount: g.currentAmount || g.currentCorpus || toMoney(0, g.currency),
-        progressPercent: g.progressPercent,
+        progressPercent: n(g.progressPercent),
         requiredMonthlySavings: g.monthlyContribution || g.autoContributionAmount || toMoney(0, g.currency),
         projectedCompletionDate: g.estimatedCompletionDate || g.forecastCompletionDate || g.targetDate,
         isBehindSchedule,

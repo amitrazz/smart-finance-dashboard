@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { accountSchema, AccountFormValues } from "../schemas/onboardingSchemas";
 import { useSubmitAccount } from "../hooks/useOnboarding";
 import { Landmark, Wallet, Building2, CreditCard as CardIcon, ArrowRight, Check, DollarSign } from "lucide-react";
-import { OnboardingAccountInput } from "../../../types";
+import { OnboardingAccountInput, FinancialInstitution } from "../../../types";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface BankAccountStepProps {
   initialData?: OnboardingAccountInput;
@@ -17,18 +18,6 @@ const ACCOUNT_TYPES = [
   { key: "CURRENT", label: "Salary / Checking", desc: "Daily spending & salary", icon: Building2, color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10" },
   { key: "CASH", label: "Cash Wallet", desc: "Physical cash in hand", icon: Wallet, color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
   { key: "WALLET", label: "Digital Wallet", desc: "Paytm, PayPal, Apple Pay", icon: CardIcon, color: "text-purple-400 border-purple-500/30 bg-purple-500/10" },
-];
-
-const POPULAR_INSTITUTIONS = [
-  "HDFC Bank",
-  "ICICI Bank",
-  "State Bank of India",
-  "Axis Bank",
-  "Kotak Mahindra",
-  "Chase",
-  "Bank of America",
-  "Revolut",
-  "Other / Cash",
 ];
 
 export const BankAccountStep: React.FC<BankAccountStepProps> = ({
@@ -56,6 +45,13 @@ export const BankAccountStep: React.FC<BankAccountStepProps> = ({
 
   const selectedType = watch("type");
   const currentName = watch("name");
+  const institutionId = watch("institutionId");
+  const [institutionName, setInstitutionName] = useState<string | undefined>(undefined);
+
+  const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
+    setValue("institutionId", id);
+    setInstitutionName(institution?.name);
+  };
 
   const onSubmit = (data: AccountFormValues) => {
     submitAccount.mutate(data, {
@@ -142,28 +138,23 @@ export const BankAccountStep: React.FC<BankAccountStepProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Institution Quick Pick
+            <label htmlFor="accountInstitution" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Institution (Optional)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {POPULAR_INSTITUTIONS.map((inst) => (
-                <button
-                  key={inst}
-                  type="button"
-                  onClick={() => setValue("name", inst === "Other / Cash" ? "Cash Wallet" : `${inst} ${selectedType}`)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 hover:border-slate-600 transition-all"
-                >
-                  + {inst}
-                </button>
-              ))}
-            </div>
+            <InstitutionPicker
+              id="accountInstitution"
+              value={institutionId}
+              valueLabel={institutionName}
+              onChange={handleInstitutionChange}
+              placeholder="e.g. HDFC Bank, Cash / Other…"
+            />
           </div>
         </div>
 
         {/* Opening Balance Entry */}
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
-            <label htmlFor="openingBalance" className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <label htmlFor="openingBalance" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <DollarSign className="w-4 h-4 text-emerald-400" />
               <span>Current Opening Balance</span>
             </label>

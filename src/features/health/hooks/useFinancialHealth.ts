@@ -12,6 +12,14 @@ import {
   CreditCardStatementPaymentInput,
 } from "../../../types";
 
+const getErrorMessage = (err: unknown): string => {
+  if (err !== null && typeof err === "object") {
+    if ("userMessage" in err) return String((err as { userMessage: unknown }).userMessage);
+    if ("message" in err) return String((err as { message: unknown }).message);
+  }
+  return "An unexpected error occurred. Please try again.";
+};
+
 export const HEALTH_DIMENSION_LABELS: Record<HealthDimensionKey, string> = {
   CASH_FLOW: "Cash Flow",
   SAVINGS_RATE: "Savings Rate",
@@ -149,9 +157,8 @@ export function useRecalculateHealthScore() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       useUIStore.getState().showToast("Financial Health Score recalculated!", "success");
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
-      useUIStore.getState().showToast("Health Score updated", "info");
+    onError: (err) => {
+      useUIStore.getState().showToast(getErrorMessage(err), "error");
     },
   });
 }

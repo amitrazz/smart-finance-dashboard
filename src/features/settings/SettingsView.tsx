@@ -13,7 +13,6 @@ export const SettingsView: React.FC = () => {
   const { data: actionPrefs } = useActionPreferences();
   const updateActionPrefsMutation = useUpdateActionPreferences();
   const { data: categoryCounts } = useActionCategories();
-  const { showToast } = useUIStore();
   const { user } = useAuthStore();
 
   const [currency, setCurrency] = useState("INR");
@@ -58,8 +57,6 @@ export const SettingsView: React.FC = () => {
       quietHoursEnd,
       notifyMinPriority,
     });
-
-    showToast("All settings saved successfully!", "success");
   };
 
   const toggleMutedCategory = (catName: string) => {
@@ -296,17 +293,19 @@ export const SettingsView: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => showToast("Exporting financial data package...", "info")}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              disabled
+              title="Data export isn't available yet — no backend endpoint exists"
+              className="px-4 py-2 rounded-xl bg-slate-800/50 text-slate-500 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" /> Export Data (JSON)
             </button>
             <button
               type="button"
-              onClick={() => showToast("Backup archive scheduled", "success")}
-              className="px-4 py-2 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              disabled
+              title="Encrypted backup isn't available yet — no backend endpoint exists"
+              className="px-4 py-2 rounded-xl bg-purple-600/10 text-purple-300/50 border border-purple-500/20 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed"
             >
-              <Shield className="w-3.5 h-3.5 text-purple-400" /> Create Encrypted Backup
+              <Shield className="w-3.5 h-3.5 text-purple-400/50" /> Create Encrypted Backup
             </button>
           </div>
         </div>
