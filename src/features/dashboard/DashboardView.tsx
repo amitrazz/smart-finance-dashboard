@@ -5,6 +5,8 @@ import {
   useLiabilitiesSummary,
   useInvestmentReturns,
   useCreditCards,
+  useCashFlowAnalytics,
+  useTransactions,
 } from "../../hooks/useFinanceQueries";
 import { OnboardingWidget } from "../onboarding/OnboardingWidget";
 
@@ -33,8 +35,13 @@ export const DashboardView: React.FC = () => {
   const { data: liabilitiesData } = useLiabilitiesSummary();
   const { data: investmentReturnsData } = useInvestmentReturns();
   const { data: creditCardsData = [] } = useCreditCards();
+  // The dashboard endpoint has no monthlyIncome/savingsRate fields — the
+  // monthly cash-flow snapshot is the real backend source for both.
+  const { data: cashFlowData } = useCashFlowAnalytics();
+  const { data: recentTransactions = [] } = useTransactions({ limit: 1 });
 
   const netWorthHistory = Array.isArray(netWorthHistoryData) ? netWorthHistoryData : [];
+  const currentCashFlow = Array.isArray(cashFlowData) && cashFlowData.length > 0 ? cashFlowData[0] : undefined;
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -59,13 +66,16 @@ export const DashboardView: React.FC = () => {
   }
 
   const netWorthVal = parseFloat(dashboard.netWorth?.amount || "0");
-  const hasSparseData = netWorthVal === 0 && (!dashboard.recentTransactions || dashboard.recentTransactions.length === 0);
+  const hasSparseData = netWorthVal === 0 && recentTransactions.length === 0;
+  const monthlyIncome = currentCashFlow?.totalIncome;
+  const savingsRate = currentCashFlow?.savingsRate;
+  const debtCurrency = dashboard.netWorth?.currency || "INR";
 
   let totalCreditBalance = 0;
   let totalCreditLimit = 0;
 
   (creditCardsData as CreditCard[]).forEach((card) => {
-    const balanceStr = typeof card.currentBalance === "object" ? card.currentBalance?.amount : String(card.currentBalance || "0");
+    const balanceStr = typeof card.currentOutstanding === "object" ? card.currentOutstanding?.amount : String(card.currentOutstanding || "0");
     const limitStr = typeof card.creditLimit === "object" ? card.creditLimit?.amount : String(card.creditLimit || "0");
     totalCreditBalance += parseFloat(balanceStr || "0");
     totalCreditLimit += parseFloat(limitStr || "0");
@@ -88,7 +98,7 @@ export const DashboardView: React.FC = () => {
       <HeroNetWorthCard
         netWorth={dashboard.netWorth}
         cashPosition={dashboard.cashPosition}
-        savingsRate={dashboard.savingsRate}
+        savingsRate={savingsRate}
         netWorthHistory={netWorthHistory}
       />
 
@@ -98,15 +108,15 @@ export const DashboardView: React.FC = () => {
       {/* 8-Metric Performance KPI Grid (Full Width) */}
       <KPIGrid
         cashPosition={dashboard.cashPosition}
-        monthlyIncome={dashboard.monthlyIncome}
-        monthlySpend={dashboard.thisMonthSpend || dashboard.monthlySpend}
-        savingsRate={dashboard.savingsRate}
+        monthlyIncome={monthlyIncome}
+        monthlySpend={dashboard.thisMonthSpend}
+        savingsRate={savingsRate}
         totalInvestments={
           investmentReturnsData && investmentReturnsData.length > 0
             ? { amount: investmentReturnsData[0].totalMarketValue, currency: "INR" }
             : undefined
         }
-        totalDebt={liabilitiesData?.totalLiabilities}
+        totalDebt={liabilitiesData ? { amount: liabilitiesData.totalDebt, currency: debtCurrency } : undefined}
         creditUtilizationPercent={realCreditUtilization}
         upcomingDuesCount={dashboard.topActions?.length || 0}
       />
@@ -125,9 +135,9 @@ export const DashboardView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
         <div className="flex">
           <CashFlowCard
-            monthlyIncome={dashboard.monthlyIncome}
-            monthlySpend={dashboard.thisMonthSpend || dashboard.monthlySpend}
-            savingsRate={dashboard.savingsRate}
+            monthlyIncome={monthlyIncome}
+            monthlySpend={dashboard.thisMonthSpend}
+            savingsRate={savingsRate}
           />
         </div>
         <div className="flex">

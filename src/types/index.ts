@@ -51,44 +51,43 @@ export interface FinancialInstitution {
   logoUrl?: string;
 }
 
-export type CardNetwork = "VISA" | "MASTERCARD" | "AMEX" | "RUPAY" | "DINERS" | "OTHER";
-export type CardType = "REWARDS" | "CASHBACK" | "TRAVEL" | "PREMIUM" | "SECURED" | "OTHER";
-export type CardStatus = "ACTIVE" | "BLOCKED" | "CLOSED" | "INACTIVE" | "EXPIRED";
+export type CardNetwork = "VISA" | "MASTERCARD" | "RUPAY" | "AMEX" | "DINERS" | "DISCOVER" | "OTHER";
+export type CreditCardCategory = "CREDIT_CARD" | "CORPORATE_CARD" | "CHARGE_CARD" | "SECURED_CARD" | "VIRTUAL_CARD";
+export type CardStatus = "ACTIVE" | "BLOCKED" | "CLOSED" | "EXPIRED";
 
 export interface CreditCard {
   id: string;
-  name: string;
   issuer: string;
+  nickname: string;
   network?: CardNetwork | string;
-  cardType?: CardType | string;
+  category?: CreditCardCategory | string;
   currency: string;
   creditLimit: Money | string | number;
   currentOutstanding?: Money | string | number;
-  currentBalance?: Money | string;
   availableCredit?: Money | string | number;
   statementBalance?: Money | string | number;
   minimumDue?: Money | string | number;
+  utilization?: string;
   billingCycleDay?: number;
-  statementDay?: number;
+  statementGenerationDay?: number;
   paymentDueDay?: number;
-  dueDay?: number;
+  nextStatementDate?: string;
   nextDueDate?: string;
-  interestRate?: number;
+  interestRate?: string | number;
+  cashAdvanceRate?: string | number;
   annualFee?: Money | string | number;
   joiningFee?: Money | string | number;
   openedDate?: string;
+  closedDate?: string;
+  expiryDate?: string;
   rewardProgram?: string;
-  rewardBalance?: number;
+  rewardPoints?: number;
   paymentAccountId?: string;
   paymentAccountName?: string;
-  autoPay?: boolean;
+  autoPayEnabled?: boolean;
   institutionId?: string;
   institutionName?: string;
-  maskedNumber?: string;
-  last4Digits?: string;
-  nickname?: string;
-  outstandingBalance?: Money | string | number;
-  creditUtilizationPercent?: number;
+  lastFourDigits?: string;
   status: CardStatus | string;
   notes?: string;
   version?: number;
@@ -97,32 +96,38 @@ export interface CreditCard {
   createdAt?: string;
 }
 
+export interface CreditCardUpcomingDue {
+  statementId: string;
+  creditCardId: string;
+  cardNickname: string;
+  dueDate: string;
+  statementBalance: string;
+  minimumDue: string;
+  status: string;
+}
+
 export interface CreditCardDashboardData {
   totalOutstanding: Money;
   totalCreditLimit: Money;
-  availableCredit: Money;
-  creditUtilizationPercent: number;
-  statementBalance: Money;
-  minimumDue: Money;
-  upcomingDue?: {
-    cardId: string;
-    cardName: string;
-    dueDate: string;
-    amount: Money;
-  } | null;
-  totalCards: number;
-  activeCards: number;
-  blockedCards: number;
+  totalAvailableCredit: Money;
+  utilization: string;
+  totalStatementBalance: Money;
+  totalMinimumDue: Money;
   totalRewardPoints: number;
-  activeEmis: number;
-  outstandingTrend: Array<{ month: string; amount: Money }>;
-  creditUtilizationTrend: Array<{ month: string; utilization: number }>;
-  outstandingByCard: Array<{ cardId: string; cardName: string; amount: Money }>;
-  outstandingByIssuer: Array<{ issuer: string; amount: Money }>;
-  monthlySpending: Array<{ month: string; amount: Money }>;
-  paymentHistory: Array<{ month: string; amount: Money }>;
-  rewardGrowth: Array<{ month: string; points: number }>;
-  emiBreakdown: Array<{ category: string; amount: Money; count: number }>;
+  activeEmiCount: number;
+  activeEmiTotalRemaining: Money;
+  interestThisMonth: Money;
+  feesThisMonth: Money;
+  upcomingDue: CreditCardUpcomingDue[];
+  nextDue: CreditCardUpcomingDue | null;
+  cardsByStatus: Record<string, number>;
+  recentlyPaid: Array<{
+    paymentId: string;
+    creditCardId: string;
+    cardNickname: string;
+    paidAmount: string;
+    paidDate: string;
+  }>;
 }
 
 export interface CreditCardStatement {
@@ -217,49 +222,55 @@ export interface CreditCardDocument {
 }
 
 export interface CreateCreditCardInput {
-  name: string;
   issuer: string;
-  network?: CardNetwork | string;
-  cardType?: CardType | string;
-  maskedNumber?: string;
-  last4Digits?: string;
-  currency: string;
+  nickname: string;
+  lastFourDigits: string;
   creditLimit: string;
-  currentOutstanding?: string;
-  availableCredit?: string;
-  statementBalance?: string;
-  minimumDue?: string;
-  billingCycleDay?: number;
-  statementDay?: number;
-  paymentDueDay?: number;
-  dueDay?: number;
-  nextDueDate?: string;
-  interestRate?: string;
+  currentOutstanding: string;
+  availableCredit: string;
+  statementBalance: string;
+  minimumDue: string;
+  billingCycleDay: number;
+  paymentDueDay: number;
+  nextDueDate: string;
+  network?: CardNetwork | string;
+  category?: CreditCardCategory | string;
+  currency?: string;
   paymentAccountId?: string;
-  autoPay?: boolean;
+  autoPayEnabled?: boolean;
+  institutionId?: string;
+  statementGenerationDay?: number;
+  nextStatementDate?: string;
+  interestRate?: string;
+  cashAdvanceRate?: string;
   annualFee?: string;
   joiningFee?: string;
-  openedDate?: string;
+  rewardProgram?: string;
+  rewardRatePoints?: string;
   notes?: string;
-  institutionId?: string;
+  openedDate?: string;
+  expiryDate?: string;
 }
 
 export interface UpdateCreditCardInput {
-  name?: string;
+  nickname?: string;
   issuer?: string;
+  lastFourDigits?: string;
+  institutionId?: string;
   network?: CardNetwork | string;
-  cardType?: CardType | string;
-  creditLimit?: string;
-  statementDay?: number;
-  dueDay?: number;
-  billingCycleDay?: number;
-  paymentDueDay?: number;
-  nextDueDate?: string;
-  interestRate?: string;
+  category?: CreditCardCategory | string;
   paymentAccountId?: string;
-  autoPay?: boolean;
-  status?: CardStatus | string;
+  autoPayEnabled?: boolean;
+  interestRate?: string;
+  cashAdvanceRate?: string;
+  annualFee?: string;
+  joiningFee?: string;
+  rewardProgram?: string;
+  rewardRatePoints?: string;
   notes?: string;
+  openedDate?: string;
+  expiryDate?: string;
+  status?: CardStatus | string;
 }
 
 export interface RecordCreditCardPaymentInput {
@@ -1235,12 +1246,14 @@ export interface NetWorthSnapshot {
   totalAssets: Money;
   totalLiabilities: Money;
   netWorth: Money;
+  // Plain decimal strings sharing `netWorth.currency` — the backend's
+  // NetWorthBreakdown does not carry a currency per line item.
   breakdown: {
-    liquidCash: Money;
-    investments: Money;
-    realEstate: Money;
-    loans: Money;
-    creditCards: Money;
+    liquidCash: string;
+    investments: string;
+    realEstate: string;
+    loans: string;
+    creditCards: string;
   };
 }
 
@@ -1322,78 +1335,6 @@ export interface InsurancePolicy {
   notes?: string;
 }
 
-export interface BootstrapOnboardingPayload {
-  cashAccounts?: Array<{
-    bank: string;
-    name: string;
-    type: string;
-    currentBalance: number;
-    balanceAsOfDate?: string;
-  }>;
-  creditCards?: Array<{
-    issuer: string;
-    name: string;
-    creditLimit: number;
-    currentOutstanding: number;
-    statementDay: number;
-    dueDay: number;
-    autoPay?: boolean;
-  }>;
-  loans?: Array<{
-    name: string;
-    lender: string;
-    type: string;
-    originalAmount: number;
-    currentBalance: number;
-    interestRate: number;
-    emiAmount: number;
-    emiFrequency: string;
-    nextEmiDate: string;
-    startDate?: string;
-    remainingTenure?: number;
-    notes?: string;
-  }>;
-  investments?: Array<{
-    type: string;
-    name: string;
-    quantity?: number;
-    currentValue: number;
-  }>;
-  physicalAssets?: Array<{
-    name: string;
-    type: string;
-    estimatedValue: number;
-    purchaseYear?: number;
-    notes?: string;
-  }>;
-  insurancePolicies?: Array<{
-    provider: string;
-    policyName: string;
-    policyType: string;
-    coverageAmount: number;
-    premiumAmount: number;
-    renewalDate: string;
-    notes?: string;
-  }>;
-  income?: {
-    primaryIncome: number;
-    salaryFrequency: string;
-    otherIncomeSources?: Array<{ name: string; amount: number; frequency: string }>;
-  };
-  monthlyExpenses?: Array<{
-    category: string;
-    estimatedAmount: number;
-  }>;
-  goals?: Array<{
-    name: string;
-    category: string;
-    targetAmount: number;
-    targetDate: string;
-    currentSavedAmount?: number;
-  }>;
-  dataImportChoice?: string;
-}
-
 export interface OnboardingStepCatalogItem {
   key: string;
   title: string;
@@ -1454,12 +1395,18 @@ export interface OnboardingAccountInput {
 }
 
 export interface OnboardingCreditCardInput {
-  name: string;
+  issuer: string;
+  nickname: string;
+  lastFourDigits: string;
   currency: string;
   creditLimit: string;
-  currentBalance: string;
-  statementDay: number;
-  dueDay: number;
+  currentOutstanding: string;
+  availableCredit: string;
+  statementBalance: string;
+  minimumDue: string;
+  billingCycleDay: number;
+  paymentDueDay: number;
+  nextDueDate: string;
   institutionId?: string;
 }
 
@@ -1707,21 +1654,12 @@ export interface ActionPreferences {
 
 export interface CashPositionData {
   totalCash: Money;
-  availableCash: Money;
-  pendingCash: Money;
-  lockedFunds: Money;
-  emergencyFund: Money;
-  investmentCash: Money;
   currencyBreakdown: Array<{ currency: string; amount: Money; percentage: number }>;
   institutionBreakdown: Array<{ institutionId: string; institutionName: string; logoUrl?: string; amount: Money; percentage: number }>;
-  cashAllocation: Array<{ category: string; amount: Money; percentage: number }>;
-  historical30DayTrend: Array<{ date: string; balance: number }>;
 }
 
 export interface WalletAccount extends Account {
   provider: "Paytm" | "PhonePe" | "Google Pay" | "Amazon Pay" | "PayPal" | "Other";
-  monthlySpend?: Money;
-  topCategories?: Array<{ categoryName: string; amount: Money }>;
   recentTransactions?: Transaction[];
 }
 

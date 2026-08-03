@@ -104,7 +104,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
     );
   }
 
-  const outstanding = getVal(card?.currentOutstanding || card?.currentBalance);
+  const outstanding = getVal(card?.currentOutstanding);
   const limit = getVal(card?.creditLimit);
   const available = getVal(card?.availableCredit) || Math.max(0, limit - outstanding);
   const statementBal = getVal(card?.statementBalance);
@@ -164,7 +164,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold text-slate-100">{card.name}</h2>
+                <h2 className="text-2xl font-bold text-slate-100">{card.nickname}</h2>
                 <span
                   className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${
                     card.status === "ACTIVE"
@@ -178,7 +178,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                {card.issuer || "Bank Issuer"} • {card.maskedNumber ? `•••• ${card.maskedNumber}` : `•••• ${card.last4Digits || "0000"}`} • {card.network || "VISA"}
+                {card.issuer || "Bank Issuer"} • {`•••• ${card.lastFourDigits || "0000"}`} • {card.network || "VISA"}
               </p>
             </div>
           </div>
@@ -259,7 +259,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
       <ConfirmModal
         isOpen={isDeleting}
         title="Delete Credit Card?"
-        message={`Are you sure you want to delete credit card "${card.name}"? All associated statements, payments, and limit history will be permanently removed.`}
+        message={`Are you sure you want to delete credit card "${card.nickname}"? All associated statements, payments, and limit history will be permanently removed.`}
         confirmText="Delete Credit Card"
         cancelText="Cancel"
         variant="danger"

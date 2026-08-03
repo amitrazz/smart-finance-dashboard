@@ -32,12 +32,18 @@ export const accountSchema = z.object({
 export type AccountFormValues = z.infer<typeof accountSchema>;
 
 export const creditCardSchema = z.object({
-  name: z.string().min(2, "Card name must be at least 2 characters"),
+  issuer: z.string().min(1, "Please specify the issuing bank"),
+  nickname: z.string().min(2, "Card name must be at least 2 characters"),
+  lastFourDigits: z.string().length(4, "Enter exactly 4 digits"),
   currency: z.string().min(3),
   creditLimit: z.string().min(1, "Please specify a credit limit"),
-  currentBalance: z.string().min(1, "Please specify current balance"),
-  statementDay: z.number().min(1).max(31),
-  dueDay: z.number().min(1).max(31),
+  currentOutstanding: z.string().min(1, "Please specify current outstanding balance"),
+  availableCredit: z.string().min(1, "Please specify available credit"),
+  statementBalance: z.string().min(1, "Please specify the latest statement balance"),
+  minimumDue: z.string().min(1, "Please specify the minimum amount due"),
+  billingCycleDay: z.number().min(1).max(31),
+  paymentDueDay: z.number().min(1).max(31),
+  nextDueDate: z.string().min(1, "Please select the next payment due date"),
   institutionId: z.string().optional(),
 });
 

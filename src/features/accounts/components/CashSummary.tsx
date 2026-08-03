@@ -1,23 +1,30 @@
 import React from "react";
 
-import { Account } from "../../../types";
+import { Account, CreditCard as CreditCardType, Money } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import {
-  DollarSign, Landmark, Wallet, ShieldAlert, TrendingUp, CreditCard,
+  DollarSign, Landmark, Wallet, ShieldAlert, CreditCard,
 } from "lucide-react";
 
 interface CashSummaryProps {
   accounts: Account[];
+  creditCards?: CreditCardType[];
 }
 
-export const CashSummary: React.FC<CashSummaryProps> = ({ accounts }) => {
+const moneyToNumber = (v?: Money | string | number): number => {
+  if (v == null) return 0;
+  if (typeof v === "object") return parseFloat(v.amount || "0") || 0;
+  return parseFloat(String(v)) || 0;
+};
+
+export const CashSummary: React.FC<CashSummaryProps> = ({ accounts, creditCards = [] }) => {
+  // Credit cards are a separate backend resource (`/finance/credit-cards`) — they are
+  // never returned by `/finance/accounts`, so outstanding balance must come from the
+  // dedicated credit card list rather than filtering `accounts` by type.
   const liquid = accounts.filter((a) => ["CHECKING", "SAVINGS", "CASH", "WALLET"].includes(a.type));
-  const creditCards = accounts.filter((a) => a.type === "CREDIT_CARD");
-  const investments = accounts.filter((a) => a.type === "BROKERAGE_CASH" || a.type === "INVESTMENT");
 
   const totalLiquid = liquid.reduce((s, a) => s + parseFloat(a.currentBalance?.amount || "0"), 0);
-  const totalCredit = creditCards.reduce((s, a) => s + parseFloat(a.currentBalance?.amount || "0"), 0);
-  const totalInv = investments.reduce((s, a) => s + parseFloat(a.currentBalance?.amount || "0"), 0);
+  const totalCredit = creditCards.reduce((s, c) => s + moneyToNumber(c.currentOutstanding), 0);
   const netCash = totalLiquid - totalCredit;
 
   const items = [
@@ -49,12 +56,6 @@ export const CashSummary: React.FC<CashSummaryProps> = ({ accounts }) => {
       accent: "text-purple-400",
     },
     {
-      label: "Investment Cash",
-      value: formatCurrency(totalInv, "INR"),
-      icon: <TrendingUp className="w-5 h-5 text-teal-400" />,
-      accent: "text-teal-400",
-    },
-    {
       label: "Net Cash Position",
       value: formatCurrency(netCash, "INR"),
       icon: <ShieldAlert className={`w-5 h-5 ${netCash >= 0 ? "text-emerald-400" : "text-rose-400"}`} />,
@@ -63,7 +64,7 @@ export const CashSummary: React.FC<CashSummaryProps> = ({ accounts }) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
       {items.map((item) => (
         <div
           key={item.label}

@@ -31,8 +31,8 @@ export const CreditCardWidget: React.FC<CreditCardWidgetProps> = ({ card, onPay,
             <CardIcon className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-slate-100 text-base">{card.name}</h4>
-            <p className="text-xs text-slate-400 font-medium">{card.issuer} •••• {card.last4Digits || "4892"}</p>
+            <h4 className="font-bold text-slate-100 text-base">{card.nickname}</h4>
+            <p className="text-xs text-slate-400 font-medium">{card.issuer} •••• {card.lastFourDigits || "4892"}</p>
           </div>
         </div>
 
@@ -82,7 +82,7 @@ export const CreditCardWidget: React.FC<CreditCardWidgetProps> = ({ card, onPay,
           <Gift className="w-4 h-4 text-purple-400" />
           <div>
             <span className="block text-[10px] text-slate-500 font-semibold uppercase">Reward Points</span>
-            <span className="text-slate-200 font-bold">{card.rewardBalance || 12450} pts</span>
+            <span className="text-slate-200 font-bold">{card.rewardPoints || 12450} pts</span>
           </div>
         </div>
       </div>

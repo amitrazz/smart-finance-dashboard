@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, ReconciliationStatus, AccountStatementItem } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, AccountStatementItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -121,36 +121,6 @@ export function useUpdateSettings() {
   });
 }
 
-// Onboarding
-export function useOnboardingProgress() {
-  return useQuery({
-    queryKey: QUERY_KEYS.onboarding,
-    queryFn: () => api.getOnboardingProgress(),
-    enabled: isAuth(),
-  });
-}
-
-export function useCompleteOnboardingStep() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (stepId: string) => api.completeOnboardingStep(stepId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.onboarding });
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useBootstrapOnboarding() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: BootstrapOnboardingPayload) => api.bootstrapOnboarding(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
 
 // Institutions
 export function useInstitutions(params?: { search?: string; limit?: number }) {
@@ -282,12 +252,15 @@ export function useDeleteAccount() {
 }
 
 // Cash Position Query
+// Derives totals purely from real account balances (`/finance/accounts`) — there is
+// no backend endpoint that classifies cash as available/pending/locked/emergency, so
+// those distinctions are intentionally not fabricated here.
 export function useCashPosition() {
-  const { data: accounts = [] } = useAccounts();
-  
+  const { data: accounts = [], isLoading, isError } = useAccounts();
+
   return useQuery({
     queryKey: QUERY_KEYS.cashPosition,
-    queryFn: async (): Promise<CashPositionData> => {
+    queryFn: (): CashPositionData => {
       const liquidAccounts = accounts.filter((a) =>
         ["CHECKING", "SAVINGS", "CASH", "WALLET", "BROKERAGE_CASH"].includes(a.type)
       );
@@ -327,44 +300,22 @@ export function useCashPosition() {
         percentage: totalNum > 0 ? Math.round((data.amount / totalNum) * 100) : 0,
       }));
 
-      const cashAllocation = [
-        { category: "Checking & Operations", amount: { amount: (totalNum * 0.45).toFixed(2), currency: "INR" }, percentage: 45 },
-        { category: "High-Yield Savings", amount: { amount: (totalNum * 0.30).toFixed(2), currency: "INR" }, percentage: 30 },
-        { category: "Emergency Reserve", amount: { amount: (totalNum * 0.15).toFixed(2), currency: "INR" }, percentage: 15 },
-        { category: "Digital Wallets & Cash", amount: { amount: (totalNum * 0.10).toFixed(2), currency: "INR" }, percentage: 10 },
-      ];
-
-      const now = new Date();
-      const historical30DayTrend = Array.from({ length: 30 }, (_, i) => {
-        const d = new Date(now);
-        d.setDate(d.getDate() - (29 - i));
-        const variance = (Math.sin(i / 3) * 0.05 + 1);
-        return {
-          date: d.toISOString().split("T")[0],
-          balance: Math.round(totalNum * variance),
-        };
-      });
-
       return {
         totalCash: { amount: totalNum.toFixed(2), currency: "INR" },
-        availableCash: { amount: (totalNum * 0.85).toFixed(2), currency: "INR" },
-        pendingCash: { amount: (totalNum * 0.05).toFixed(2), currency: "INR" },
-        lockedFunds: { amount: (totalNum * 0.10).toFixed(2), currency: "INR" },
-        emergencyFund: { amount: (totalNum * 0.35).toFixed(2), currency: "INR" },
-        investmentCash: { amount: (totalNum * 0.15).toFixed(2), currency: "INR" },
         currencyBreakdown,
         institutionBreakdown,
-        cashAllocation,
-        historical30DayTrend,
       };
     },
-    enabled: isAuth() && accounts.length >= 0,
+    enabled: isAuth() && !isLoading && !isError,
   });
 }
 
 // Wallets Query
+// Wallet accounts are real `/finance/accounts` records filtered by type; `provider` is
+// inferred from the account name for display only. There is no backend endpoint for
+// per-wallet spend analytics, so no spend/category figures are fabricated here.
 export function useWallets() {
-  const { data: accounts = [] } = useAccounts();
+  const { data: accounts = [], isLoading, isError } = useAccounts();
   return useQuery({
     queryKey: QUERY_KEYS.wallets,
     queryFn: (): WalletAccount[] => {
@@ -378,132 +329,38 @@ export function useWallets() {
         else if (nameLower.includes("amazon")) provider = "Amazon Pay";
         else if (nameLower.includes("paypal")) provider = "PayPal";
 
-        return {
-          ...w,
-          provider,
-          monthlySpend: { amount: "12450.00", currency: w.currency || "INR" },
-          topCategories: [
-            { categoryName: "Food & Dining", amount: { amount: "4200.00", currency: "INR" } },
-            { categoryName: "Utilities", amount: { amount: "3500.00", currency: "INR" } },
-            { categoryName: "Groceries", amount: { amount: "2850.00", currency: "INR" } },
-          ],
-        };
+        return { ...w, provider };
       });
     },
-    enabled: isAuth(),
+    enabled: isAuth() && !isLoading && !isError,
   });
 }
 
 // Fixed Deposits Query
+// There is no backend endpoint or account field for FD terms (interest rate, maturity
+// date, tenure, principal) — `/finance/accounts` only exposes a current balance. Rather
+// than inventing those figures, this resolves to an error state like `useAccountTransfers`.
 export function useFixedDeposits() {
-  const { data: accounts = [] } = useAccounts();
   return useQuery({
     queryKey: QUERY_KEYS.fixedDeposits,
-    queryFn: (): FixedDeposit[] => {
-      const fdAccounts = accounts.filter(
-        (a) => a.type === "FIXED_DEPOSIT" || a.type === "RECURRING_DEPOSIT"
-      );
-
-      if (fdAccounts.length > 0) {
-        return fdAccounts.map((fd, index) => {
-          const val = parseFloat(fd.currentBalance?.amount || "100000");
-          return {
-            id: fd.id,
-            accountNumber: fd.maskedNumber || `FD-9842${index + 1}`,
-            accountName: fd.name,
-            institutionId: fd.institutionId || fd.institution?.id || "inst-hdfc",
-            institutionName: fd.institution?.name || "HDFC Bank",
-            logoUrl: fd.institution?.logoUrl,
-            principal: { amount: (val * 0.9).toFixed(2), currency: fd.currency || "INR" },
-            currentValue: { amount: val.toFixed(2), currency: fd.currency || "INR" },
-            interestEarned: { amount: (val * 0.1).toFixed(2), currency: fd.currency || "INR" },
-            interestRate: 7.25,
-            startDate: "2024-01-15",
-            maturityDate: "2026-01-15",
-            tenureMonths: 24,
-            status: "ACTIVE",
-            currency: fd.currency || "INR",
-          };
-        });
-      }
-
-      // Default FD items for display if none created yet
-      return [
-        {
-          id: "fd-1",
-          accountNumber: "FD-8823-9941",
-          accountName: "HDFC Tax Saver FD",
-          institutionId: "inst-1",
-          institutionName: "HDFC Bank",
-          principal: { amount: "250000.00", currency: "INR" },
-          currentValue: { amount: "284500.00", currency: "INR" },
-          interestEarned: { amount: "34500.00", currency: "INR" },
-          interestRate: 7.4,
-          startDate: "2024-03-10",
-          maturityDate: "2027-03-10",
-          tenureMonths: 36,
-          status: "ACTIVE",
-          currency: "INR",
-        },
-        {
-          id: "fd-2",
-          accountNumber: "FD-4412-1092",
-          accountName: "ICICI High Yield FD",
-          institutionId: "inst-2",
-          institutionName: "ICICI Bank",
-          principal: { amount: "500000.00", currency: "INR" },
-          currentValue: { amount: "542000.00", currency: "INR" },
-          interestEarned: { amount: "42000.00", currency: "INR" },
-          interestRate: 7.1,
-          startDate: "2024-06-01",
-          maturityDate: "2025-12-01",
-          tenureMonths: 18,
-          status: "ACTIVE",
-          currency: "INR",
-        },
-      ];
-    },
+    queryFn: (): Promise<FixedDeposit[]> =>
+      Promise.reject(new Error("Fixed deposit tracking is not available yet — no backend endpoint exists.")),
     enabled: isAuth(),
+    retry: false,
   });
 }
 
 // Investment Cash Query
+// There is no backend endpoint for per-broker cash positions (available to trade,
+// pending settlement, withdrawable) — resolves to an error state instead of
+// fabricating broker balances.
 export function useInvestmentCash() {
   return useQuery({
     queryKey: QUERY_KEYS.investmentCash,
-    queryFn: (): InvestmentCashPosition[] => [
-      {
-        brokerId: "brk-zerodha",
-        brokerName: "Zerodha Kite",
-        totalCash: { amount: "85400.00", currency: "INR" },
-        availableToTrade: { amount: "80000.00", currency: "INR" },
-        pendingSettlement: { amount: "5400.00", currency: "INR" },
-        withdrawable: { amount: "75000.00", currency: "INR" },
-        recentTradesCount: 14,
-        currency: "INR",
-      },
-      {
-        brokerId: "brk-groww",
-        brokerName: "Groww Stocks",
-        totalCash: { amount: "34200.00", currency: "INR" },
-        availableToTrade: { amount: "34200.00", currency: "INR" },
-        pendingSettlement: { amount: "0.00", currency: "INR" },
-        withdrawable: { amount: "34200.00", currency: "INR" },
-        recentTradesCount: 6,
-        currency: "INR",
-      },
-      {
-        brokerId: "brk-ibkr",
-        brokerName: "Interactive Brokers",
-        totalCash: { amount: "1250.00", currency: "USD" },
-        availableToTrade: { amount: "1200.00", currency: "USD" },
-        pendingSettlement: { amount: "50.00", currency: "USD" },
-        withdrawable: { amount: "1150.00", currency: "USD" },
-        recentTradesCount: 8,
-        currency: "USD",
-      },
-    ],
+    queryFn: (): Promise<InvestmentCashPosition[]> =>
+      Promise.reject(new Error("Broker cash positions are not available yet — no backend endpoint exists.")),
     enabled: isAuth(),
+    retry: false,
   });
 }
 
@@ -533,120 +390,37 @@ export function useCreateTransfer() {
 }
 
 // Reconciliation Query & Mutations
+// There is no backend endpoint for matching imported statement lines against ledger
+// transactions — resolves to an error state instead of fabricating match results.
 export function useReconciliation(params?: { status?: string }) {
   return useQuery({
     queryKey: QUERY_KEYS.reconciliation(params),
-    queryFn: (): ReconciliationItem[] => [
-      {
-        id: "rec-1",
-        accountId: "acc-1",
-        accountName: "HDFC Salary Checking",
-        statementDate: "2026-07-28",
-        importedTransaction: {
-          id: "imp-101",
-          date: "2026-07-28",
-          description: "NEFT-SWIGGY FOOD ORDER",
-          amount: { amount: "480.00", currency: "INR" },
-          fitId: "FIT-991204",
-        },
-        confidenceScore: 98,
-        status: "MATCHED",
-      },
-      {
-        id: "rec-2",
-        accountId: "acc-1",
-        accountName: "HDFC Salary Checking",
-        statementDate: "2026-07-29",
-        importedTransaction: {
-          id: "imp-102",
-          date: "2026-07-29",
-          description: "ATM CASH WITHDRAWAL MUMBAI",
-          amount: { amount: "5000.00", currency: "INR" },
-          fitId: "FIT-991205",
-        },
-        confidenceScore: 45,
-        discrepancyNote: "No corresponding manual Cash entry found in Petty Cash log",
-        status: "EXCEPTIONS" as ReconciliationStatus,
-      },
-      {
-        id: "rec-3",
-        accountId: "acc-2",
-        accountName: "ICICI Savings Account",
-        statementDate: "2026-07-30",
-        importedTransaction: {
-          id: "imp-103",
-          date: "2026-07-30",
-          description: "UPI-AMAZON PAY INDIA",
-          amount: { amount: "1299.00", currency: "INR" },
-        },
-        confidenceScore: 85,
-        status: "PENDING",
-      },
-    ],
+    queryFn: (): Promise<ReconciliationItem[]> =>
+      Promise.reject(new Error("Statement reconciliation is not available yet — no backend endpoint exists.")),
     enabled: isAuth(),
+    retry: false,
   });
 }
 
 export function useBulkReconcile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ ids, action }: { ids: string[]; action: "MATCH" | "DISMISS" }) => {
-      return { success: true, count: ids.length, action };
-    },
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
-      useUIStore.getState().showToast(`Bulk ${res.action.toLowerCase()} completed for ${res.count} items`, "success");
+  return useMutation<never, Error, { ids: string[]; action: "MATCH" | "DISMISS" }>({
+    mutationFn: async () => {
+      throw new Error("Statement reconciliation is not available yet — no backend endpoint exists.");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });
 }
 
 // Account Statements Query
+// There is no backend endpoint that generates/aggregates bank, wallet, or investment
+// account statements — resolves to an error state instead of fabricating statement history.
 export function useAccountStatements(params?: { type?: string }) {
   return useQuery({
     queryKey: QUERY_KEYS.accountStatements(params),
-    queryFn: (): AccountStatementItem[] => [
-      {
-        id: "stmt-1",
-        accountId: "acc-1",
-        accountName: "HDFC Salary Checking",
-        type: "BANK",
-        periodStart: "2026-06-01",
-        periodEnd: "2026-06-30",
-        openingBalance: { amount: "142000.00", currency: "INR" },
-        closingBalance: { amount: "185400.00", currency: "INR" },
-        status: "READY",
-        downloadUrl: "#",
-        importedAt: "2026-07-02",
-      },
-      {
-        id: "stmt-2",
-        accountId: "acc-credit-1",
-        accountName: "HDFC Regalia Credit Card",
-        type: "CREDIT_CARD",
-        periodStart: "2026-06-15",
-        periodEnd: "2026-07-15",
-        openingBalance: { amount: "0.00", currency: "INR" },
-        closingBalance: { amount: "34200.00", currency: "INR" },
-        status: "READY",
-        downloadUrl: "#",
-        importedAt: "2026-07-16",
-      },
-      {
-        id: "stmt-3",
-        accountId: "acc-wallet-1",
-        accountName: "Paytm Digital Wallet",
-        type: "WALLET",
-        periodStart: "2026-06-01",
-        periodEnd: "2026-06-30",
-        openingBalance: { amount: "2500.00", currency: "INR" },
-        closingBalance: { amount: "4800.00", currency: "INR" },
-        status: "READY",
-        downloadUrl: "#",
-        importedAt: "2026-07-01",
-      },
-    ],
+    queryFn: (): Promise<AccountStatementItem[]> =>
+      Promise.reject(new Error("Account statements are not available yet — no backend endpoint exists.")),
     enabled: isAuth(),
+    retry: false,
   });
 }
 
@@ -1143,10 +917,45 @@ export function useLiabilitiesSummary() {
 }
 
 // Analytics & Insights
+// The backend's NetWorthResponseDto uses `snapshotDate` (not `date`) and a
+// `breakdown` keyed by `cash` (not `liquidCash`), with an extra `otherAssets`
+// line this feature doesn't surface. Map once here so every consumer can use
+// the app-facing field names.
+interface RawNetWorthSnapshot {
+  snapshotDate: string;
+  totalAssets: Money;
+  totalLiabilities: Money;
+  netWorth: Money;
+  breakdown: {
+    cash: string;
+    investments: string;
+    realEstate: string;
+    otherAssets: string;
+    loans: string;
+    creditCards: string;
+  };
+}
+
+function mapNetWorthSnapshot(raw: RawNetWorthSnapshot): NetWorthSnapshot {
+  return {
+    date: raw.snapshotDate,
+    totalAssets: raw.totalAssets,
+    totalLiabilities: raw.totalLiabilities,
+    netWorth: raw.netWorth,
+    breakdown: {
+      liquidCash: raw.breakdown?.cash ?? "0",
+      investments: raw.breakdown?.investments ?? "0",
+      realEstate: raw.breakdown?.realEstate ?? "0",
+      loans: raw.breakdown?.loans ?? "0",
+      creditCards: raw.breakdown?.creditCards ?? "0",
+    },
+  };
+}
+
 export function useNetWorth() {
   return useQuery({
     queryKey: QUERY_KEYS.netWorth,
-    queryFn: () => api.getNetWorth(),
+    queryFn: async () => mapNetWorthSnapshot((await api.getNetWorth()) as unknown as RawNetWorthSnapshot),
     enabled: isAuth(),
   });
 }
@@ -1154,18 +963,58 @@ export function useNetWorth() {
 export function useNetWorthHistory(params?: { limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.netWorthHistory(params),
-    queryFn: () => api.getNetWorthHistory(params),
+    queryFn: async () => {
+      const res = await api.getNetWorthHistory(params);
+      return unwrapList<RawNetWorthSnapshot>(res).map(mapNetWorthSnapshot);
+    },
     enabled: isAuth(),
-    select: (res) => unwrapList<NetWorthSnapshot>(res),
   });
+}
+
+// The backend's CashFlowResponseDto uses `periodStart`/`periodEnd` (not
+// `period`), `netCashFlow` (not `netSavings`), `savingsRate` as a decimal
+// string (not a whole-percent number), and category breakdown lines with a
+// plain string `amount` (not Money) and no `percentage` — derive that last
+// one from each line's share of `totalExpense` instead of fabricating it.
+interface RawCashFlowSnapshot {
+  periodStart: string;
+  periodEnd: string;
+  totalIncome: Money;
+  totalExpense: Money;
+  netCashFlow: Money;
+  savingsRate: string;
+  categoryBreakdown: Array<{ categoryId: string | null; categoryName: string; amount: string }>;
+}
+
+function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
+  const currency = raw.totalIncome?.currency || raw.totalExpense?.currency || "INR";
+  const totalExpenseVal = parseFloat(raw.totalExpense?.amount || "0") || 0;
+  return {
+    period: raw.periodStart,
+    totalIncome: raw.totalIncome,
+    totalExpense: raw.totalExpense,
+    netSavings: raw.netCashFlow,
+    savingsRate: parseFloat(raw.savingsRate) || 0,
+    categoryBreakdown: (raw.categoryBreakdown || []).map((c) => {
+      const amountVal = parseFloat(c.amount) || 0;
+      return {
+        categoryId: c.categoryId || "uncategorized",
+        categoryName: c.categoryName,
+        amount: { amount: c.amount, currency },
+        percentage: totalExpenseVal > 0 ? Math.round((amountVal / totalExpenseVal) * 100) : 0,
+      };
+    }),
+  };
 }
 
 export function useCashFlowAnalytics(params?: { limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.cashFlow(params),
-    queryFn: () => api.getCashFlow(params),
+    queryFn: async () => {
+      const res = await api.getCashFlow(params);
+      return unwrapList<RawCashFlowSnapshot>(res).map(mapCashFlowSnapshot);
+    },
     enabled: isAuth(),
-    select: (res) => unwrapList<CashFlowSnapshot>(res),
   });
 }
 

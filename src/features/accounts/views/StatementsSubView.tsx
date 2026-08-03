@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useAccountStatements } from "../../../hooks/useFinanceQueries";
 import { StatementTimeline } from "../components/StatementTimeline";
+import { EmptyState } from "../../../components/common/EmptyState";
 import { AccountStatementItem } from "../../../types";
 import { FileText, Upload } from "lucide-react";
 import type { ActiveRoute } from "../components/AccountsNavigation";
@@ -21,7 +22,7 @@ interface StatementsSubViewProps {
 export const StatementsSubView: React.FC<StatementsSubViewProps> = ({
   activeTab = "statements-overview",
 }) => {
-  const { data: statements = [], isLoading } = useAccountStatements();
+  const { data: statements = [], isLoading, isError } = useAccountStatements();
 
   const typeFilter = ROUTE_TO_TYPE[activeTab] ?? null;
   const filtered = typeFilter
@@ -37,6 +38,16 @@ export const StatementsSubView: React.FC<StatementsSubViewProps> = ({
             <div key={i} className="h-20 bg-slate-900/60 rounded-2xl border border-slate-800" />
           ))}
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon={<FileText className="w-10 h-10 text-slate-600 mx-auto" aria-hidden="true" />}
+        title="Statement Center Not Available"
+        message="There is no backend endpoint that generates or aggregates account statements yet."
+      />
     );
   }
 

@@ -4,9 +4,8 @@ import { motion } from "framer-motion";
 import { useCashPosition } from "../../../hooks/useFinanceQueries";
 import { formatCurrency } from "../../../utils/formatters";
 import { BalanceCard } from "../components/BalanceCard";
-import { LiquidityCard } from "../components/LiquidityCard";
 import { CashAllocationChart } from "../components/CashAllocationChart";
-import { Building2, DollarSign, Lock, Clock, ShieldCheck, TrendingUp } from "lucide-react";
+import { Building2, DollarSign, Landmark } from "lucide-react";
 
 export const CashPositionView: React.FC = () => {
   const { data: cashPos, isLoading } = useCashPosition();
@@ -23,20 +22,14 @@ export const CashPositionView: React.FC = () => {
   }
 
   const totalNum = parseFloat(cashPos?.totalCash?.amount || "0");
-  const availNum = parseFloat(cashPos?.availableCash?.amount || "0");
-  const pendNum = parseFloat(cashPos?.pendingCash?.amount || "0");
-  const lockNum = parseFloat(cashPos?.lockedFunds?.amount || "0");
-  const emgNum = parseFloat(cashPos?.emergencyFund?.amount || "0");
-  const invNum = parseFloat(cashPos?.investmentCash?.amount || "0");
   const currency = cashPos?.totalCash?.currency || "INR";
+  const institutionCount = cashPos?.institutionBreakdown?.length || 0;
+  const currencyCount = cashPos?.currencyBreakdown?.length || 0;
 
   const kpis = [
-    { title: "Total Cash", amount: formatCurrency(totalNum, currency), icon: <DollarSign className="w-5 h-5" />, gradient: "from-emerald-500/20 to-teal-500/20", trend: { value: 3.2, isPositive: true } },
-    { title: "Available Now", amount: formatCurrency(availNum, currency), icon: <TrendingUp className="w-5 h-5" />, gradient: "from-indigo-500/20 to-blue-500/20", trend: { value: 1.4, isPositive: true } },
-    { title: "Pending Clearing", amount: formatCurrency(pendNum, currency), icon: <Clock className="w-5 h-5" />, gradient: "from-amber-500/20 to-orange-500/20", trend: { value: 0.8, isPositive: false } },
-    { title: "Locked in FDs", amount: formatCurrency(lockNum, currency), icon: <Lock className="w-5 h-5" />, gradient: "from-purple-500/20 to-violet-500/20", trend: { value: 5.0, isPositive: true } },
-    { title: "Emergency Reserve", amount: formatCurrency(emgNum, currency), icon: <ShieldCheck className="w-5 h-5" />, gradient: "from-teal-500/20 to-cyan-500/20", trend: { value: 2.1, isPositive: true } },
-    { title: "Investment Cash", amount: formatCurrency(invNum, currency), icon: <Building2 className="w-5 h-5" />, gradient: "from-rose-500/20 to-pink-500/20", trend: { value: 7.2, isPositive: true } },
+    { title: "Total Liquid Cash", amount: formatCurrency(totalNum, currency), icon: <DollarSign className="w-5 h-5" />, gradient: "from-emerald-500/20 to-teal-500/20" },
+    { title: "Institutions", amount: String(institutionCount), icon: <Building2 className="w-5 h-5" />, gradient: "from-indigo-500/20 to-blue-500/20" },
+    { title: "Currencies Held", amount: String(currencyCount), icon: <Landmark className="w-5 h-5" />, gradient: "from-purple-500/20 to-violet-500/20" },
   ];
 
   return (
@@ -51,35 +44,22 @@ export const CashPositionView: React.FC = () => {
               currency=""
               icon={kpi.icon}
               gradient={kpi.gradient}
-              trend={kpi.trend}
             />
           </motion.div>
         ))}
       </div>
 
-      {/* Liquidity Spectrum */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-        <LiquidityCard
-          available={cashPos?.availableCash?.amount || "0"}
-          pending={cashPos?.pendingCash?.amount || "0"}
-          locked={cashPos?.lockedFunds?.amount || "0"}
-          emergency={cashPos?.emergencyFund?.amount || "0"}
-          currency={currency}
-        />
-      </motion.div>
-
       {/* Charts */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
         <CashAllocationChart
-          trendData={cashPos?.historical30DayTrend || []}
-          allocationData={cashPos?.cashAllocation || []}
+          institutionData={cashPos?.institutionBreakdown || []}
           currencyData={cashPos?.currencyBreakdown || []}
         />
       </motion.div>
 
       {/* Institution Breakdown */}
       {(cashPos?.institutionBreakdown?.length || 0) > 0 && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
           <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
             <div>
               <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">

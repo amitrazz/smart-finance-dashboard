@@ -16,7 +16,7 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import React, { useMemo } from 'react';
-import { useOnboardingProgress } from '../../hooks/useFinanceQueries';
+import { useOnboardingState } from '../../features/onboarding/hooks/useOnboarding';
 import { useAuthStore } from '../../store/useAuthStore';
 import { NavTab, useUIStore } from '../../store/useUIStore';
 
@@ -28,32 +28,17 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, completedStepIds } = useUIStore();
+  const { activeTab, setActiveTab } = useUIStore();
   const { user, logout } = useAuthStore();
-  const { data: onboardingProgress } = useOnboardingProgress();
+  const { data: onboardingState } = useOnboardingState();
 
-  const isComplete = onboardingProgress?.isComplete ?? false;
-
-  const backendCompletedSteps = onboardingProgress?.steps?.filter((s) => s.completed).length ?? 0;
-  const backendCount = onboardingProgress?.completedCount ?? backendCompletedSteps;
-  const completedCount = isComplete ? 10 : Math.max(backendCount, completedStepIds.length);
-  const totalCount = onboardingProgress?.totalCount ?? 10;
-
-  const isCompletedFlow = isComplete || completedCount >= 10;
+  const isCompletedFlow = onboardingState?.isCompleted ?? false;
+  const completedCount = onboardingState?.completedCount ?? 0;
+  const totalCount = onboardingState?.totalCount ?? 7;
 
   const navItems: NavItem[] = useMemo(
     () => [
       { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-      ...(!isCompletedFlow
-        ? [
-            {
-              id: 'onboarding' as NavTab,
-              label: 'Setup Checklist',
-              icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
-              badge: `${completedCount}/${totalCount}`,
-            },
-          ]
-        : []),
       { id: 'planning', label: 'Planning', icon: <Target className="w-5 h-5" /> },
       { id: 'investments', label: 'Investments', icon: <PieChart className="w-5 h-5" /> },
       { id: 'accounts', label: 'Accounts & Cash', icon: <Landmark className="w-5 h-5" /> },
@@ -73,6 +58,16 @@ export const Sidebar: React.FC = () => {
         icon: <UploadCloud className="w-5 h-5" />,
         badge: 'CSV/PDF',
       },
+      ...(!isCompletedFlow
+        ? [
+            {
+              id: 'onboarding' as NavTab,
+              label: 'Setup Checklist',
+              icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
+              badge: `${completedCount}/${totalCount}`,
+            },
+          ]
+        : []),
       { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ],
     [isCompletedFlow, completedCount, totalCount],

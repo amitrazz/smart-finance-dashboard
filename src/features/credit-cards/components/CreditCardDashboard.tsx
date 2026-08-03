@@ -13,8 +13,6 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   PieChart,
@@ -52,139 +50,35 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
   const { data: dashboard, isLoading, isError, error, refetch } = useCreditCardDashboard();
   const { data: cards = [] } = useCreditCards();
 
-  // 1. Outstanding Trend Data
-  const outstandingTrendData = useMemo(() => {
-    if (dashboard?.outstandingTrend && dashboard.outstandingTrend.length > 0) {
-      return dashboard.outstandingTrend.map((item) => ({
-        month: item.month,
-        value: getAmountVal(item.amount),
-      }));
-    }
-    const totalOut = getAmountVal(dashboard?.totalOutstanding);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
-      month: m,
-      value: Math.round(totalOut * (0.6 + i * 0.08)),
-    }));
-  }, [dashboard]);
-
-  // 2. Credit Utilization Trend Data
-  const utilizationTrendData = useMemo(() => {
-    if (dashboard?.creditUtilizationTrend && dashboard.creditUtilizationTrend.length > 0) {
-      return dashboard.creditUtilizationTrend.map((item) => ({
-        month: item.month,
-        utilization: item.utilization,
-      }));
-    }
-    const currentUtil = dashboard?.creditUtilizationPercent || 0;
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
-      month: m,
-      utilization: Math.min(100, Math.round(currentUtil * (0.75 + i * 0.05))),
-    }));
-  }, [dashboard]);
-
-  // 3. Outstanding Balance by Card
+  // 1. Outstanding Balance by Card (derived client-side; backend dashboard has no trend endpoint)
   const cardBalancesData = useMemo(() => {
-    if (dashboard?.outstandingByCard && dashboard.outstandingByCard.length > 0) {
-      return dashboard.outstandingByCard.map((item) => ({
-        name: item.cardName || "Card",
-        value: getAmountVal(item.amount),
-      }));
-    }
     if (cards && cards.length > 0) {
       return cards.map((c) => ({
-        name: c.name || c.nickname || c.issuer || "Credit Card",
-        value: getAmountVal(c.currentOutstanding || c.currentBalance || c.outstandingBalance),
+        name: c.nickname || c.issuer || "Credit Card",
+        value: getAmountVal(c.currentOutstanding),
       }));
     }
     return [];
-  }, [dashboard, cards]);
+  }, [cards]);
 
-  // 4. Outstanding Distribution by Issuer
+  // 2. Outstanding Distribution by Issuer
   const issuerDistributionData = useMemo(() => {
-    if (dashboard?.outstandingByIssuer && dashboard.outstandingByIssuer.length > 0) {
-      return dashboard.outstandingByIssuer.map((item) => ({
-        name: item.issuer || "Other Bank",
-        value: getAmountVal(item.amount),
-      }));
-    }
     if (cards && cards.length > 0) {
       const map = new Map<string, number>();
       cards.forEach((c) => {
         const issuer = c.issuer || "Other Bank";
-        const amt = getAmountVal(c.currentOutstanding || c.currentBalance || c.outstandingBalance);
+        const amt = getAmountVal(c.currentOutstanding);
         map.set(issuer, (map.get(issuer) || 0) + amt);
       });
       return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
     }
     return [];
-  }, [dashboard, cards]);
+  }, [cards]);
 
-  // 5. Monthly Spending
-  const monthlySpendingData = useMemo(() => {
-    if (dashboard?.monthlySpending && dashboard.monthlySpending.length > 0) {
-      return dashboard.monthlySpending.map((item) => ({
-        month: item.month,
-        value: getAmountVal(item.amount),
-      }));
-    }
-    const totalOut = getAmountVal(dashboard?.totalOutstanding);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
-      month: m,
-      value: Math.round(totalOut * (0.2 + (i % 3) * 0.1)),
-    }));
-  }, [dashboard]);
-
-  // 6. Payment History
-  const paymentHistoryData = useMemo(() => {
-    if (dashboard?.paymentHistory && dashboard.paymentHistory.length > 0) {
-      return dashboard.paymentHistory.map((item) => ({
-        month: item.month,
-        value: getAmountVal(item.amount),
-      }));
-    }
-    const stmtBal = getAmountVal(dashboard?.statementBalance);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
-      month: m,
-      value: Math.round(stmtBal * (0.8 + (i % 2) * 0.2)),
-    }));
-  }, [dashboard]);
-
-  // 7. Reward Points Growth
-  const rewardGrowthData = useMemo(() => {
-    if (dashboard?.rewardGrowth && dashboard.rewardGrowth.length > 0) {
-      return dashboard.rewardGrowth.map((item) => ({
-        month: item.month,
-        points: item.points,
-      }));
-    }
-    const totalPts = dashboard?.totalRewardPoints || 0;
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    return months.map((m, i) => ({
-      month: m,
-      points: Math.round(totalPts * (0.5 + i * 0.1)),
-    }));
-  }, [dashboard]);
-
-  // 8. EMI Breakdown
-  const emiBreakdownData = useMemo(() => {
-    if (dashboard?.emiBreakdown && dashboard.emiBreakdown.length > 0) {
-      return dashboard.emiBreakdown.map((item) => ({
-        name: item.category,
-        value: getAmountVal(item.amount),
-      }));
-    }
-    if ((dashboard?.activeEmis || 0) > 0) {
-      return [
-        { name: "Electronics", value: 25000 },
-        { name: "Travel", value: 15000 },
-        { name: "Appliances", value: 10000 },
-      ];
-    }
-    return [];
+  // 3. Cards by Status
+  const cardsByStatusData = useMemo(() => {
+    const byStatus = dashboard?.cardsByStatus || {};
+    return Object.entries(byStatus).map(([name, value]) => ({ name, value }));
   }, [dashboard]);
 
   if (isLoading) {
@@ -226,6 +120,11 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
     return null;
   }
 
+  const totalCards = Object.values(dashboard.cardsByStatus || {}).reduce((sum, n) => sum + n, 0);
+  const activeCards = dashboard.cardsByStatus?.ACTIVE || 0;
+  const blockedCards = dashboard.cardsByStatus?.BLOCKED || 0;
+  const utilizationPercent = (parseFloat(dashboard.utilization || "0") || 0) * 100;
+
   const kpis = [
     {
       title: "Total Outstanding",
@@ -243,47 +142,47 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
     },
     {
       title: "Available Credit",
-      value: formatCurrency(dashboard.availableCredit),
+      value: formatCurrency(dashboard.totalAvailableCredit),
       subtext: "Remaining borrowing limit",
       icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
       bg: "bg-emerald-500/10 border-emerald-500/20",
     },
     {
       title: "Credit Utilization",
-      value: `${(dashboard.creditUtilizationPercent || 0).toFixed(1)}%`,
-      subtext: (dashboard.creditUtilizationPercent || 0) > 30 ? "High Utilization Warning" : "Healthy Range (<30%)",
+      value: `${utilizationPercent.toFixed(1)}%`,
+      subtext: utilizationPercent > 30 ? "High Utilization Warning" : "Healthy Range (<30%)",
       icon: <Percent className="w-5 h-5 text-amber-400" />,
       bg: "bg-amber-500/10 border-amber-500/20",
     },
     {
       title: "Statement Balance",
-      value: formatCurrency(dashboard.statementBalance),
+      value: formatCurrency(dashboard.totalStatementBalance),
       subtext: "Total billed statement dues",
       icon: <Calendar className="w-5 h-5 text-purple-400" />,
       bg: "bg-purple-500/10 border-purple-500/20",
     },
     {
       title: "Minimum Due",
-      value: formatCurrency(dashboard.minimumDue),
+      value: formatCurrency(dashboard.totalMinimumDue),
       subtext: "Mandatory minimum payment",
       icon: <AlertTriangle className="w-5 h-5 text-rose-400" />,
       bg: "bg-rose-500/10 border-rose-500/20",
     },
     {
       title: "Upcoming Payment",
-      value: dashboard.upcomingDue
-        ? formatCurrency(dashboard.upcomingDue.amount)
+      value: dashboard.nextDue
+        ? formatCurrency(dashboard.nextDue.statementBalance)
         : "No Dues",
-      subtext: dashboard.upcomingDue
-        ? `Due ${dashboard.upcomingDue.dueDate} (${dashboard.upcomingDue.cardName})`
+      subtext: dashboard.nextDue
+        ? `Due ${dashboard.nextDue.dueDate} (${dashboard.nextDue.cardNickname})`
         : "All cards up to date",
       icon: <Calendar className="w-5 h-5 text-cyan-400" />,
       bg: "bg-cyan-500/10 border-cyan-500/20",
     },
     {
       title: "Active Cards",
-      value: `${dashboard.activeCards || 0} / ${dashboard.totalCards || 0}`,
-      subtext: `${dashboard.blockedCards || 0} blocked cards`,
+      value: `${activeCards} / ${totalCards}`,
+      subtext: `${blockedCards} blocked cards`,
       icon: <CreditCard className="w-5 h-5 text-indigo-400" />,
       bg: "bg-indigo-500/10 border-indigo-500/20",
     },
@@ -296,7 +195,7 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
     },
     {
       title: "Active EMIs",
-      value: dashboard.activeEmis || 0,
+      value: dashboard.activeEmiCount || 0,
       subtext: "Ongoing installment plans",
       icon: <TrendingUp className="w-5 h-5 text-teal-400" />,
       bg: "bg-teal-500/10 border-teal-500/20",
@@ -347,70 +246,62 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
 
       {/* Data-Driven Visualizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 1. Outstanding Trend */}
+        {/* 1. Interest & Fees This Month */}
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-indigo-400" /> Outstanding Balance Trend
-            </h3>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Monthly</span>
-          </div>
+          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-indigo-400" /> Interest & Fees This Month
+          </h3>
           <div className="h-60 w-full">
-            {outstandingTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={outstandingTrendData}>
-                  <defs>
-                    <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v.toLocaleString()}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`₹${Number(val).toLocaleString()}`, "Outstanding"]}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorOut)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No trend dataset available</div>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={[
+                  { name: "Interest Charged", value: getAmountVal(dashboard.interestThisMonth) },
+                  { name: "Fees Charged", value: getAmountVal(dashboard.feesThisMonth) },
+                ]}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
+                <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v.toLocaleString()}`} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
+                  formatter={(val: TooltipValueType | undefined) => [`₹${Number(val).toLocaleString()}`, "Amount"]}
+                />
+                <Bar dataKey="value" fill="#6366f1" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* 2. Credit Utilization Trend */}
+        {/* 2. Cards by Status */}
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Percent className="w-4 h-4 text-amber-400" /> Credit Utilization Ratio (%)
-            </h3>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Target &lt; 30%</span>
-          </div>
+          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <Percent className="w-4 h-4 text-amber-400" /> Cards by Status
+          </h3>
           <div className="h-60 w-full">
-            {utilizationTrendData.length > 0 ? (
+            {cardsByStatusData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={utilizationTrendData}>
-                  <defs>
-                    <linearGradient id="colorUtil" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                <PieChart>
+                  <Pie
+                    data={cardsByStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, value }: { name?: string; value?: number }) => `${name || ""} (${value || 0})`}
+                  >
+                    {cardsByStatusData.map((_, index) => (
+                      <Cell key={`cell-status-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
                   <Tooltip
                     contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`${val}%`, "Utilization"]}
+                    formatter={(val: TooltipValueType | undefined) => [`${val} card(s)`, "Count"]}
                   />
-                  <Area type="monotone" dataKey="utilization" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorUtil)" />
-                </AreaChart>
+                </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No utilization dataset available</div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">No cards found</div>
             )}
           </div>
         </div>
@@ -474,117 +365,45 @@ export const CreditCardDashboard: React.FC<{ onAddCard?: () => void }> = ({ onAd
           </div>
         </div>
 
-        {/* 5. Monthly Spending */}
+        {/* 5. Recently Paid */}
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
           <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-purple-400" /> Credit Card Monthly Spend History
+            <CheckCircle2 className="w-4 h-4 text-teal-400" /> Recently Paid
           </h3>
-          <div className="h-60 w-full">
-            {monthlySpendingData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlySpendingData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v.toLocaleString()}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`₹${Number(val).toLocaleString()}`, "Monthly Spend"]}
-                  />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          <div className="h-60 w-full overflow-y-auto">
+            {dashboard.recentlyPaid && dashboard.recentlyPaid.length > 0 ? (
+              <div className="divide-y divide-slate-800/60">
+                {dashboard.recentlyPaid.map((p) => (
+                  <div key={p.paymentId} className="flex items-center justify-between py-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">{p.cardNickname}</p>
+                      <p className="text-[11px] text-slate-500">{p.paidDate}</p>
+                    </div>
+                    <span className="font-bold text-emerald-400">{formatCurrency(p.paidAmount)}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No monthly spend dataset available</div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">No recent payments</div>
             )}
           </div>
         </div>
 
-        {/* 6. Payment History */}
+        {/* 6. Active EMI Summary */}
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
           <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-teal-400" /> Repayments & Settlement History
+            <Layers className="w-4 h-4 text-rose-400" /> Active EMI Summary
           </h3>
-          <div className="h-60 w-full">
-            {paymentHistoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={paymentHistoryData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v.toLocaleString()}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`₹${Number(val).toLocaleString()}`, "Repaid"]}
-                  />
-                  <Bar dataKey="value" fill="#06b6d4" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          <div className="h-60 w-full flex flex-col items-center justify-center gap-4">
+            {dashboard.activeEmiCount > 0 ? (
+              <>
+                <p className="text-3xl font-extrabold text-slate-100">{dashboard.activeEmiCount}</p>
+                <p className="text-xs text-slate-400">Active installment plans</p>
+                <p className="text-lg font-bold text-amber-400">{formatCurrency(dashboard.activeEmiTotalRemaining)}</p>
+                <p className="text-[11px] text-slate-500">Total remaining principal</p>
+              </>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No payment history dataset available</div>
-            )}
-          </div>
-        </div>
-
-        {/* 7. Reward Growth */}
-        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Award className="w-4 h-4 text-amber-400" /> Reward Points Growth
-          </h3>
-          <div className="h-60 w-full">
-            {rewardGrowthData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={rewardGrowthData}>
-                  <defs>
-                    <linearGradient id="colorRew" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`${val} Pts`, "Points Accumulation"]}
-                  />
-                  <Area type="monotone" dataKey="points" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorRew)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No reward growth dataset available</div>
-            )}
-          </div>
-        </div>
-
-        {/* 8. EMI Breakdown */}
-        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-rose-400" /> Active EMI Distribution by Category
-          </h3>
-          <div className="h-60 w-full">
-            {emiBreakdownData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={emiBreakdownData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={({ name, percent }: { name?: string; percent?: number }) => `${name || ""} (${((percent || 0) * 100).toFixed(0)}%)`}
-                  >
-                    {emiBreakdownData.map((_, index) => (
-                      <Cell key={`cell-emi-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc" }}
-                    formatter={(val: TooltipValueType | undefined) => [`₹${Number(val).toLocaleString()}`, "EMI Principal"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">No EMI breakdown dataset available</div>
+              <div className="text-xs text-slate-500">No active EMIs</div>
             )}
           </div>
         </div>

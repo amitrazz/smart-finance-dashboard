@@ -1,13 +1,15 @@
-import { create } from "zustand";
-import { api, setAccessToken, getAccessToken, setOnUnauthorizedCallback } from "../services/api";
-import { parseJwt, isTokenValid } from "../utils/jwt";
-import { clearAppDataOnAuthChange } from "../lib/queryClient";
-import { useUIStore } from "./useUIStore";
+import { create } from 'zustand';
+import { clearAppDataOnAuthChange } from '../lib/queryClient';
+import { api, getAccessToken, setAccessToken, setOnUnauthorizedCallback } from '../services/api';
+import { isTokenValid, parseJwt } from '../utils/jwt';
+import { useUIStore } from './useUIStore';
 
 export interface User {
   id: string;
   email: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 interface AuthState {
@@ -29,10 +31,10 @@ const getUserFromToken = (token: string | null): User | null => {
   if (!token || !isTokenValid(token)) return null;
   const payload = parseJwt(token);
   if (!payload || !payload.email) return null;
-  
+
   const email = payload.email;
-  const name = payload.name || email.split("@")[0];
-  const id = payload.sub || "user";
+  const name = payload.name || email.split('@')[0];
+  const id = payload.sub || 'user';
   return { id, email, name };
 };
 
@@ -74,14 +76,14 @@ export const useAuthStore = create<AuthState>((set) => {
       try {
         const res = await api.login({ email, password });
         if (!res.accessToken) {
-          throw new Error("No access token returned from API");
+          throw new Error('No access token returned from API');
         }
         resetAllState();
         setAccessToken(res.accessToken);
         const user = getUserFromToken(res.accessToken) || {
-          id: "user",
+          id: 'user',
           email,
-          name: email.split("@")[0],
+          name: email.split('@')[0],
         };
 
         set({
@@ -102,14 +104,14 @@ export const useAuthStore = create<AuthState>((set) => {
         // After successful registration, log in using API credentials
         const res = await api.login({ email, password });
         if (!res.accessToken) {
-          throw new Error("No access token returned after registration");
+          throw new Error('No access token returned after registration');
         }
         resetAllState();
         setAccessToken(res.accessToken);
         const user = getUserFromToken(res.accessToken) || {
-          id: "user",
+          id: 'user',
           email,
-          name: name || email.split("@")[0],
+          name: name || email.split('@')[0],
         };
 
         set({

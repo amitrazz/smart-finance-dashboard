@@ -68,8 +68,8 @@ export const CardSettingsTab: React.FC<CardSettingsTabProps> = ({ cardId, onEdit
                 <p className="text-[11px] text-slate-400">Automatically pay bill on due date</p>
               </div>
             </div>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${card.autoPay ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-slate-400 bg-slate-800"}`}>
-              {card.autoPay ? "Enabled" : "Disabled"}
+            <span className={`text-xs font-bold px-3 py-1 rounded-full ${card.autoPayEnabled ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-slate-400 bg-slate-800"}`}>
+              {card.autoPayEnabled ? "Enabled" : "Disabled"}
             </span>
           </div>
 
@@ -80,10 +80,10 @@ export const CardSettingsTab: React.FC<CardSettingsTabProps> = ({ cardId, onEdit
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-200">Billing Cycle Day</p>
-                <p className="text-[11px] text-slate-400">Statement cuts off on Day {card.billingCycleDay || card.statementDay || 5} of every month</p>
+                <p className="text-[11px] text-slate-400">Statement cuts off on Day {card.billingCycleDay || 5} of every month</p>
               </div>
             </div>
-            <span className="text-xs font-bold text-slate-200">Day {card.billingCycleDay || card.statementDay || 5}</span>
+            <span className="text-xs font-bold text-slate-200">Day {card.billingCycleDay || 5}</span>
           </div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export const CardSettingsTab: React.FC<CardSettingsTabProps> = ({ cardId, onEdit
       <ConfirmModal
         isOpen={isDeleting}
         title="Delete Credit Card?"
-        message={`Are you sure you want to delete credit card "${card.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete credit card "${card.nickname}"? This action cannot be undone.`}
         confirmText="Delete Credit Card"
         cancelText="Cancel"
         variant="danger"

@@ -12,7 +12,7 @@ import { Account, Money } from "../../../types";
 import { useUIStore } from "../../../store/useUIStore";
 import { type ActiveRoute } from "../components/AccountsNavigation";
 import {
-  DollarSign, Clock, TrendingUp, Landmark, CreditCard as CreditCardIcon,
+  DollarSign, TrendingUp, Landmark, CreditCard as CreditCardIcon,
   AlertTriangle, ArrowRightLeft, BarChart2, Building2, RefreshCw,
 } from "lucide-react";
 
@@ -39,9 +39,8 @@ export const AccountsOverviewView: React.FC<AccountsOverviewViewProps> = ({ onNa
   const { data: creditCards = [] } = useCreditCards();
 
   const totalCash = parseFloat(cashPosition?.totalCash?.amount || "0");
-  const availCash = parseFloat(cashPosition?.availableCash?.amount || "0");
-  const pendingCash = parseFloat(cashPosition?.pendingCash?.amount || "0");
-  const creditTotal = creditCards.reduce((s, c) => s + moneyToNumber(c.currentOutstanding ?? c.outstandingBalance ?? c.currentBalance), 0);
+  const institutionCount = cashPosition?.institutionBreakdown?.length || 0;
+  const creditTotal = creditCards.reduce((s, c) => s + moneyToNumber(c.currentOutstanding), 0);
   const limitTotal = creditCards.reduce((s, c) => s + moneyToNumber(c.creditLimit), 0);
   const utilPct = limitTotal > 0 ? Math.round((creditTotal / limitTotal) * 100) : 0;
 
@@ -50,8 +49,8 @@ export const AccountsOverviewView: React.FC<AccountsOverviewViewProps> = ({ onNa
 
   const kpiCards = [
     { title: "Total Cash", amount: formatCurrency(totalCash, "INR").replace(/[₹$€£]/g, ""), currency: "₹", subtitle: "All liquid assets", icon: <DollarSign className="w-5 h-5" />, gradient: "from-emerald-500/20 to-teal-500/20" },
-    { title: "Available Balance", amount: formatCurrency(availCash, "INR").replace(/[₹$€£]/g, ""), currency: "₹", subtitle: "Ready to spend", icon: <TrendingUp className="w-5 h-5" />, gradient: "from-indigo-500/20 to-purple-500/20" },
-    { title: "Pending Settlement", amount: formatCurrency(pendingCash, "INR").replace(/[₹$€£]/g, ""), currency: "₹", subtitle: "Clearing in 1–2 days", icon: <Clock className="w-5 h-5" />, gradient: "from-amber-500/20 to-orange-500/20" },
+    { title: "Accounts Connected", amount: String(accounts.length), currency: "", subtitle: "Across all account types", icon: <TrendingUp className="w-5 h-5" />, gradient: "from-indigo-500/20 to-purple-500/20" },
+    { title: "Institutions", amount: String(institutionCount), currency: "", subtitle: "Connected banks & providers", icon: <Building2 className="w-5 h-5" />, gradient: "from-amber-500/20 to-orange-500/20" },
     { title: "Credit Utilization", amount: `${utilPct}%`, currency: "", subtitle: `${formatCurrency(creditTotal, "INR")} outstanding`, icon: <CreditCardIcon className="w-5 h-5" />, gradient: "from-purple-500/20 to-pink-500/20" },
   ];
 
@@ -92,7 +91,7 @@ export const AccountsOverviewView: React.FC<AccountsOverviewViewProps> = ({ onNa
 
       {/* Cash Summary Strip */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
-        <CashSummary accounts={accounts} />
+        <CashSummary accounts={accounts} creditCards={creditCards} />
       </motion.div>
 
       {/* Largest Accounts + Recent Transfers Grid */}

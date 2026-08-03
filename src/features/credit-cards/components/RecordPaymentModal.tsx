@@ -31,9 +31,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
     }
     if (typeof card.currentOutstanding === "number") return card.currentOutstanding;
     if (typeof card.currentOutstanding === "string") return parseFloat(card.currentOutstanding) || 0;
-    if (typeof card.currentBalance === "object" && card.currentBalance !== null) {
-      return parseFloat(card.currentBalance.amount || "0");
-    }
     return 0;
   }, [card]);
 
@@ -128,7 +125,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
             <div>
               <h3 className="text-lg font-bold text-slate-100">Pay Credit Card Bill</h3>
               <p className="text-xs text-slate-400">
-                {card.name} • {card.issuer} (•••• {card.last4Digits || "CARD"})
+                {card.nickname} • {card.issuer} (•••• {card.lastFourDigits || "CARD"})
               </p>
             </div>
           </div>

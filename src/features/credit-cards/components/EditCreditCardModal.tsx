@@ -14,33 +14,23 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
   const updateCardMutation = useUpdateCreditCard();
   const { data: accounts = [] } = useAccounts();
 
-  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [issuer, setIssuer] = useState("");
-  const [creditLimit, setCreditLimit] = useState("");
-  const [billingCycleDay, setBillingCycleDay] = useState(5);
-  const [paymentDueDay, setPaymentDueDay] = useState(25);
+  const [lastFourDigits, setLastFourDigits] = useState("");
   const [interestRate, setInterestRate] = useState("42.0");
   const [paymentAccountId, setPaymentAccountId] = useState("");
-  const [autoPay, setAutoPay] = useState(false);
+  const [autoPayEnabled, setAutoPayEnabled] = useState(false);
   const [status, setStatus] = useState<CardStatus>("ACTIVE");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (card) {
-      setName(card.name || "");
+      setNickname(card.nickname || "");
       setIssuer(card.issuer || "");
-
-      const lim =
-        typeof card.creditLimit === "object" && card.creditLimit !== null
-          ? (card.creditLimit as { amount?: string }).amount || ""
-          : String(card.creditLimit || "");
-      setCreditLimit(lim);
-
-      setBillingCycleDay(card.billingCycleDay || card.statementDay || 5);
-      setPaymentDueDay(card.paymentDueDay || card.dueDay || 25);
+      setLastFourDigits(card.lastFourDigits || "");
       setInterestRate(String(card.interestRate || "42.0"));
       setPaymentAccountId(card.paymentAccountId || "");
-      setAutoPay(Boolean(card.autoPay));
+      setAutoPayEnabled(Boolean(card.autoPayEnabled));
       setStatus((card.status as CardStatus) || "ACTIVE");
       setNotes(card.notes || "");
     }
@@ -52,16 +42,12 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
     e.preventDefault();
 
     const payload: UpdateCreditCardInput = {
-      name,
+      nickname,
       issuer,
-      creditLimit,
-      billingCycleDay,
-      statementDay: billingCycleDay,
-      paymentDueDay,
-      dueDay: paymentDueDay,
+      lastFourDigits,
       interestRate,
       paymentAccountId: paymentAccountId || undefined,
-      autoPay,
+      autoPayEnabled,
       notes: notes || undefined,
     };
 
@@ -108,12 +94,12 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Card Name</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Card Name / Nickname</label>
               <input
                 type="text"
                 required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
@@ -132,14 +118,14 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Credit Limit</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Last 4 Digits</label>
               <input
-                type="number"
-                step="any"
+                type="text"
+                maxLength={4}
                 required
-                value={creditLimit}
-                onChange={(e) => setCreditLimit(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                value={lastFourDigits}
+                onChange={(e) => setLastFourDigits(e.target.value.replace(/\D/g, ""))}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
 
@@ -159,37 +145,20 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Billing Cycle Day</label>
-              <select
-                value={billingCycleDay}
-                onChange={(e) => setBillingCycleDay(parseInt(e.target.value, 10))}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-              >
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Day {d} of month
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Payment Due Day</label>
-              <select
-                value={paymentDueDay}
-                onChange={(e) => setPaymentDueDay(parseInt(e.target.value, 10))}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-              >
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Day {d} of month
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Interest Rate (APR % p.a.)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+            />
           </div>
+
+          <p className="text-[11px] text-slate-500 -mt-2">
+            Credit limit, billing cycle day, and payment due day are set when the card is added and are not editable here.
+          </p>
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">Default Payment Account</label>
@@ -216,8 +185,8 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
             </div>
             <input
               type="checkbox"
-              checked={autoPay}
-              onChange={(e) => setAutoPay(e.target.checked)}
+              checked={autoPayEnabled}
+              onChange={(e) => setAutoPayEnabled(e.target.checked)}
               className="w-4 h-4 text-indigo-600 rounded bg-slate-900 border-slate-700 focus:ring-indigo-500"
             />
           </div>

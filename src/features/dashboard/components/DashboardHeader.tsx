@@ -1,7 +1,7 @@
-import React from "react";
-import { Bell } from "lucide-react";
-import { useAuthStore } from "../../../store/useAuthStore";
-import { useUIStore } from "../../../store/useUIStore";
+import { Bell } from 'lucide-react';
+import React from 'react';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { useUIStore } from '../../../store/useUIStore';
 
 export const DashboardHeader: React.FC = () => {
   const { user } = useAuthStore();
@@ -9,12 +9,13 @@ export const DashboardHeader: React.FC = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   };
 
-  const rawName = user?.name || user?.email?.split("@")[0] || "Amit";
+  const rawName =
+    user?.name || user?.firstName + ' ' + user?.lastName || user?.email?.split('@')[0] || 'Amit';
   const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   return (
@@ -35,7 +36,7 @@ export const DashboardHeader: React.FC = () => {
 
       <div className="flex items-center gap-2">
         <button
-          onClick={() => setActiveTab("notifications")}
+          onClick={() => setActiveTab('notifications')}
           className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
         >
           <Bell className="w-4 h-4 text-indigo-400" />

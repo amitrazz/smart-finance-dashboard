@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useCreateCreditCard } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
-import { CardNetwork, CardType, CreateCreditCardInput } from "../../../types";
+import { CardNetwork, CreditCardCategory, CreateCreditCardInput } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 
 interface AddCreditCardWizardProps {
@@ -27,10 +27,10 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
 
   // Step 1: Basic Info
   const [issuer, setIssuer] = useState("");
-  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [network, setNetwork] = useState<CardNetwork>("VISA");
-  const [cardType, setCardType] = useState<CardType>("REWARDS");
-  const [last4Digits, setLast4Digits] = useState("");
+  const [category, setCategory] = useState<CreditCardCategory>("CREDIT_CARD");
+  const [lastFourDigits, setLastFourDigits] = useState("");
   const [currency, setCurrency] = useState("INR");
 
   // Step 2: Current Card Position
@@ -46,7 +46,7 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
 
   // Step 3: Payment Setup
   const [paymentAccountId, setPaymentAccountId] = useState("");
-  const [autoPay, setAutoPay] = useState(false);
+  const [autoPayEnabled, setAutoPayEnabled] = useState(false);
 
   // Step 4: Advanced
   const [annualFee, setAnnualFee] = useState("");
@@ -59,10 +59,10 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
   const resetForm = () => {
     setCurrentStep(1);
     setIssuer("");
-    setName("");
+    setNickname("");
     setNetwork("VISA");
-    setCardType("REWARDS");
-    setLast4Digits("");
+    setCategory("CREDIT_CARD");
+    setLastFourDigits("");
     setCurrency("INR");
     setCreditLimit("");
     setCurrentOutstanding("");
@@ -74,7 +74,7 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
     setNextDueDate("");
     setInterestRate("42.0");
     setPaymentAccountId("");
-    setAutoPay(false);
+    setAutoPayEnabled(false);
     setAnnualFee("");
     setJoiningFee("");
     setOpenedDate("");
@@ -103,12 +103,11 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
     e.preventDefault();
 
     const payload: CreateCreditCardInput = {
-      name: name || `${issuer} ${network} Card`,
       issuer,
+      nickname: nickname || `${issuer} ${network} Card`,
+      lastFourDigits,
       network,
-      cardType,
-      last4Digits,
-      maskedNumber: last4Digits ? `•••• •••• •••• ${last4Digits}` : undefined,
+      category,
       currency,
       creditLimit: creditLimit || "0",
       currentOutstanding: currentOutstanding || "0",
@@ -116,13 +115,11 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
       statementBalance: statementBalance || "0",
       minimumDue: minimumDue || "0",
       billingCycleDay,
-      statementDay: billingCycleDay,
       paymentDueDay,
-      dueDay: paymentDueDay,
-      nextDueDate: nextDueDate || undefined,
+      nextDueDate,
       interestRate,
       paymentAccountId: paymentAccountId || undefined,
-      autoPay,
+      autoPayEnabled,
       annualFee: annualFee || undefined,
       joiningFee: joiningFee || undefined,
       openedDate: openedDate || undefined,
@@ -218,8 +215,8 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                     type="text"
                     required
                     placeholder="e.g. Regalia Gold, Infinia, Amazon Pay"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>
@@ -238,23 +235,23 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                     <option value="AMEX">American Express</option>
                     <option value="RUPAY">RuPay</option>
                     <option value="DINERS">Diners Club</option>
+                    <option value="DISCOVER">Discover</option>
                     <option value="OTHER">Other</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Card Type</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Card Category</label>
                   <select
-                    value={cardType}
-                    onChange={(e) => setCardType(e.target.value as CardType)}
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as CreditCardCategory)}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                   >
-                    <option value="REWARDS">Rewards</option>
-                    <option value="CASHBACK">Cashback</option>
-                    <option value="TRAVEL">Travel</option>
-                    <option value="PREMIUM">Premium</option>
-                    <option value="SECURED">Secured</option>
-                    <option value="OTHER">Other</option>
+                    <option value="CREDIT_CARD">Credit Card</option>
+                    <option value="CORPORATE_CARD">Corporate Card</option>
+                    <option value="CHARGE_CARD">Charge Card</option>
+                    <option value="SECURED_CARD">Secured Card</option>
+                    <option value="VIRTUAL_CARD">Virtual Card</option>
                   </select>
                 </div>
 
@@ -265,8 +262,8 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                     maxLength={4}
                     required
                     placeholder="e.g. 4321"
-                    value={last4Digits}
-                    onChange={(e) => setLast4Digits(e.target.value.replace(/\D/g, ""))}
+                    value={lastFourDigits}
+                    onChange={(e) => setLastFourDigits(e.target.value.replace(/\D/g, ""))}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 font-mono focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>
@@ -283,6 +280,12 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
                   <option value="GBP">GBP (£)</option>
+                  <option value="AED">AED</option>
+                  <option value="SGD">SGD</option>
+                  <option value="AUD">AUD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="JPY">JPY</option>
+                  <option value="CNY">CNY</option>
                 </select>
               </div>
             </form>
@@ -419,9 +422,10 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Next Payment Due Date (Optional)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Next Payment Due Date *</label>
                 <input
                   type="date"
+                  required
                   value={nextDueDate}
                   onChange={(e) => setNextDueDate(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
@@ -464,8 +468,8 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={autoPay}
-                    onChange={(e) => setAutoPay(e.target.checked)}
+                    checked={autoPayEnabled}
+                    onChange={(e) => setAutoPayEnabled(e.target.checked)}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
@@ -548,19 +552,19 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
               <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs">
                 <div>
                   <span className="text-slate-400 block">Card Name:</span>
-                  <span className="font-bold text-slate-100">{name}</span>
+                  <span className="font-bold text-slate-100">{nickname}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Issuer / Bank:</span>
                   <span className="font-bold text-slate-100">{issuer}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">Network & Type:</span>
-                  <span className="font-bold text-slate-100">{network} • {cardType}</span>
+                  <span className="text-slate-400 block">Network & Category:</span>
+                  <span className="font-bold text-slate-100">{network} • {category}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Last 4 Digits:</span>
-                  <span className="font-mono font-bold text-slate-100">•••• {last4Digits}</span>
+                  <span className="font-mono font-bold text-slate-100">•••• {lastFourDigits}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Credit Limit:</span>

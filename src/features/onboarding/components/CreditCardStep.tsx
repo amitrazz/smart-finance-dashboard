@@ -26,18 +26,34 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CreditCardFormValues>({
     resolver: zodResolver(creditCardSchema),
     defaultValues: {
-      name: initialData?.name || "HDFC Regalia",
+      issuer: initialData?.issuer || "HDFC Bank",
+      nickname: initialData?.nickname || "HDFC Regalia",
+      lastFourDigits: initialData?.lastFourDigits || "",
       currency: initialData?.currency || baseCurrency,
       creditLimit: initialData?.creditLimit || "200000.00",
-      currentBalance: initialData?.currentBalance || "0.00",
-      statementDay: initialData?.statementDay || 5,
-      dueDay: initialData?.dueDay || 25,
+      currentOutstanding: initialData?.currentOutstanding || "0.00",
+      availableCredit: initialData?.availableCredit || "200000.00",
+      statementBalance: initialData?.statementBalance || "0.00",
+      minimumDue: initialData?.minimumDue || "0.00",
+      billingCycleDay: initialData?.billingCycleDay || 5,
+      paymentDueDay: initialData?.paymentDueDay || 25,
+      nextDueDate: initialData?.nextDueDate || "",
     },
   });
+
+  const creditLimit = watch("creditLimit");
+  const currentOutstanding = watch("currentOutstanding");
+
+  const handleLimitOrOutstandingChange = (limit: string, outstanding: string) => {
+    const avail = Math.max(0, parseFloat(limit || "0") - parseFloat(outstanding || "0"));
+    setValue("availableCredit", avail.toFixed(2));
+  };
 
   const handleSkip = () => {
     skipStep.mutate("CREDIT_CARD", {
@@ -108,26 +124,57 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
 
       {wantsCard === true && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Card Name */}
-          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-            <label htmlFor="cardName" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
-              Credit Card Name / Issuer
-            </label>
-            <input
-              id="cardName"
-              type="text"
-              placeholder="e.g. HDFC Regalia Black"
-              {...register("name")}
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
-            />
-            {errors.name && <p className="text-xs text-rose-400">{errors.name.message}</p>}
+          {/* Card Identity */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="issuer" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Issuing Bank
+              </label>
+              <input
+                id="issuer"
+                type="text"
+                placeholder="e.g. HDFC Bank"
+                {...register("issuer")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.issuer && <p className="text-xs text-rose-400">{errors.issuer.message}</p>}
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="nickname" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Card Name / Nickname
+              </label>
+              <input
+                id="nickname"
+                type="text"
+                placeholder="e.g. HDFC Regalia Black"
+                {...register("nickname")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.nickname && <p className="text-xs text-rose-400">{errors.nickname.message}</p>}
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="lastFourDigits" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Last 4 Digits
+              </label>
+              <input
+                id="lastFourDigits"
+                type="text"
+                maxLength={4}
+                placeholder="4321"
+                {...register("lastFourDigits")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.lastFourDigits && <p className="text-xs text-rose-400">{errors.lastFourDigits.message}</p>}
+            </div>
           </div>
 
           {/* Limits & Outstanding Balance Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Credit Limit */}
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <label htmlFor="creditLimit" className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <label htmlFor="creditLimit" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <DollarSign className="w-4 h-4 text-purple-400" />
                 <span>Total Credit Limit</span>
               </label>
@@ -139,43 +186,91 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
                   step="0.01"
                   placeholder="200000.00"
                   {...register("creditLimit")}
+                  onBlur={(e) => handleLimitOrOutstandingChange(e.target.value, currentOutstanding)}
                   className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
                 />
               </div>
               {errors.creditLimit && <p className="text-xs text-rose-400">{errors.creditLimit.message}</p>}
             </div>
 
-            {/* Current Balance */}
+            {/* Current Outstanding */}
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <label htmlFor="currentBalance" className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <label htmlFor="currentOutstanding" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <DollarSign className="w-4 h-4 text-rose-400" />
                 <span>Current Outstanding Balance</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-3 text-xs font-bold text-slate-500">{baseCurrency}</span>
                 <input
-                  id="currentBalance"
+                  id="currentOutstanding"
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  {...register("currentBalance")}
+                  {...register("currentOutstanding")}
+                  onBlur={(e) => handleLimitOrOutstandingChange(creditLimit, e.target.value)}
                   className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all text-xs"
                 />
               </div>
+              {errors.currentOutstanding && <p className="text-xs text-rose-400">{errors.currentOutstanding.message}</p>}
+            </div>
+          </div>
+
+          {/* Available Credit / Statement Balance / Minimum Due */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="availableCredit" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Available Credit
+              </label>
+              <input
+                id="availableCredit"
+                type="number"
+                step="0.01"
+                {...register("availableCredit")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.availableCredit && <p className="text-xs text-rose-400">{errors.availableCredit.message}</p>}
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="statementBalance" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Latest Statement Balance
+              </label>
+              <input
+                id="statementBalance"
+                type="number"
+                step="0.01"
+                {...register("statementBalance")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.statementBalance && <p className="text-xs text-rose-400">{errors.statementBalance.message}</p>}
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="minimumDue" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Minimum Amount Due
+              </label>
+              <input
+                id="minimumDue"
+                type="number"
+                step="0.01"
+                {...register("minimumDue")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
+              />
+              {errors.minimumDue && <p className="text-xs text-rose-400">{errors.minimumDue.message}</p>}
             </div>
           </div>
 
           {/* Billing & Due Dates */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Statement Day */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Billing Cycle Day */}
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <label htmlFor="statementDay" className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <label htmlFor="billingCycleDay" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-purple-400" />
                 <span>Statement Cut-off Day</span>
               </label>
               <select
-                id="statementDay"
-                {...register("statementDay", { valueAsNumber: true })}
+                id="billingCycleDay"
+                {...register("billingCycleDay", { valueAsNumber: true })}
                 className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-xs"
               >
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
@@ -188,13 +283,13 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
 
             {/* Payment Due Day */}
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <label htmlFor="dueDay" className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <label htmlFor="paymentDueDay" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-rose-400" />
                 <span>Payment Due Day</span>
               </label>
               <select
-                id="dueDay"
-                {...register("dueDay", { valueAsNumber: true })}
+                id="paymentDueDay"
+                {...register("paymentDueDay", { valueAsNumber: true })}
                 className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all text-xs"
               >
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
@@ -203,6 +298,21 @@ export const CreditCardStep: React.FC<CreditCardStepProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Next Due Date */}
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <label htmlFor="nextDueDate" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-rose-400" />
+                <span>Next Payment Due Date</span>
+              </label>
+              <input
+                id="nextDueDate"
+                type="date"
+                {...register("nextDueDate")}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all text-xs"
+              />
+              {errors.nextDueDate && <p className="text-xs text-rose-400">{errors.nextDueDate.message}</p>}
             </div>
           </div>
 

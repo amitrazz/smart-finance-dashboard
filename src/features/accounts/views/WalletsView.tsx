@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useWallets } from "../../../hooks/useFinanceQueries";
 import { formatCurrency } from "../../../utils/formatters";
 import { StatusBadge } from "../components/StatusBadge";
-import { Wallet, TrendingDown, Tag } from "lucide-react";
+import { Wallet } from "lucide-react";
 
 const PROVIDER_COLORS: Record<string, string> = {
   Paytm: "from-indigo-600 to-blue-600",
@@ -31,7 +31,6 @@ export const WalletsView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {wallets.length > 0 ? wallets.map((wallet, i) => {
           const balance = parseFloat(wallet.currentBalance?.amount || "0");
-          const monthlySpend = parseFloat(wallet.monthlySpend?.amount || "0");
           const provider = wallet.provider || "Other";
           const gradient = PROVIDER_COLORS[provider] || PROVIDER_COLORS.Other;
 
@@ -57,32 +56,6 @@ export const WalletsView: React.FC = () => {
                   <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Current Balance</p>
                   <p className="text-2xl font-extrabold text-slate-100">{formatCurrency(balance, wallet.currency || "INR")}</p>
                 </div>
-
-                {/* Monthly Spend */}
-                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex items-center gap-3">
-                  <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Monthly Spend</p>
-                    <p className="text-sm font-bold text-rose-300">{formatCurrency(monthlySpend, wallet.currency || "INR")}</p>
-                  </div>
-                </div>
-
-                {/* Top Categories */}
-                {(wallet.topCategories?.length || 0) > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider flex items-center gap-1">
-                      <Tag className="w-3 h-3" /> Top Spend Categories
-                    </p>
-                    <div className="space-y-1.5">
-                      {wallet.topCategories!.map((cat) => (
-                        <div key={cat.categoryName} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-300 font-medium">{cat.categoryName}</span>
-                          <span className="font-bold text-slate-100">{formatCurrency(parseFloat(cat.amount?.amount || "0"), "INR")}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </motion.div>
           );

@@ -53,9 +53,6 @@ interface UIState {
   hideToast: () => void;
   onboardingCurrentStep: number;
   setOnboardingCurrentStep: (step: number) => void;
-  completedStepIds: number[];
-  markStepCompleted: (step: number) => void;
-  setCompletedStepIds: (steps: number[]) => void;
   resetUIState: () => void;
 }
 
@@ -194,14 +191,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   hideToast: () => set({ toastMessage: null }),
   onboardingCurrentStep: 1,
   setOnboardingCurrentStep: (onboardingCurrentStep) => set({ onboardingCurrentStep }),
-  completedStepIds: [],
-  markStepCompleted: (step) =>
-    set((state) => ({
-      completedStepIds: state.completedStepIds.includes(step)
-        ? state.completedStepIds
-        : [...state.completedStepIds, step],
-    })),
-  setCompletedStepIds: (completedStepIds) => set({ completedStepIds }),
   resetUIState: () =>
     set({
       activeTab: "dashboard",
@@ -212,6 +201,5 @@ export const useUIStore = create<UIState>((set, get) => ({
       isImportModalOpen: false,
       selectedAccountId: null,
       onboardingCurrentStep: 1,
-      completedStepIds: [],
     }),
 }));

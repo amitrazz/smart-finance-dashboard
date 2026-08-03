@@ -31,7 +31,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ cardId, card: propCard
     return 0;
   };
 
-  const outstanding = getVal(card.currentOutstanding || card.currentBalance);
+  const outstanding = getVal(card.currentOutstanding);
   const limit = getVal(card.creditLimit);
   const available = getVal(card.availableCredit) || Math.max(0, limit - outstanding);
   const annualFee = getVal(card.annualFee);
@@ -78,11 +78,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ cardId, card: propCard
           <div className="space-y-1.5 pt-1 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Statement Cut-off:</span>
-              <span className="font-bold text-slate-200">Day {card.billingCycleDay || card.statementDay || 5} of month</span>
+              <span className="font-bold text-slate-200">Day {card.billingCycleDay || 5} of month</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Payment Due Day:</span>
-              <span className="font-bold text-slate-200">Day {card.paymentDueDay || card.dueDay || 25} of month</span>
+              <span className="font-bold text-slate-200">Day {card.paymentDueDay || 25} of month</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Next Payment Due:</span>
@@ -123,12 +123,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ cardId, card: propCard
           </div>
           <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80">
             <span className="text-slate-500 block">Reward Balance:</span>
-            <span className="font-bold text-amber-400 block mt-0.5">{(card.rewardBalance || 0).toLocaleString()} Pts</span>
+            <span className="font-bold text-amber-400 block mt-0.5">{(card.rewardPoints || 0).toLocaleString()} Pts</span>
           </div>
           <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80">
             <span className="text-slate-500 block">Auto-Pay Enabled:</span>
-            <span className={`font-bold block mt-0.5 ${card.autoPay ? "text-emerald-400" : "text-slate-400"}`}>
-              {card.autoPay ? "Active" : "Disabled"}
+            <span className={`font-bold block mt-0.5 ${card.autoPayEnabled ? "text-emerald-400" : "text-slate-400"}`}>
+              {card.autoPayEnabled ? "Active" : "Disabled"}
             </span>
           </div>
           <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80">

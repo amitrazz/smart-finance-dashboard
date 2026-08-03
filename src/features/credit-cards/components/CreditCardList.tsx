@@ -75,17 +75,16 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
     const searchLower = (search || "").toLowerCase();
     return cards.filter((card) => {
       if (!card) return false;
-      const cardName = (card.name || card.nickname || card.issuer || "Credit Card").toLowerCase();
+      const cardName = (card.nickname || card.issuer || "Credit Card").toLowerCase();
       const cardIssuer = (card.issuer || "").toLowerCase();
 
       const matchesSearch =
         search === "" ||
         cardName.includes(searchLower) ||
         cardIssuer.includes(searchLower) ||
-        (card.maskedNumber && String(card.maskedNumber).includes(search)) ||
-        (card.last4Digits && String(card.last4Digits).includes(search));
+        (card.lastFourDigits && String(card.lastFourDigits).includes(search));
 
-      const matchesType = filterType === "ALL" || card.cardType === filterType;
+      const matchesType = filterType === "ALL" || card.category === filterType;
       const matchesIssuer = filterIssuer === "ALL" || card.issuer === filterIssuer;
       const matchesStatus = filterStatus === "ALL" || card.status === filterStatus;
 
@@ -101,19 +100,19 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
 
       switch (sortField) {
         case "name":
-          aVal = (a?.name || a?.nickname || a?.issuer || "").toLowerCase();
-          bVal = (b?.name || b?.nickname || b?.issuer || "").toLowerCase();
+          aVal = (a?.nickname || a?.issuer || "").toLowerCase();
+          bVal = (b?.nickname || b?.issuer || "").toLowerCase();
           break;
         case "outstanding":
           aVal = parseFloat(
             typeof a?.currentOutstanding === "object"
               ? a?.currentOutstanding?.amount || "0"
-              : String(a?.currentOutstanding || a?.outstandingBalance || "0")
+              : String(a?.currentOutstanding || "0")
           );
           bVal = parseFloat(
             typeof b?.currentOutstanding === "object"
               ? b?.currentOutstanding?.amount || "0"
-              : String(b?.currentOutstanding || b?.outstandingBalance || "0")
+              : String(b?.currentOutstanding || "0")
           );
           break;
         case "availableCredit":
@@ -237,10 +236,12 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
           }}
           className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none"
         >
-          <option value="ALL">All Card Types</option>
-          <option value="PERSONAL">Personal</option>
-          <option value="BUSINESS">Business</option>
-          <option value="PREMIUM">Premium / Metal</option>
+          <option value="ALL">All Card Categories</option>
+          <option value="CREDIT_CARD">Credit Card</option>
+          <option value="CORPORATE_CARD">Corporate Card</option>
+          <option value="CHARGE_CARD">Charge Card</option>
+          <option value="SECURED_CARD">Secured Card</option>
+          <option value="VIRTUAL_CARD">Virtual Card</option>
         </select>
 
         {/* Filter Issuer */}
@@ -366,7 +367,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                   const outAmt = parseFloat(
                     typeof card.currentOutstanding === "object"
                       ? card.currentOutstanding?.amount || "0"
-                      : String(card.currentOutstanding || card.outstandingBalance || "0")
+                      : String(card.currentOutstanding || "0")
                   );
                   const availAmt = parseFloat(
                     typeof card.availableCredit === "object"
@@ -385,8 +386,8 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                   );
 
                   const utilization =
-                    typeof card.creditUtilizationPercent === "number"
-                      ? card.creditUtilizationPercent
+                    card.utilization !== undefined
+                      ? parseFloat(card.utilization) * 100
                       : limitAmt > 0
                       ? (outAmt / limitAmt) * 100
                       : 0;
@@ -404,14 +405,14 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                           </div>
                           <div>
                             <p className="font-bold text-slate-100 group-hover:text-indigo-300 transition-colors">
-                              {card.name || card.nickname || card.issuer || "Credit Card"}
+                              {card.nickname || card.issuer || "Credit Card"}
                             </p>
                             <p className="text-[11px] text-slate-400">{card.issuer || "Card Issuer"}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-mono text-slate-300">
-                        {card.maskedNumber ? `•••• ${card.maskedNumber}` : `•••• ${card.last4Digits || "0000"}`}
+                        {`•••• ${card.lastFourDigits || "0000"}`}
                       </td>
                       <td className="py-3.5 px-4 text-right font-extrabold text-slate-100">
                         {formatCurrency({ amount: outAmt.toFixed(2), currency: card.currency || "INR" })}
@@ -439,7 +440,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                         {formatCurrency({ amount: minDue.toFixed(2), currency: card.currency || "INR" })}
                       </td>
                       <td className="py-3.5 px-4 text-slate-300 font-medium whitespace-nowrap">
-                        {card.nextDueDate ? card.nextDueDate : `Day ${card.paymentDueDay || card.dueDay || "-"}`}
+                        {card.nextDueDate ? card.nextDueDate : `Day ${card.paymentDueDay || "-"}`}
                       </td>
                       <td className="py-3.5 px-4">
                         <span
@@ -478,7 +479,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => setDeletingCard({ id: card.id, name: card.name || card.nickname || "Credit Card", version: card.version || 1 })}
+                            onClick={() => setDeletingCard({ id: card.id, name: card.nickname || "Credit Card", version: card.version || 1 })}
                             title="Delete Credit Card"
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                           >

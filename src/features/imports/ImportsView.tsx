@@ -42,16 +42,16 @@ export const ImportsView: React.FC = () => {
       .filter((c) => !accountIds.has(c.id))
       .map((c) => ({
         id: c.id,
-        name: c.name,
+        name: c.nickname,
         type: "CREDIT_CARD" as const,
         currentBalance:
-          typeof c.currentBalance === "object" && c.currentBalance !== null
-            ? c.currentBalance
-            : { amount: String(c.currentBalance || c.creditLimit || "0"), currency: c.currency || "INR" },
+          typeof c.currentOutstanding === "object" && c.currentOutstanding !== null
+            ? c.currentOutstanding
+            : { amount: String(c.currentOutstanding || c.creditLimit || "0"), currency: c.currency || "INR" },
         status: (c.status as import("../../types").AccountStatus) || "ACTIVE",
         isManual: true,
         currency: c.currency || "INR",
-        maskedNumber: c.maskedNumber,
+        maskedNumber: c.lastFourDigits ? `•••• ${c.lastFourDigits}` : undefined,
         updatedAt: c.updatedAt,
         lastSyncedAt: c.lastSyncedAt,
       }));
