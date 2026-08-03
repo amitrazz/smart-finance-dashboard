@@ -2,10 +2,10 @@ import React from "react";
 import { useUIStore } from "../../store/useUIStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useFinancialHealth } from "../../hooks/useFinanceQueries";
-import { Search, Plus, UploadCloud, Sun, Moon, ShieldCheck } from "lucide-react";
+import { Search, Plus, UploadCloud, Sun, Moon, ShieldCheck, ChevronRight, Eye, EyeOff } from "lucide-react";
 
 export const Navbar: React.FC = () => {
-  const { toggleSearch, setActiveTab, setAddTransactionOpen, setImportModalOpen } = useUIStore();
+  const { activeTab, activeSubTab, toggleSearch, setActiveTab, setAddTransactionOpen, setImportModalOpen, moneyVisible, toggleMoneyVisibility } = useUIStore();
   const { theme, toggleTheme } = useSettingsStore();
   const { data: health } = useFinancialHealth();
 
@@ -19,25 +19,48 @@ export const Navbar: React.FC = () => {
     setImportModalOpen(true);
   };
 
+  const formatSegment = (segment: string) => {
+    return segment
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
   return (
     <header className="h-16 bg-slate-900/60 border-b border-slate-800 backdrop-blur-xl px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* Search Bar Trigger */}
-      <button
-        onClick={toggleSearch}
-        className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all text-sm w-72"
-      >
-        <Search className="w-4 h-4 text-slate-400" />
-        <span className="flex-1 text-left">Search anything...</span>
-        <kbd className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 border border-slate-600/50">
-          ⌘K
-        </kbd>
-      </button>
+      {/* Left: Breadcrumb Navigation & Search Trigger */}
+      <div className="flex items-center gap-4">
+        {/* Dynamic Breadcrumbs */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400">
+          <span className="font-semibold text-slate-400">Personal Finance OS</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+          <span className="font-bold text-slate-200">{formatSegment(activeTab)}</span>
+          {activeSubTab && (
+            <>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+              <span className="font-semibold text-emerald-400">{formatSegment(activeSubTab)}</span>
+            </>
+          )}
+        </div>
+
+        {/* Search Bar Trigger */}
+        <button
+          onClick={toggleSearch}
+          className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all text-xs sm:text-sm w-48 sm:w-64"
+        >
+          <Search className="w-4 h-4 text-slate-400" />
+          <span className="flex-1 text-left truncate">Search anything...</span>
+          <kbd className="hidden sm:inline-block text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 border border-slate-600/50">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
         {/* Health Score Pill */}
         {health && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
             <ShieldCheck className="w-4 h-4" />
             <span>Health Score: {health.overallScore}/100</span>
           </div>
@@ -49,7 +72,7 @@ export const Navbar: React.FC = () => {
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-all shadow-md shadow-emerald-500/20"
         >
           <Plus className="w-4 h-4" />
-          <span>Transaction</span>
+          <span className="hidden sm:inline">Transaction</span>
         </button>
 
         <button
@@ -58,6 +81,26 @@ export const Navbar: React.FC = () => {
         >
           <UploadCloud className="w-4 h-4 text-teal-400" />
           <span className="hidden sm:inline">Import Statement</span>
+        </button>
+
+        {/* Privacy Toggle — Eye / Eye-Off */}
+        <button
+          id="privacy-toggle-btn"
+          onClick={toggleMoneyVisibility}
+          className={`p-2 rounded-xl border transition-all duration-200 ${
+            !moneyVisible
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 privacy-toggle-active"
+              : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-800"
+          }`}
+          title={moneyVisible ? "Hide financial values" : "Show financial values"}
+          aria-label={moneyVisible ? "Hide financial values" : "Show financial values"}
+          aria-pressed={moneyVisible}
+        >
+          {moneyVisible ? (
+            <Eye className="w-4 h-4" />
+          ) : (
+            <EyeOff className="w-4 h-4" />
+          )}
         </button>
 
         {/* Theme Toggle */}

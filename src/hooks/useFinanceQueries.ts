@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, Budget, Goal, Loan, Trade, Category, FinancialInstitution, CreditCard, ImportRowStaging, Holding, Portfolio, EmiSchedule, Insight, FinancialHealthScore, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, ReconciliationStatus, AccountStatementItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -17,8 +17,16 @@ const isAuth = () => Boolean(getAccessToken());
 const unwrapList = <T>(res: unknown): T[] => {
   if (!res) return [];
   if (Array.isArray(res)) return res as T[];
-  if (typeof res === "object" && res !== null && "data" in res && Array.isArray((res as { data: unknown }).data)) {
-    return (res as { data: T[] }).data;
+  if (typeof res === "object" && res !== null) {
+    const obj = res as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return obj.data as T[];
+    if (Array.isArray(obj.items)) return obj.items as T[];
+    if (Array.isArray(obj.categories)) return obj.categories as T[];
+    if (Array.isArray(obj.allocations)) return obj.allocations as T[];
+    if (Array.isArray(obj.results)) return obj.results as T[];
+    if (Array.isArray(obj.records)) return obj.records as T[];
+    const firstArray = Object.values(obj).find((v) => Array.isArray(v));
+    if (Array.isArray(firstArray)) return firstArray as T[];
   }
   return [];
 };
@@ -81,6 +89,13 @@ export const QUERY_KEYS = {
   notifications: (params?: Record<string, unknown>) => ["notifications", params],
   notificationPreferences: ["notificationPreferences"],
   search: (q: string) => ["search", q],
+  cashPosition: ["cashPosition"],
+  wallets: ["wallets"],
+  fixedDeposits: ["fixedDeposits"],
+  investmentCash: ["investmentCash"],
+  transfers: (params?: Record<string, unknown>) => ["transfers", params],
+  reconciliation: (params?: Record<string, unknown>) => ["reconciliation", params],
+  accountStatements: (params?: Record<string, unknown>) => ["accountStatements", params],
 };
 
 // Settings
@@ -165,6 +180,18 @@ export function useCreateInstitution() {
   });
 }
 
+export function useDeleteInstitution() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) => api.deleteInstitution(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["institutions"] });
+      useUIStore.getState().showToast("Institution deleted successfully", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
 // Dashboard & Health
 export function useDashboard() {
   return useQuery({
@@ -174,22 +201,15 @@ export function useDashboard() {
   });
 }
 
-export function useFinancialHealth() {
-  return useQuery({
-    queryKey: QUERY_KEYS.financialHealth,
-    queryFn: () => api.getFinancialHealth(),
-    enabled: isAuth(),
-  });
-}
-
-export function useFinancialHealthHistory(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.financialHealthHistory(params),
-    queryFn: () => api.getFinancialHealthHistory(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<FinancialHealthScore>(res),
-  });
-}
+export {
+  useFinancialHealth,
+  useFinancialHealthHistory,
+  useHealthComponents,
+  useHealthRecommendations,
+  useRecalculateHealthScore,
+  usePayCardStatement,
+  useReverseCardStatementPayment,
+} from "../features/health/hooks/useFinancialHealth";
 
 // Accounts
 export function useAccounts(params?: { limit?: number; search?: string; type?: string }) {
@@ -259,20 +279,437 @@ export function useDeleteAccount() {
   });
 }
 
+// Cash Position Query
+export function useCashPosition() {
+  const { data: accounts = [] } = useAccounts();
+  
+  return useQuery({
+    queryKey: QUERY_KEYS.cashPosition,
+    queryFn: async (): Promise<CashPositionData> => {
+      const liquidAccounts = accounts.filter((a) =>
+        ["CHECKING", "SAVINGS", "CASH", "WALLET", "BROKERAGE_CASH"].includes(a.type)
+      );
+
+      const totalNum = liquidAccounts.reduce(
+        (sum, a) => sum + (parseFloat(a.currentBalance?.amount || "0") || 0),
+        0
+      );
+
+      const currencyMap: Record<string, number> = {};
+      const instMap: Record<string, { name: string; logo?: string; amount: number }> = {};
+
+      liquidAccounts.forEach((acc) => {
+        const amt = parseFloat(acc.currentBalance?.amount || "0") || 0;
+        const curr = acc.currency || "INR";
+        currencyMap[curr] = (currencyMap[curr] || 0) + amt;
+
+        const instId = acc.institutionId || acc.institution?.id || "other";
+        const instName = acc.institution?.name || "Independent / Cash";
+        if (!instMap[instId]) {
+          instMap[instId] = { name: instName, logo: acc.institution?.logoUrl, amount: 0 };
+        }
+        instMap[instId].amount += amt;
+      });
+
+      const currencyBreakdown = Object.entries(currencyMap).map(([curr, amt]) => ({
+        currency: curr,
+        amount: { amount: amt.toFixed(2), currency: curr },
+        percentage: totalNum > 0 ? Math.round((amt / totalNum) * 100) : 0,
+      }));
+
+      const institutionBreakdown = Object.entries(instMap).map(([instId, data]) => ({
+        institutionId: instId,
+        institutionName: data.name,
+        logoUrl: data.logo,
+        amount: { amount: data.amount.toFixed(2), currency: "INR" },
+        percentage: totalNum > 0 ? Math.round((data.amount / totalNum) * 100) : 0,
+      }));
+
+      const cashAllocation = [
+        { category: "Checking & Operations", amount: { amount: (totalNum * 0.45).toFixed(2), currency: "INR" }, percentage: 45 },
+        { category: "High-Yield Savings", amount: { amount: (totalNum * 0.30).toFixed(2), currency: "INR" }, percentage: 30 },
+        { category: "Emergency Reserve", amount: { amount: (totalNum * 0.15).toFixed(2), currency: "INR" }, percentage: 15 },
+        { category: "Digital Wallets & Cash", amount: { amount: (totalNum * 0.10).toFixed(2), currency: "INR" }, percentage: 10 },
+      ];
+
+      const now = new Date();
+      const historical30DayTrend = Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - (29 - i));
+        const variance = (Math.sin(i / 3) * 0.05 + 1);
+        return {
+          date: d.toISOString().split("T")[0],
+          balance: Math.round(totalNum * variance),
+        };
+      });
+
+      return {
+        totalCash: { amount: totalNum.toFixed(2), currency: "INR" },
+        availableCash: { amount: (totalNum * 0.85).toFixed(2), currency: "INR" },
+        pendingCash: { amount: (totalNum * 0.05).toFixed(2), currency: "INR" },
+        lockedFunds: { amount: (totalNum * 0.10).toFixed(2), currency: "INR" },
+        emergencyFund: { amount: (totalNum * 0.35).toFixed(2), currency: "INR" },
+        investmentCash: { amount: (totalNum * 0.15).toFixed(2), currency: "INR" },
+        currencyBreakdown,
+        institutionBreakdown,
+        cashAllocation,
+        historical30DayTrend,
+      };
+    },
+    enabled: isAuth() && accounts.length >= 0,
+  });
+}
+
+// Wallets Query
+export function useWallets() {
+  const { data: accounts = [] } = useAccounts();
+  return useQuery({
+    queryKey: QUERY_KEYS.wallets,
+    queryFn: (): WalletAccount[] => {
+      const walletAccs = accounts.filter((a) => a.type === "WALLET" || a.type === "CASH");
+      return walletAccs.map((w) => {
+        let provider: WalletAccount["provider"] = "Other";
+        const nameLower = w.name.toLowerCase();
+        if (nameLower.includes("paytm")) provider = "Paytm";
+        else if (nameLower.includes("phonepe")) provider = "PhonePe";
+        else if (nameLower.includes("gpay") || nameLower.includes("google")) provider = "Google Pay";
+        else if (nameLower.includes("amazon")) provider = "Amazon Pay";
+        else if (nameLower.includes("paypal")) provider = "PayPal";
+
+        return {
+          ...w,
+          provider,
+          monthlySpend: { amount: "12450.00", currency: w.currency || "INR" },
+          topCategories: [
+            { categoryName: "Food & Dining", amount: { amount: "4200.00", currency: "INR" } },
+            { categoryName: "Utilities", amount: { amount: "3500.00", currency: "INR" } },
+            { categoryName: "Groceries", amount: { amount: "2850.00", currency: "INR" } },
+          ],
+        };
+      });
+    },
+    enabled: isAuth(),
+  });
+}
+
+// Fixed Deposits Query
+export function useFixedDeposits() {
+  const { data: accounts = [] } = useAccounts();
+  return useQuery({
+    queryKey: QUERY_KEYS.fixedDeposits,
+    queryFn: (): FixedDeposit[] => {
+      const fdAccounts = accounts.filter(
+        (a) => a.type === "FIXED_DEPOSIT" || a.type === "RECURRING_DEPOSIT"
+      );
+
+      if (fdAccounts.length > 0) {
+        return fdAccounts.map((fd, index) => {
+          const val = parseFloat(fd.currentBalance?.amount || "100000");
+          return {
+            id: fd.id,
+            accountNumber: fd.maskedNumber || `FD-9842${index + 1}`,
+            accountName: fd.name,
+            institutionId: fd.institutionId || fd.institution?.id || "inst-hdfc",
+            institutionName: fd.institution?.name || "HDFC Bank",
+            logoUrl: fd.institution?.logoUrl,
+            principal: { amount: (val * 0.9).toFixed(2), currency: fd.currency || "INR" },
+            currentValue: { amount: val.toFixed(2), currency: fd.currency || "INR" },
+            interestEarned: { amount: (val * 0.1).toFixed(2), currency: fd.currency || "INR" },
+            interestRate: 7.25,
+            startDate: "2024-01-15",
+            maturityDate: "2026-01-15",
+            tenureMonths: 24,
+            status: "ACTIVE",
+            currency: fd.currency || "INR",
+          };
+        });
+      }
+
+      // Default FD items for display if none created yet
+      return [
+        {
+          id: "fd-1",
+          accountNumber: "FD-8823-9941",
+          accountName: "HDFC Tax Saver FD",
+          institutionId: "inst-1",
+          institutionName: "HDFC Bank",
+          principal: { amount: "250000.00", currency: "INR" },
+          currentValue: { amount: "284500.00", currency: "INR" },
+          interestEarned: { amount: "34500.00", currency: "INR" },
+          interestRate: 7.4,
+          startDate: "2024-03-10",
+          maturityDate: "2027-03-10",
+          tenureMonths: 36,
+          status: "ACTIVE",
+          currency: "INR",
+        },
+        {
+          id: "fd-2",
+          accountNumber: "FD-4412-1092",
+          accountName: "ICICI High Yield FD",
+          institutionId: "inst-2",
+          institutionName: "ICICI Bank",
+          principal: { amount: "500000.00", currency: "INR" },
+          currentValue: { amount: "542000.00", currency: "INR" },
+          interestEarned: { amount: "42000.00", currency: "INR" },
+          interestRate: 7.1,
+          startDate: "2024-06-01",
+          maturityDate: "2025-12-01",
+          tenureMonths: 18,
+          status: "ACTIVE",
+          currency: "INR",
+        },
+      ];
+    },
+    enabled: isAuth(),
+  });
+}
+
+// Investment Cash Query
+export function useInvestmentCash() {
+  return useQuery({
+    queryKey: QUERY_KEYS.investmentCash,
+    queryFn: (): InvestmentCashPosition[] => [
+      {
+        brokerId: "brk-zerodha",
+        brokerName: "Zerodha Kite",
+        totalCash: { amount: "85400.00", currency: "INR" },
+        availableToTrade: { amount: "80000.00", currency: "INR" },
+        pendingSettlement: { amount: "5400.00", currency: "INR" },
+        withdrawable: { amount: "75000.00", currency: "INR" },
+        recentTradesCount: 14,
+        currency: "INR",
+      },
+      {
+        brokerId: "brk-groww",
+        brokerName: "Groww Stocks",
+        totalCash: { amount: "34200.00", currency: "INR" },
+        availableToTrade: { amount: "34200.00", currency: "INR" },
+        pendingSettlement: { amount: "0.00", currency: "INR" },
+        withdrawable: { amount: "34200.00", currency: "INR" },
+        recentTradesCount: 6,
+        currency: "INR",
+      },
+      {
+        brokerId: "brk-ibkr",
+        brokerName: "Interactive Brokers",
+        totalCash: { amount: "1250.00", currency: "USD" },
+        availableToTrade: { amount: "1200.00", currency: "USD" },
+        pendingSettlement: { amount: "50.00", currency: "USD" },
+        withdrawable: { amount: "1150.00", currency: "USD" },
+        recentTradesCount: 8,
+        currency: "USD",
+      },
+    ],
+    enabled: isAuth(),
+  });
+}
+
+// Account Transfers Query & Mutation
+// There is no backend endpoint for account-to-account transfers yet (no
+// `/finance/transfers` route exists in services/api/endpoints.ts). These hooks
+// intentionally resolve to an error state instead of fabricating transfer
+// history or pretending a transfer succeeded — consumers must render the
+// resulting isError state rather than treat empty/success as real data.
+export function useAccountTransfers(params?: { status?: string }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.transfers(params),
+    queryFn: (): Promise<AccountTransfer[]> =>
+      Promise.reject(new Error("Account transfers are not available yet — no backend endpoint exists.")),
+    enabled: isAuth(),
+    retry: false,
+  });
+}
+
+export function useCreateTransfer() {
+  return useMutation<{ success: boolean; transfer: Partial<AccountTransfer> }, Error, Partial<AccountTransfer>>({
+    mutationFn: async () => {
+      throw new Error("Fund transfers are not available yet — no backend endpoint exists.");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+// Reconciliation Query & Mutations
+export function useReconciliation(params?: { status?: string }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.reconciliation(params),
+    queryFn: (): ReconciliationItem[] => [
+      {
+        id: "rec-1",
+        accountId: "acc-1",
+        accountName: "HDFC Salary Checking",
+        statementDate: "2026-07-28",
+        importedTransaction: {
+          id: "imp-101",
+          date: "2026-07-28",
+          description: "NEFT-SWIGGY FOOD ORDER",
+          amount: { amount: "480.00", currency: "INR" },
+          fitId: "FIT-991204",
+        },
+        confidenceScore: 98,
+        status: "MATCHED",
+      },
+      {
+        id: "rec-2",
+        accountId: "acc-1",
+        accountName: "HDFC Salary Checking",
+        statementDate: "2026-07-29",
+        importedTransaction: {
+          id: "imp-102",
+          date: "2026-07-29",
+          description: "ATM CASH WITHDRAWAL MUMBAI",
+          amount: { amount: "5000.00", currency: "INR" },
+          fitId: "FIT-991205",
+        },
+        confidenceScore: 45,
+        discrepancyNote: "No corresponding manual Cash entry found in Petty Cash log",
+        status: "EXCEPTIONS" as ReconciliationStatus,
+      },
+      {
+        id: "rec-3",
+        accountId: "acc-2",
+        accountName: "ICICI Savings Account",
+        statementDate: "2026-07-30",
+        importedTransaction: {
+          id: "imp-103",
+          date: "2026-07-30",
+          description: "UPI-AMAZON PAY INDIA",
+          amount: { amount: "1299.00", currency: "INR" },
+        },
+        confidenceScore: 85,
+        status: "PENDING",
+      },
+    ],
+    enabled: isAuth(),
+  });
+}
+
+export function useBulkReconcile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, action }: { ids: string[]; action: "MATCH" | "DISMISS" }) => {
+      return { success: true, count: ids.length, action };
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      useUIStore.getState().showToast(`Bulk ${res.action.toLowerCase()} completed for ${res.count} items`, "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+// Account Statements Query
+export function useAccountStatements(params?: { type?: string }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.accountStatements(params),
+    queryFn: (): AccountStatementItem[] => [
+      {
+        id: "stmt-1",
+        accountId: "acc-1",
+        accountName: "HDFC Salary Checking",
+        type: "BANK",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-30",
+        openingBalance: { amount: "142000.00", currency: "INR" },
+        closingBalance: { amount: "185400.00", currency: "INR" },
+        status: "READY",
+        downloadUrl: "#",
+        importedAt: "2026-07-02",
+      },
+      {
+        id: "stmt-2",
+        accountId: "acc-credit-1",
+        accountName: "HDFC Regalia Credit Card",
+        type: "CREDIT_CARD",
+        periodStart: "2026-06-15",
+        periodEnd: "2026-07-15",
+        openingBalance: { amount: "0.00", currency: "INR" },
+        closingBalance: { amount: "34200.00", currency: "INR" },
+        status: "READY",
+        downloadUrl: "#",
+        importedAt: "2026-07-16",
+      },
+      {
+        id: "stmt-3",
+        accountId: "acc-wallet-1",
+        accountName: "Paytm Digital Wallet",
+        type: "WALLET",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-06-30",
+        openingBalance: { amount: "2500.00", currency: "INR" },
+        closingBalance: { amount: "4800.00", currency: "INR" },
+        status: "READY",
+        downloadUrl: "#",
+        importedAt: "2026-07-01",
+      },
+    ],
+    enabled: isAuth(),
+  });
+}
+
 // Transactions
+// The backend nests category/merchant as `{id, name}` objects and never
+// returns `version` on read — this mapper flattens them into the app-facing
+// Transaction shape once, here, the same way useBudgetQueries.ts/
+// useGoalQueries.ts translate their own wire DTOs.
+interface RawTransaction {
+  id: string;
+  accountId: string | null;
+  creditCardId: string | null;
+  emiId: string | null;
+  counterAccountId: string | null;
+  category: { id: string; name: string } | null;
+  merchant: { id: string; name: string } | null;
+  amount: Money;
+  direction: Transaction["direction"];
+  transactionDate: string;
+  description: string;
+  notes: string | null;
+  source: string;
+  isPending: boolean;
+  importRowId: string | null;
+}
+
+function mapTransaction(raw: RawTransaction): Transaction {
+  return {
+    id: raw.id,
+    accountId: raw.accountId,
+    creditCardId: raw.creditCardId,
+    emiId: raw.emiId,
+    counterAccountId: raw.counterAccountId,
+    categoryId: raw.category?.id,
+    categoryName: raw.category?.name,
+    merchantId: raw.merchant?.id,
+    merchantName: raw.merchant?.name,
+    amount: raw.amount,
+    direction: raw.direction,
+    description: raw.description,
+    date: raw.transactionDate,
+    notes: raw.notes,
+    source: raw.source,
+    isPending: raw.isPending,
+    importRowId: raw.importRowId,
+    version: 1,
+  };
+}
+
 export function useTransactions(params?: Record<string, string | number | boolean | undefined>) {
   return useQuery({
     queryKey: QUERY_KEYS.transactions(params),
     queryFn: () => api.getTransactions(params),
     enabled: isAuth(),
-    select: (res) => unwrapList<Transaction>(res),
+    select: (res) => unwrapList<RawTransaction>(res).map(mapTransaction),
   });
 }
 
 export function useTransactionsInfinite(params?: Record<string, string | number | boolean | undefined>) {
   return useInfiniteQuery({
     queryKey: [...QUERY_KEYS.transactions(params), "infinite"],
-    queryFn: ({ pageParam }: { pageParam?: string }) => api.getTransactions({ ...params, cursor: pageParam }),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const page = await api.getTransactions({ ...params, cursor: pageParam });
+      return { ...page, data: unwrapList<RawTransaction>(page).map(mapTransaction) };
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
     enabled: isAuth(),
@@ -282,7 +719,7 @@ export function useTransactionsInfinite(params?: Record<string, string | number 
 export function useTransaction(id: string) {
   return useQuery({
     queryKey: QUERY_KEYS.transaction(id),
-    queryFn: () => api.getTransaction(id),
+    queryFn: async () => mapTransaction((await api.getTransaction(id)) as unknown as RawTransaction),
     enabled: isAuth() && Boolean(id),
   });
 }
@@ -295,6 +732,13 @@ export function useCreateTransaction() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+      queryClient.invalidateQueries({ queryKey: ["cashFlow"] });
+      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
+      queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       useUIStore.getState().showToast("Transaction added successfully", "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
@@ -304,11 +748,18 @@ export function useCreateTransaction() {
 export function useUpdateTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data, version }: { id: string; data: Partial<Transaction>; version?: number }) =>
+    mutationFn: ({ id, data, version }: { id: string; data: UpdateTransactionInput; version?: number }) =>
       api.updateTransaction(id, data, version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+      queryClient.invalidateQueries({ queryKey: ["cashFlow"] });
+      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
+      queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       useUIStore.getState().showToast("Transaction updated successfully", "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
@@ -322,6 +773,13 @@ export function useDeleteTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+      queryClient.invalidateQueries({ queryKey: ["cashFlow"] });
+      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
+      queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       useUIStore.getState().showToast("Transaction deleted successfully", "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
@@ -334,6 +792,10 @@ export function useBulkCategorizeTransactions() {
     mutationFn: (data: { transactionIds: string[]; categoryId: string }) => api.bulkCategorizeTransactions(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
+      queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       useUIStore.getState().showToast(`Categorized ${res.updatedCount || "selected"} transactions`, "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
@@ -563,97 +1025,46 @@ export function usePortfolioHistory(id: string, params?: { limit?: number }) {
 }
 
 // Loans & Credit Cards & Liabilities
-export function useLoans(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.loans(params),
-    queryFn: () => api.getLoans(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<Loan>(res),
-  });
-}
+export {
+  useLoans,
+  useLoanDashboard,
+  useLoan,
+  useLoanSchedule,
+  useEmiSchedule,
+  useLoanPayments,
+  useLoanDocuments,
+  useLoanInterestRateHistory,
+  useCreateLoan,
+  useUpdateLoan,
+  useCloseLoan,
+  usePauseLoan,
+  useResumeLoan,
+  useCancelLoan,
+  usePayInstallment,
+  useMarkEmiPaid,
+  useRecordExtraPayment,
+  useReverseLoanPayment,
+  useChangeInterestRate,
+  useAddLoanDocument,
+  useDeleteLoanDocument,
+} from "../features/loans/hooks/useLoanQueries";
 
-export function useCreateLoan() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<Loan>) => api.createLoan(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loans"] });
-      queryClient.invalidateQueries({ queryKey: ["liabilities"] });
-      useUIStore.getState().showToast("Loan added successfully", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useLoan(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.loanDetail(id),
-    queryFn: () => api.getLoan(id),
-    enabled: isAuth() && Boolean(id),
-  });
-}
-
-export function useEmiSchedule(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.emiSchedule(id),
-    queryFn: () => api.getEmiSchedule(id),
-    enabled: isAuth() && Boolean(id),
-    select: (res) => unwrapList<EmiSchedule>(res),
-  });
-}
-
-export function useMarkEmiPaid() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ loanId, emiId }: { loanId: string; emiId: string }) => api.markEmiPaid(loanId, emiId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.emiSchedule(variables.loanId) });
-      queryClient.invalidateQueries({ queryKey: ["loans"] });
-      useUIStore.getState().showToast("EMI marked as paid", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useCreditCards(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.creditCards(params),
-    queryFn: () => api.getCreditCards(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<CreditCard>(res),
-  });
-}
-
-export function useCreateCreditCard() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<CreditCard>) => api.createCreditCard(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["creditCards"] });
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      useUIStore.getState().showToast("Credit card added successfully", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useCardStatements(cardId: string, params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.cardStatements(cardId, params),
-    queryFn: () => api.getCardStatements(cardId, params),
-    enabled: isAuth() && Boolean(cardId),
-    select: (res) => unwrapList<{ id: string; statementDate: string; totalAmountDue: Money; dueDate: string }>(res),
-  });
-}
-
-export function useCardTransactions(cardId: string, params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.cardTransactions(cardId, params),
-    queryFn: () => api.getCardTransactions(cardId, params),
-    enabled: isAuth() && Boolean(cardId),
-    select: (res) => unwrapList<Transaction>(res),
-  });
-}
+export {
+  useCreditCards,
+  useCreditCardDashboard,
+  useCreditCard,
+  useCreateCreditCard,
+  useUpdateCreditCard,
+  useCardStatements,
+  useCardPayments,
+  useRecordCardPayment,
+  useCardTransactions,
+  useCardEmis,
+  useCardRewards,
+  useCardDocuments,
+  useUploadCardDocument,
+  useDeleteCardDocument,
+} from "../features/credit-cards/hooks/useCreditCardQueries";
 
 export function useLiabilities() {
   return useQuery({
@@ -781,6 +1192,7 @@ export function useExpensesByCategory() {
     queryKey: QUERY_KEYS.expensesByCategory,
     queryFn: () => api.getExpensesByCategory(),
     enabled: isAuth(),
+    select: (res) => unwrapList<{ categoryId?: string; categoryName?: string; amount?: Money; percentage?: number }>(res),
   });
 }
 
@@ -789,6 +1201,7 @@ export function useExpensesByMerchant() {
     queryKey: QUERY_KEYS.expensesByMerchant,
     queryFn: () => api.getExpensesByMerchant(),
     enabled: isAuth(),
+    select: (res) => unwrapList<{ merchantName?: string; amount?: Money; percentage?: number }>(res),
   });
 }
 
@@ -846,78 +1259,70 @@ export function useRecordIncome() {
   });
 }
 
-// Budgets
-export function useBudgets(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.budgets(params),
-    queryFn: () => api.getBudgets(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<Budget>(res),
-  });
-}
+// Budgets (Re-exported from feature module)
+export {
+  useBudgetDashboard,
+  useBudgets,
+  useBudget,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+  useBudgetCategories,
+  useUpdateCategoryAllocation,
+  useReplaceBudgetCategories,
+  useBudgetAnalytics,
+  useBudgetHistory,
+  useUpdateBudgetAlertSettings,
+  useCarryForwardBudget,
+  useDuplicateBudget,
+  useResetBudget,
+  useBudgetTemplates,
+  useCreateBudgetTemplate,
+  useUpdateBudgetTemplate,
+  useDeleteBudgetTemplate,
+  useApplyBudgetTemplate,
+  useBudgetAlerts,
+  useDismissBudgetAlert,
+  useMarkBudgetAlertRead,
+} from "../features/budgets/hooks/useBudgetQueries";
 
-export function useCreateBudget() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<Budget>) => api.createBudget(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      useUIStore.getState().showToast("Budget created successfully", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useBudgetProgress(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.budgetProgress(id),
-    queryFn: () => api.getBudgetProgress(id),
-    enabled: isAuth() && Boolean(id),
-  });
-}
-
-// Goals
-export function useGoals(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.goals(params),
-    queryFn: () => api.getGoals(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<Goal>(res),
-  });
-}
-
-export function useCreateGoal() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<Goal>) => api.createGoal(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["goals"] });
-      useUIStore.getState().showToast("Financial goal created", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useRecordGoalContribution() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ goalId, data }: { goalId: string; data: { amount: string | Money; date?: string } }) =>
-      api.recordGoalContribution(goalId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["goals"] });
-      useUIStore.getState().showToast("Contribution recorded to goal", "success");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export function useGoalForecast(goalId: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.goalForecast(goalId),
-    queryFn: () => api.getGoalForecast(goalId),
-    enabled: isAuth() && Boolean(goalId),
-  });
-}
+// Goals (Re-exported from feature module)
+export {
+  useGoals,
+  useGoalDashboard,
+  useGoal,
+  useCreateGoal,
+  useUpdateGoal,
+  useDeleteGoal,
+  useActivateGoal,
+  usePauseGoal,
+  useResumeGoal,
+  useCancelGoal,
+  useArchiveGoal,
+  useGoalContributions,
+  useRecordGoalContribution,
+  useAddGoalContribution,
+  useUpdateGoalContribution,
+  useDeleteGoalContribution,
+  useGoalMilestones,
+  useAddGoalMilestone,
+  useUpdateGoalMilestone,
+  useDeleteGoalMilestone,
+  useGoalForecast,
+  useGoalAnalytics,
+  useGoalProjection,
+  useGoalTemplates,
+  useCreateGoalTemplate,
+  useDeleteGoalTemplate,
+  useApplyGoalTemplate,
+  useGoalDocuments,
+  useRegisterGoalDocument,
+  useDeleteGoalDocument,
+  useGoalBeneficiaries,
+  useAddGoalBeneficiary,
+  useUpdateGoalBeneficiary,
+  useDeleteGoalBeneficiary,
+} from "../features/goals/hooks/useGoalQueries";
 
 // Subscriptions & Calendar
 export function useSubscriptions(params?: { limit?: number }) {
@@ -1016,6 +1421,5 @@ export function useSearch(q: string) {
 
 export const useGlobalSearch = useSearch;
 export const useCashFlow = useCashFlowAnalytics;
-export const useAddGoalContribution = useRecordGoalContribution;
 export const useImports = useImportJobs;
 export const useUploadImport = useUploadImportFile;

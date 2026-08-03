@@ -2,29 +2,78 @@ import { fetchWithAuth } from "./client";
 import {
   Account,
   Budget,
+  BudgetDashboardData,
+  BudgetAnalytics,
+  BudgetAlert,
+  BudgetTemplate,
   CalendarItem,
+  CalendarEventItem,
   CashFlowSnapshot,
   FinancialHealthScore,
   Goal,
+  GoalDashboardData,
+  GoalContribution,
+  GoalMilestone,
+  GoalForecast,
+  GoalAnalytics,
+  GoalProjection,
+  GoalDocument,
+  GoalBeneficiary,
+  GoalTemplate,
+  CreateGoalInput,
+  UpdateGoalInput,
   Holding,
   ImportJob,
   ImportRowStaging,
   Insight,
   Loan,
-  EmiSchedule,
+  LoanDashboardData,
+  LoanScheduleItem,
+  LoanPayment,
+  LoanDocument,
+  LoanInterestRateHistory,
+  CreateLoanInput,
+  UpdateLoanInput,
   Money,
   NetWorthSnapshot,
   OnboardingProgress,
   BootstrapOnboardingPayload,
+  OnboardingState,
+  OnboardingStatus,
+  OnboardingStepCatalogItem,
+  OnboardingProfileInput,
+  OnboardingPreferencesInput,
+  OnboardingAccountInput,
+  OnboardingCreditCardInput,
+  OnboardingLoanInput,
+  OnboardingInvestmentInput,
+  OnboardingGoalInput,
+  HealthDimensionDetail,
+  HealthRecommendation,
+  FinancialHealthHistoryPoint,
+  CreditCardStatementPaymentInput,
+  SmartActionItem,
+  ActionCategoryCount,
+  ActionPreferences,
   Portfolio,
   SearchResultItem,
   Trade,
   Transaction,
   CreateTransactionInput,
+  UpdateTransactionInput,
   UserSettings,
   Category,
   FinancialInstitution,
   CreditCard,
+  CreditCardDashboardData,
+  CreditCardStatement,
+  CreditCardPayment,
+  CreditCardEmi,
+  CreditCardRewards,
+  CreditCardDocument,
+  CreateCreditCardInput,
+  UpdateCreditCardInput,
+  RecordCreditCardPaymentInput,
   InvestmentReturnsResponse,
   AssetAllocationResponse,
   DebtBreakdownResponse,
@@ -57,12 +106,16 @@ export interface DashboardResponse {
   monthlySpend?: Money;
   monthlyIncome?: Money;
   financialHealthScore?: number;
+  financialHealthRating?: string;
+  financialHealthComponents?: Record<string, HealthDimensionDetail>;
+  topRecommendations?: HealthRecommendation[];
   healthScore?: number;
   savingsRate?: number;
   recentTransactions?: Transaction[];
-  upcomingBills?: CalendarItem[];
+  upcomingBills?: Array<{ title: string; dueDate: string; amount: Money; deepLink?: string } | CalendarItem>;
   topInsights?: Insight[];
   insights?: Insight[];
+  topActions?: SmartActionItem[];
 }
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined>): string {
@@ -75,6 +128,103 @@ function buildQuery(params?: Record<string, string | number | boolean | undefine
   });
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
+}
+
+const GOAL_TYPE_MAP: Record<string, string> = {
+  EMERGENCY: "EMERGENCY_FUND",
+  VEHICLE: "CAR",
+  OTHER: "CUSTOM",
+};
+
+const RISK_PROFILE_MAP: Record<string, string> = {
+  BALANCED: "MODERATE",
+  GROWTH: "AGGRESSIVE",
+};
+
+const VALID_GOAL_TYPES = new Set([
+  "EMERGENCY_FUND",
+  "RETIREMENT",
+  "HOUSE",
+  "CAR",
+  "VACATION",
+  "WEDDING",
+  "EDUCATION",
+  "CHILD_EDUCATION",
+  "BUSINESS",
+  "INVESTMENT_CORPUS",
+  "PASSIVE_INCOME",
+  "DEBT_FREE",
+  "INSURANCE_CORPUS",
+  "MEDICAL_FUND",
+  "CUSTOM",
+]);
+
+const VALID_RISK_PROFILES = new Set(["CONSERVATIVE", "MODERATE", "AGGRESSIVE"]);
+
+function normalizeGoalInput<T extends Record<string, unknown>>(data: T): T {
+  if (!data || typeof data !== "object") return data;
+  const payload: Record<string, unknown> = { ...data };
+
+  if (payload.type) {
+    const rawType = String(payload.type).toUpperCase();
+    if (GOAL_TYPE_MAP[rawType]) {
+      payload.type = GOAL_TYPE_MAP[rawType];
+    } else if (!VALID_GOAL_TYPES.has(rawType)) {
+      payload.type = "CUSTOM";
+    } else {
+      payload.type = rawType;
+    }
+  }
+
+  if (payload.riskProfile) {
+    const rawRisk = String(payload.riskProfile).toUpperCase();
+    if (RISK_PROFILE_MAP[rawRisk]) {
+      payload.riskProfile = RISK_PROFILE_MAP[rawRisk];
+    } else if (!VALID_RISK_PROFILES.has(rawRisk)) {
+      payload.riskProfile = "MODERATE";
+    } else {
+      payload.riskProfile = rawRisk;
+    }
+  }
+
+  if (payload.defaultRiskProfile) {
+    const rawRisk = String(payload.defaultRiskProfile).toUpperCase();
+    if (RISK_PROFILE_MAP[rawRisk]) {
+      payload.defaultRiskProfile = RISK_PROFILE_MAP[rawRisk];
+    } else if (!VALID_RISK_PROFILES.has(rawRisk)) {
+      payload.defaultRiskProfile = "MODERATE";
+    } else {
+      payload.defaultRiskProfile = rawRisk;
+    }
+  }
+
+  if (payload.expectedReturnRate !== undefined && payload.expectedReturnRate !== null && payload.expectedReturnRate !== "") {
+    const isString = typeof payload.expectedReturnRate === "string";
+    const num = typeof payload.expectedReturnRate === "number" ? payload.expectedReturnRate : parseFloat(payload.expectedReturnRate as string);
+    if (!isNaN(num)) {
+      let decimalVal = num;
+      if (num > 1) {
+        decimalVal = num / 100;
+      }
+      decimalVal = Math.min(Math.max(0, decimalVal), 9.9999);
+      payload.expectedReturnRate = isString ? decimalVal.toString() : decimalVal;
+    }
+  }
+
+  if (payload.defaultExpectedReturnRate !== undefined && payload.defaultExpectedReturnRate !== null && payload.defaultExpectedReturnRate !== "") {
+    const isString = typeof payload.defaultExpectedReturnRate === "string";
+    const num = typeof payload.defaultExpectedReturnRate === "number" ? payload.defaultExpectedReturnRate : parseFloat(payload.defaultExpectedReturnRate as string);
+    if (!isNaN(num)) {
+      let decimalVal = num;
+      if (num > 1) {
+        decimalVal = num / 100;
+      }
+      decimalVal = Math.min(Math.max(0, decimalVal), 9.9999);
+      payload.defaultExpectedReturnRate = isString ? decimalVal.toString() : decimalVal;
+    }
+  }
+
+  return payload as T;
 }
 
 export const api = {
@@ -101,7 +251,62 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // Onboarding
+  // Onboarding (API-Driven)
+  getOnboardingState: () => fetchWithAuth<OnboardingState>("/finance/onboarding"),
+  getOnboardingStatus: () => fetchWithAuth<OnboardingStatus>("/finance/onboarding/status"),
+  getOnboardingSteps: () => fetchWithAuth<OnboardingStepCatalogItem[]>("/finance/onboarding/steps"),
+  getOnboardingCurrent: () => fetchWithAuth<{ currentStepKey: string }>("/finance/onboarding/current"),
+
+  postOnboardingProfile: (data: OnboardingProfileInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/profile", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingPreferences: (data: OnboardingPreferencesInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/preferences", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingAccount: (data: OnboardingAccountInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/account", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingCreditCard: (data: OnboardingCreditCardInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/credit-card", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingLoan: (data: OnboardingLoanInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/loan", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingInvestment: (data: OnboardingInvestmentInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/investment", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingGoal: (data: OnboardingGoalInput) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/goal", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  postOnboardingSkip: (stepKey: string) =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/skip", {
+      method: "POST",
+      body: JSON.stringify({ stepKey }),
+    }),
+  postOnboardingComplete: () =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/complete", {
+      method: "POST",
+    }),
+  postOnboardingReset: () =>
+    fetchWithAuth<OnboardingState>("/finance/onboarding/reset", {
+      method: "POST",
+    }),
+
+  // Legacy / fallback compatibility
   getOnboardingProgress: () => fetchWithAuth<OnboardingProgress>("/finance/onboarding"),
   bootstrapOnboarding: (payload: BootstrapOnboardingPayload) =>
     fetchWithAuth<OnboardingProgress>("/finance/onboarding/bootstrap", {
@@ -121,6 +326,10 @@ export const api = {
     fetchWithAuth<FinancialInstitution>("/finance/institutions", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+  deleteInstitution: (id: string) =>
+    fetchWithAuth<void>(`/finance/institutions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
     }),
 
   // Accounts
@@ -155,7 +364,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getTransaction: (id: string) => fetchWithAuth<Transaction>(`/finance/transactions/${encodeURIComponent(id)}`),
-  updateTransaction: (id: string, data: Partial<Transaction>, version = 1) =>
+  updateTransaction: (id: string, data: UpdateTransactionInput, version = 1) =>
     fetchWithAuth<Transaction>(`/finance/transactions/${encodeURIComponent(id)}${buildQuery({ version })}`, {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -257,35 +466,200 @@ export const api = {
     fetchWithAuth<PaginatedResponse<{ date: string; value: Money }>>(`/finance/portfolio/${encodeURIComponent(id)}/history${buildQuery(params)}`),
 
   // Loans
-  getLoans: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<Loan>>(`/finance/loans${buildQuery(params)}`),
-  createLoan: (data: Partial<Loan>) =>
+  getLoans: (params?: { status?: string; type?: string; search?: string; limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<Loan> | Loan[]>(`/finance/loans${buildQuery(params)}`),
+  getLoanDashboard: () => fetchWithAuth<LoanDashboardData>("/finance/loans/dashboard"),
+  createLoan: (data: CreateLoanInput) =>
     fetchWithAuth<Loan>("/finance/loans", {
       method: "POST",
       body: JSON.stringify(data),
     }),
   getLoan: (id: string) => fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}`),
-  getEmiSchedule: (id: string) =>
-    fetchWithAuth<PaginatedResponse<EmiSchedule> | EmiSchedule[]>(`/finance/loans/${encodeURIComponent(id)}/emi-schedule`),
-  markEmiPaid: (loanId: string, emiId: string) =>
-    fetchWithAuth<EmiSchedule>(`/finance/loans/${encodeURIComponent(loanId)}/emi-schedule/${encodeURIComponent(emiId)}/mark-paid`, {
+  updateLoan: (id: string, data: UpdateLoanInput, version = 1) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  closeLoan: (id: string, version = 1) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}/close${buildQuery({ version })}`, {
       method: "POST",
     }),
+  pauseLoan: (id: string, version = 1) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}/pause${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  resumeLoan: (id: string, version = 1) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}/resume${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  cancelLoan: (id: string, version = 1) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(id)}/cancel${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  getLoanSchedule: (id: string) =>
+    fetchWithAuth<PaginatedResponse<LoanScheduleItem> | LoanScheduleItem[]>(`/finance/loans/${encodeURIComponent(id)}/schedule`),
+  getEmiSchedule: (id: string) =>
+    fetchWithAuth<PaginatedResponse<LoanScheduleItem> | LoanScheduleItem[]>(`/finance/loans/${encodeURIComponent(id)}/schedule`),
+  regenerateLoanSchedule: (id: string, version = 1) =>
+    fetchWithAuth<LoanScheduleItem[]>(`/finance/loans/${encodeURIComponent(id)}/schedule/regenerate${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  payLoanInstallment: (
+    loanId: string,
+    scheduleId: string,
+    data?: {
+      paidAmount?: string;
+      paidDate?: string;
+      paymentMethod?: string;
+      reference?: string;
+      principalPortion?: string;
+      interestPortion?: string;
+      penaltyPortion?: string;
+    }
+  ) =>
+    fetchWithAuth<LoanScheduleItem>(
+      `/finance/loans/${encodeURIComponent(loanId)}/schedule/${encodeURIComponent(scheduleId)}/pay`,
+      {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }
+    ),
+  markEmiPaid: (loanId: string, emiId: string, data?: Record<string, unknown>) =>
+    fetchWithAuth<LoanScheduleItem>(
+      `/finance/loans/${encodeURIComponent(loanId)}/schedule/${encodeURIComponent(emiId)}/pay`,
+      {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }
+    ),
+  recordExtraLoanPayment: (
+    loanId: string,
+    data: {
+      paidAmount: string;
+      paidDate?: string;
+      paymentMethod?: string;
+      reference?: string;
+      principalPortion?: string;
+      interestPortion?: string;
+      penaltyPortion?: string;
+      notes?: string;
+    }
+  ) =>
+    fetchWithAuth<LoanPayment>(`/finance/loans/${encodeURIComponent(loanId)}/payments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getLoanPayments: (id: string, params?: { limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<LoanPayment> | LoanPayment[]>(`/finance/loans/${encodeURIComponent(id)}/payments${buildQuery(params)}`),
+  reverseLoanPayment: (loanId: string, paymentId: string) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/loans/${encodeURIComponent(loanId)}/payments/${encodeURIComponent(paymentId)}/reverse`,
+      { method: "POST" }
+    ),
+  getLoanInterestRateHistory: (id: string) =>
+    fetchWithAuth<LoanInterestRateHistory[]>(`/finance/loans/${encodeURIComponent(id)}/interest-rate-history`),
+  changeLoanInterestRate: (
+    loanId: string,
+    data: { newRate: string; effectiveDate: string; reason?: string },
+    version = 1
+  ) =>
+    fetchWithAuth<Loan>(`/finance/loans/${encodeURIComponent(loanId)}/interest-rate${buildQuery({ version })}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getLoanDocuments: (id: string) =>
+    fetchWithAuth<LoanDocument[]>(`/finance/loans/${encodeURIComponent(id)}/documents`),
+  addLoanDocument: (
+    loanId: string,
+    data: { category: string; fileName: string; storageKey: string; mimeType: string; sizeBytes: number }
+  ) =>
+    fetchWithAuth<LoanDocument>(`/finance/loans/${encodeURIComponent(loanId)}/documents`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteLoanDocument: (loanId: string, documentId: string) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/loans/${encodeURIComponent(loanId)}/documents/${encodeURIComponent(documentId)}`,
+      { method: "DELETE" }
+    ),
 
   // Credit Cards
-  getCreditCards: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<CreditCard>>(`/finance/credit-cards${buildQuery(params)}`),
-  createCreditCard: (data: Partial<CreditCard>) =>
+  getCreditCards: (params?: { limit?: number; status?: string; issuer?: string; search?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCard> | CreditCard[]>(`/finance/credit-cards${buildQuery(params)}`),
+  getCreditCard: (id: string) =>
+    fetchWithAuth<CreditCard>(`/finance/credit-cards/${encodeURIComponent(id)}`),
+  getCreditCardDashboard: () =>
+    fetchWithAuth<CreditCardDashboardData>("/finance/credit-cards/dashboard"),
+  createCreditCard: (data: CreateCreditCardInput | Partial<CreditCard>) =>
     fetchWithAuth<CreditCard>("/finance/credit-cards", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getCardStatements: (cardId: string, params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<{ id: string; statementDate: string; totalAmountDue: Money; dueDate: string }>>(
+  updateCreditCard: (id: string, data: UpdateCreditCardInput | Partial<CreditCard>, version = 1) =>
+    fetchWithAuth<CreditCard>(`/finance/credit-cards/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteCreditCard: (id: string, version = 1) =>
+    fetchWithAuth<void>(`/finance/credit-cards/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "DELETE",
+    }),
+  getCardStatements: (cardId: string, params?: { limit?: number; status?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardStatement> | CreditCardStatement[]>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/statements${buildQuery(params)}`
     ),
-  getCardTransactions: (cardId: string, params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<Transaction>>(`/finance/credit-cards/${encodeURIComponent(cardId)}/transactions${buildQuery(params)}`),
+  getCardStatementDetails: (cardId: string, statementId: string) =>
+    fetchWithAuth<CreditCardStatement>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}`
+    ),
+  payCardStatement: (cardId: string, statementId: string, data: CreditCardStatementPaymentInput) =>
+    fetchWithAuth<{ success: boolean; statementId: string; paidAmount: string }>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}/pay`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+  reverseCardStatementPayment: (cardId: string, statementId: string) =>
+    fetchWithAuth<{ success: boolean; statementId: string }>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}/pay/reverse`,
+      {
+        method: "POST",
+      }
+    ),
+  getCardPayments: (cardId: string, params?: { limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardPayment> | CreditCardPayment[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/payments${buildQuery(params)}`
+    ),
+  recordCardPayment: (cardId: string, data: RecordCreditCardPaymentInput) =>
+    fetchWithAuth<CreditCardPayment>(`/finance/credit-cards/${encodeURIComponent(cardId)}/payments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getCardTransactions: (cardId: string, params?: { limit?: number; category?: string; merchant?: string; search?: string }) =>
+    fetchWithAuth<PaginatedResponse<Transaction> | Transaction[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/transactions${buildQuery(params)}`
+    ),
+  getCardEmis: (cardId: string, params?: { limit?: number; status?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardEmi> | CreditCardEmi[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/emis${buildQuery(params)}`
+    ),
+  getCardRewards: (cardId: string) =>
+    fetchWithAuth<CreditCardRewards>(`/finance/credit-cards/${encodeURIComponent(cardId)}/rewards`),
+  getCardDocuments: (cardId: string) =>
+    fetchWithAuth<CreditCardDocument[] | PaginatedResponse<CreditCardDocument>>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/documents`
+    ),
+  uploadCardDocument: (cardId: string, formData: FormData) =>
+    fetchWithAuth<CreditCardDocument>(`/finance/credit-cards/${encodeURIComponent(cardId)}/documents`, {
+      method: "POST",
+      body: formData,
+    }),
+  deleteCardDocument: (cardId: string, documentId: string) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/documents/${encodeURIComponent(documentId)}`,
+      { method: "DELETE" }
+    ),
 
   // Liabilities
   getLiabilities: () => fetchWithAuth<PaginatedResponse<{ id: string; name: string; type: string; amount: Money }>>("/finance/liabilities"),
@@ -318,9 +692,57 @@ export const api = {
 
   // Financial Health & Dashboard
   getFinancialHealth: () => fetchWithAuth<FinancialHealthScore>("/finance/financial-health"),
-  getFinancialHealthHistory: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<FinancialHealthScore>>(`/finance/financial-health/history${buildQuery(params)}`),
+  getFinancialHealthHistory: (params?: { window?: string; limit?: number }) =>
+    fetchWithAuth<FinancialHealthHistoryPoint[] | PaginatedResponse<FinancialHealthHistoryPoint>>(
+      `/finance/financial-health/history${buildQuery(params)}`
+    ),
   getDashboard: () => fetchWithAuth<DashboardResponse>("/finance/dashboard"),
+
+  // Detailed Financial Health Score (Centerpiece Engine)
+  getHealthScore: () => fetchWithAuth<FinancialHealthScore>("/finance/financial-health"),
+  getHealthHistory: (params?: { window?: string; period?: string; limit?: number }) =>
+    fetchWithAuth<FinancialHealthHistoryPoint[] | PaginatedResponse<FinancialHealthHistoryPoint>>(
+      `/finance/financial-health/history${buildQuery(params)}`
+    ),
+  getHealthComponents: () => fetchWithAuth<HealthDimensionDetail[]>("/finance/financial-health/components"),
+  getHealthRecommendations: () => fetchWithAuth<HealthRecommendation[]>("/finance/financial-health/recommendations"),
+  recalculateHealthScore: () =>
+    fetchWithAuth<FinancialHealthScore>("/finance/financial-health/recalculate", { method: "POST" }),
+
+  // Smart Action Center (Daily Command Center)
+  getSmartActions: (params?: { category?: string; priority?: string; status?: string; search?: string; limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<SmartActionItem>>(`/finance/actions${buildQuery(params)}`),
+  getTodayActions: () => fetchWithAuth<SmartActionItem[]>("/finance/actions/today"),
+  getHighPriorityActions: () => fetchWithAuth<SmartActionItem[]>("/finance/actions/high-priority"),
+  getActionCategories: () =>
+    fetchWithAuth<ActionCategoryCount[] | PaginatedResponse<ActionCategoryCount>>("/finance/actions/categories"),
+  getActionPreferences: () =>
+    fetchWithAuth<ActionPreferences>("/finance/actions/preferences"),
+  updateActionPreferences: (data: Partial<ActionPreferences>) =>
+    fetchWithAuth<ActionPreferences>("/finance/actions/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  getActionById: (id: string) =>
+    fetchWithAuth<SmartActionItem>(`/finance/actions/${encodeURIComponent(id)}`),
+  getActionsByCategory: (category: string) =>
+    fetchWithAuth<SmartActionItem[]>(`/finance/actions/category/${encodeURIComponent(category)}`),
+  dismissSmartAction: (id: string, version = 1) =>
+    fetchWithAuth<{ success: boolean; status?: string }>(`/finance/actions/${encodeURIComponent(id)}/dismiss${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  completeSmartAction: (id: string, version = 1) =>
+    fetchWithAuth<{ success: boolean; status?: string }>(`/finance/actions/${encodeURIComponent(id)}/complete${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+  snoozeSmartAction: (id: string, snoozedUntil: string, version = 1) =>
+    fetchWithAuth<{ success: boolean; status?: string }>(`/finance/actions/${encodeURIComponent(id)}/snooze${buildQuery({ version })}`, {
+      method: "POST",
+      body: JSON.stringify({ snoozedUntil }),
+    }),
+  refreshSmartActions: () =>
+    fetchWithAuth<{ status: string; refreshedCount?: number }>("/finance/actions/refresh", { method: "POST" }),
+
 
   // Expenses
   getExpensesByCategory: () =>
@@ -348,31 +770,318 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // Budgets
-  getBudgets: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<Budget>>(`/finance/budgets${buildQuery(params)}`),
+  // Budgets & Spend Platform APIs
+  getBudgetDashboard: () =>
+    fetchWithAuth<BudgetDashboardData>("/finance/budgets/dashboard"),
+
+  getBudgets: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<Budget> | Budget[]>(`/finance/budgets${buildQuery(params)}`),
+
+  getBudget: (id: string) =>
+    fetchWithAuth<Budget>(`/finance/budgets/${encodeURIComponent(id)}`),
+
   createBudget: (data: Partial<Budget>) =>
     fetchWithAuth<Budget>("/finance/budgets", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getBudgetProgress: (id: string) => fetchWithAuth<{ budgetId: string; spent: Money; remaining: Money; percentSpent: number }>(`/finance/budgets/${encodeURIComponent(id)}/progress`),
 
-  // Goals
-  getGoals: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<Goal>>(`/finance/goals${buildQuery(params)}`),
-  createGoal: (data: Partial<Goal>) =>
-    fetchWithAuth<Goal>("/finance/goals", {
+  updateBudget: (id: string, data: Partial<Budget>, version = 1) =>
+    fetchWithAuth<Budget>(`/finance/budgets/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteBudget: (id: string, version = 1) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/budgets/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "DELETE",
+    }),
+
+  getBudgetCategories: (budgetId: string) =>
+    fetchWithAuth<unknown[] | PaginatedResponse<unknown>>(`/finance/budgets/${encodeURIComponent(budgetId)}/categories`),
+
+  // No update-in-place endpoint for a single existing category allocation —
+  // only creation. POSTing an allocation for a category that's already
+  // allocated returns a 422 (DUPLICATE_ALLOCATION_CATEGORY). To edit an
+  // existing allocation's limit, use replaceBudgetCategories instead.
+  updateCategoryAllocation: (budgetId: string, categoryId: string, data: { limitAmount: string | Money }) =>
+    fetchWithAuth<unknown>(`/finance/budgets/${encodeURIComponent(budgetId)}/categories`, {
+      method: "POST",
+      body: JSON.stringify({
+        categoryId,
+        allocatedAmount: typeof data.limitAmount === "object" ? data.limitAmount.amount : data.limitAmount,
+      }),
+    }),
+
+  // Replaces the whole current period's allocation set in one call.
+  replaceBudgetCategories: (budgetId: string, allocations: Array<{ categoryId: string; allocatedAmount: string; warningThreshold?: string; criticalThreshold?: string }>) =>
+    fetchWithAuth<unknown>(`/finance/budgets/${encodeURIComponent(budgetId)}/categories`, {
+      method: "PATCH",
+      body: JSON.stringify({ allocations }),
+    }),
+
+  getBudgetSummary: (budgetId: string) =>
+    fetchWithAuth<{
+      budgetId?: string;
+      allocated?: string;
+      spent?: string;
+      remaining?: string;
+      available?: string;
+      dailyBudget?: string;
+      forecastExpectedMonthEndSpend?: string;
+      utilization?: string;
+      daysRemaining?: number;
+      healthScore?: number;
+      riskLevel?: string;
+    }>(`/finance/budgets/${encodeURIComponent(budgetId)}/summary`),
+
+  // Analytics is per-budget only — there is no cross-budget aggregate route.
+  getBudgetAnalytics: (id: string) =>
+    fetchWithAuth<BudgetAnalytics>(`/finance/budgets/${encodeURIComponent(id)}/analytics`),
+
+  getBudgetHistory: (id: string, params?: { cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<unknown>>(`/finance/budgets/${encodeURIComponent(id)}/history${buildQuery(params)}`),
+
+  updateBudgetAlertSettings: (id: string, notificationEnabled: boolean, version: number) =>
+    fetchWithAuth<Budget>(`/finance/budgets/${encodeURIComponent(id)}/alerts/settings${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify({ notificationEnabled }),
+    }),
+
+  carryForwardBudget: (id: string) =>
+    fetchWithAuth<unknown>(`/finance/budgets/${encodeURIComponent(id)}/carry-forward`, { method: "POST" }),
+
+  duplicateBudget: (id: string, data: { source: "PREVIOUS_MONTH" | "PREVIOUS_YEAR" | "TEMPLATE"; name: string; startDate: string; templateId?: string }) =>
+    fetchWithAuth<Budget>(`/finance/budgets/${encodeURIComponent(id)}/duplicate`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  recordGoalContribution: (goalId: string, data: { amount: string | Money; date?: string }) =>
-    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(goalId)}/contributions`, {
+
+  resetBudget: (id: string) =>
+    fetchWithAuth<Budget>(`/finance/budgets/${encodeURIComponent(id)}/reset`, { method: "POST" }),
+
+  getBudgetTemplates: () =>
+    fetchWithAuth<BudgetTemplate[] | PaginatedResponse<BudgetTemplate>>("/finance/budgets/templates"),
+
+  createBudgetTemplate: (data: { name: string; description?: string; templateType: string; allocations: Array<{ categoryId: string; percentage?: string; fixedAmount?: string }> }) =>
+    fetchWithAuth<BudgetTemplate>("/finance/budgets/templates", {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  updateBudgetTemplate: (id: string, data: Partial<{ name: string; description: string; templateType: string; allocations: Array<{ categoryId: string; percentage?: string; fixedAmount?: string }> }>, version: number) =>
+    fetchWithAuth<BudgetTemplate>(`/finance/budgets/templates/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteBudgetTemplate: (id: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/budgets/templates/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "DELETE",
+    }),
+
+  // Applies the template's allocations onto an *existing* budget's current
+  // period — it does not create a new budget. Returns the resulting
+  // allocation lines, not a Budget.
+  applyBudgetTemplate: (templateId: string, budgetId: string) =>
+    fetchWithAuth<unknown[]>(`/finance/budgets/templates/${encodeURIComponent(templateId)}/apply`, {
+      method: "POST",
+      body: JSON.stringify({ budgetId }),
+    }),
+
+  getBudgetAlerts: (params?: { budgetId?: string; isRead?: boolean; isDismissed?: boolean; type?: string; cursor?: string; limit?: number }) =>
+    fetchWithAuth<BudgetAlert[] | PaginatedResponse<BudgetAlert>>(`/finance/budgets/alerts${buildQuery(params)}`),
+
+  dismissBudgetAlert: (alertId: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/budgets/alerts/${encodeURIComponent(alertId)}/dismiss${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+
+  markBudgetAlertRead: (alertId: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/budgets/alerts/${encodeURIComponent(alertId)}/read${buildQuery({ version })}`, {
+      method: "POST",
+    }),
+
+  // Goals Platform APIs
+  getGoals: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<Goal> | Goal[]>(`/finance/goals${buildQuery(params)}`),
+
+  getGoalDashboard: () =>
+    fetchWithAuth<GoalDashboardData>("/finance/goals/dashboard"),
+
+  getGoal: (id: string) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}`),
+
+  createGoal: (data: CreateGoalInput | Partial<Goal>) => {
+    const normalized = normalizeGoalInput(data as Record<string, unknown>);
+    return fetchWithAuth<Goal>("/finance/goals", {
+      method: "POST",
+      body: JSON.stringify(normalized),
+    });
+  },
+
+  updateGoal: (id: string, data: UpdateGoalInput | Partial<Goal>, version = 1) => {
+    const normalized = normalizeGoalInput(data as Record<string, unknown>);
+    return fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "PATCH",
+      body: JSON.stringify(normalized),
+    });
+  },
+
+  deleteGoal: (id: string, version = 1) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/goals/${encodeURIComponent(id)}${buildQuery({ version })}`, {
+      method: "DELETE",
+    }),
+
+  // Status transitions
+  activateGoal: (id: string, version: number) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}/activate${buildQuery({ version })}`, { method: "POST" }),
+
+  pauseGoal: (id: string, version: number) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}/pause${buildQuery({ version })}`, { method: "POST" }),
+
+  resumeGoal: (id: string, version: number) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}/resume${buildQuery({ version })}`, { method: "POST" }),
+
+  cancelGoal: (id: string, version: number) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}/cancel${buildQuery({ version })}`, { method: "POST" }),
+
+  archiveGoal: (id: string, version: number) =>
+    fetchWithAuth<Goal>(`/finance/goals/${encodeURIComponent(id)}/archive${buildQuery({ version })}`, { method: "POST" }),
+
+  // Contributions — list/edit/delete are per-goal only, there is no
+  // cross-goal aggregate route.
+  getGoalContributions: (goalId: string, params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<GoalContribution> | GoalContribution[]>(
+      `/finance/goals/${encodeURIComponent(goalId)}/contributions${buildQuery(params)}`
+    ),
+
+  recordGoalContribution: (goalId: string, data: Record<string, unknown>) =>
+    fetchWithAuth<GoalContribution>(`/finance/goals/${encodeURIComponent(goalId)}/contributions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGoalContribution: (goalId: string, contributionId: string, data: Record<string, unknown>, expectedVersion: number) =>
+    fetchWithAuth<GoalContribution>(
+      `/finance/goals/${encodeURIComponent(goalId)}/contributions/${encodeURIComponent(contributionId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ ...data, expectedVersion }),
+      }
+    ),
+
+  deleteGoalContribution: (goalId: string, contributionId: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/goals/${encodeURIComponent(goalId)}/contributions/${encodeURIComponent(contributionId)}${buildQuery({ version })}`,
+      { method: "DELETE" }
+    ),
+
+  // Milestones — list/edit/delete are per-goal only, there is no cross-goal
+  // aggregate route.
+  getGoalMilestones: (goalId: string) =>
+    fetchWithAuth<PaginatedResponse<GoalMilestone> | GoalMilestone[]>(
+      `/finance/goals/${encodeURIComponent(goalId)}/milestones`
+    ),
+
+  addGoalMilestone: (goalId: string, data: Record<string, unknown>) =>
+    fetchWithAuth<GoalMilestone>(`/finance/goals/${encodeURIComponent(goalId)}/milestones`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGoalMilestone: (goalId: string, milestoneId: string, data: Record<string, unknown>, expectedVersion: number) =>
+    fetchWithAuth<GoalMilestone>(
+      `/finance/goals/${encodeURIComponent(goalId)}/milestones/${encodeURIComponent(milestoneId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ ...data, expectedVersion }),
+      }
+    ),
+
+  deleteGoalMilestone: (goalId: string, milestoneId: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/goals/${encodeURIComponent(goalId)}/milestones/${encodeURIComponent(milestoneId)}${buildQuery({ version })}`,
+      { method: "DELETE" }
+    ),
+
+  // Forecast, Projection & Analytics — per-goal only, no cross-goal
+  // aggregate route exists on the backend.
   getGoalForecast: (goalId: string) =>
-    fetchWithAuth<{ forecastCompletionDate: string; onTrack: boolean }>(`/finance/goals/${encodeURIComponent(goalId)}/forecast`),
+    fetchWithAuth<GoalForecast>(`/finance/goals/${encodeURIComponent(goalId)}/forecast`),
+
+  getGoalAnalytics: (goalId: string) =>
+    fetchWithAuth<GoalAnalytics>(`/finance/goals/${encodeURIComponent(goalId)}/analytics`),
+
+  getGoalProjection: (goalId: string) =>
+    fetchWithAuth<GoalProjection>(`/finance/goals/${encodeURIComponent(goalId)}/projection`),
+
+  // Templates
+  getGoalTemplates: () =>
+    fetchWithAuth<GoalTemplate[] | PaginatedResponse<GoalTemplate>>("/finance/goals/templates"),
+
+  createGoalTemplate: (data: Partial<GoalTemplate>) =>
+    fetchWithAuth<GoalTemplate>("/finance/goals/templates", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteGoalTemplate: (templateId: string) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/goals/templates/${encodeURIComponent(templateId)}`, {
+      method: "DELETE",
+    }),
+
+  applyGoalTemplate: (templateId: string, data?: Partial<CreateGoalInput>) =>
+    fetchWithAuth<Goal>(`/finance/goals/templates/${encodeURIComponent(templateId)}/apply`, {
+      method: "POST",
+      body: JSON.stringify(data || {}),
+    }),
+
+  // Documents — list/delete are per-goal only. This registers metadata for
+  // an already-uploaded file (storageKey points at wherever the file was
+  // actually uploaded via the platform's storage service) — it does not
+  // accept raw file bytes.
+  getGoalDocuments: (goalId: string) =>
+    fetchWithAuth<GoalDocument[] | PaginatedResponse<GoalDocument>>(`/finance/goals/${encodeURIComponent(goalId)}/documents`),
+
+  registerGoalDocument: (goalId: string, data: { category: string; fileName: string; storageKey: string; mimeType: string; sizeBytes: number; notes?: string }) =>
+    fetchWithAuth<GoalDocument>(`/finance/goals/${encodeURIComponent(goalId)}/documents`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteGoalDocument: (goalId: string, documentId: string) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/goals/${encodeURIComponent(goalId)}/documents/${encodeURIComponent(documentId)}`,
+      { method: "DELETE" }
+    ),
+
+  // Beneficiaries
+  getGoalBeneficiaries: (goalId: string) =>
+    fetchWithAuth<GoalBeneficiary[] | PaginatedResponse<GoalBeneficiary>>(
+      `/finance/goals/${encodeURIComponent(goalId)}/beneficiaries`
+    ),
+
+  addGoalBeneficiary: (goalId: string, data: Partial<GoalBeneficiary>) =>
+    fetchWithAuth<GoalBeneficiary>(`/finance/goals/${encodeURIComponent(goalId)}/beneficiaries`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGoalBeneficiary: (goalId: string, beneficiaryId: string, data: Partial<GoalBeneficiary>, expectedVersion: number) =>
+    fetchWithAuth<GoalBeneficiary>(
+      `/finance/goals/${encodeURIComponent(goalId)}/beneficiaries/${encodeURIComponent(beneficiaryId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ ...data, expectedVersion }),
+      }
+    ),
+
+  deleteGoalBeneficiary: (goalId: string, beneficiaryId: string, version: number) =>
+    fetchWithAuth<{ success: boolean }>(
+      `/finance/goals/${encodeURIComponent(goalId)}/beneficiaries/${encodeURIComponent(beneficiaryId)}${buildQuery({ version })}`,
+      { method: "DELETE" }
+    ),
 
   // Subscriptions
   getSubscriptions: (params?: { limit?: number }) =>
@@ -389,14 +1098,49 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // Calendar
-  getCalendar: () => fetchWithAuth<PaginatedResponse<CalendarItem> | CalendarItem[]>("/finance/calendar"),
+  // Calendar & Financial Events
+  getCalendar: (params?: { from?: string; to?: string }) => {
+    const cleanParams: Record<string, string> = {};
+    if (typeof params?.from === "string" && params.from.includes("-")) {
+      cleanParams.from = params.from;
+    }
+    if (typeof params?.to === "string" && params.to.includes("-")) {
+      cleanParams.to = params.to;
+    }
+    return fetchWithAuth<CalendarEventItem[]>(`/finance/calendar${buildQuery(cleanParams)}`);
+  },
+  getFinancialCalendar: (params?: { from?: string; to?: string }) => {
+    const cleanParams: Record<string, string> = {};
+    if (typeof params?.from === "string" && params.from.includes("-")) {
+      cleanParams.from = params.from;
+    }
+    if (typeof params?.to === "string" && params.to.includes("-")) {
+      cleanParams.to = params.to;
+    }
+    return fetchWithAuth<CalendarEventItem[]>(`/finance/calendar${buildQuery(cleanParams)}`);
+  },
+  getUpcomingEvents: (params?: { from?: string; to?: string }) => {
+    const cleanParams: Record<string, string> = {};
+    if (typeof params?.from === "string" && params.from.includes("-")) {
+      cleanParams.from = params.from;
+    }
+    if (typeof params?.to === "string" && params.to.includes("-")) {
+      cleanParams.to = params.to;
+    }
+    return fetchWithAuth<CalendarEventItem[]>(`/finance/calendar${buildQuery(cleanParams)}`);
+  },
+
 
   // Notifications
   getNotifications: (params?: { limit?: number }) =>
     fetchWithAuth<PaginatedResponse<{ id: string; title: string; message: string; isRead: boolean; createdAt: string }>>(
       `/finance/notifications${buildQuery(params)}`
     ),
+  getUnreadNotifications: () =>
+    fetchWithAuth<
+      | PaginatedResponse<{ id: string; title: string; message: string; isRead: boolean; createdAt: string }>
+      | Array<{ id: string; title: string; message: string; isRead: boolean; createdAt: string }>
+    >("/finance/notifications/unread"),
   getNotificationPreferences: () => fetchWithAuth<Record<string, boolean>>("/finance/notifications/preferences"),
   updateNotificationPreferences: (preferences: Record<string, boolean>) =>
     fetchWithAuth<Record<string, boolean>>("/finance/notifications/preferences", {
@@ -405,7 +1149,15 @@ export const api = {
     }),
   markNotificationRead: (id: string) =>
     fetchWithAuth<{ success: boolean }>(`/finance/notifications/${encodeURIComponent(id)}/read`, {
-      method: "PATCH",
+      method: "POST",
+    }),
+  archiveNotification: (id: string) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/notifications/${encodeURIComponent(id)}/archive`, {
+      method: "POST",
+    }),
+  dismissNotification: (id: string) =>
+    fetchWithAuth<{ success: boolean }>(`/finance/notifications/${encodeURIComponent(id)}/dismiss`, {
+      method: "POST",
     }),
 
   // Search

@@ -20,10 +20,68 @@
   }
 }
 
+/* =====================================================
+   Privacy Mode — Money Value Transitions
+   No layout shifts: mask string has fixed character width
+   ===================================================== */
+
+.money-value {
+  display: inline-block;
+  transition: opacity 200ms ease, filter 200ms ease, letter-spacing 200ms ease;
+  will-change: opacity;
+}
+
+.money-value[data-money-visible="false"] {
+  opacity: 0.75;
+  letter-spacing: 0.08em;
+  filter: blur(0px);
+}
+
+.money-value[data-money-visible="true"] {
+  opacity: 1;
+  letter-spacing: normal;
+  filter: blur(0px);
+}
+
+/* Privacy toggle button — pulse ring when privacy is ON */
+@keyframes privacy-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  70%  { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+
+.privacy-toggle-active {
+  animation: privacy-pulse 2s ease-in-out infinite;
+}
+
 /* Custom Utilities */
 .glass-panel {
   background: rgba(15, 23, 42, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+/* Print stylesheet for Planning > Reports (window.print()-based export) */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .print-report {
+    color: #0f172a !important;
+  }
+
+  .print-report * {
+    color: inherit !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
 }

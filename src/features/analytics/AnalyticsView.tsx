@@ -123,7 +123,7 @@ export const AnalyticsView: React.FC = () => {
         },
       ];
 
-  const categoryBreakdown = cfSnapshot.categoryBreakdown || [];
+  const categoryBreakdown = Array.isArray(cfSnapshot.categoryBreakdown) ? cfSnapshot.categoryBreakdown : [];
 
   const pieData = categoryBreakdown.map((c, idx) => ({
     name: c.categoryName,
@@ -131,11 +131,13 @@ export const AnalyticsView: React.FC = () => {
     color: ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"][idx % 6],
   }));
 
-  const assetAllocData = assetAllocation?.allocations?.map((a, idx) => ({
-    name: a.assetClass,
-    value: parseFloat(a.amount?.amount || "0"),
-    color: ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"][idx % 5],
-  })) || [];
+  const assetAllocData = Array.isArray(assetAllocation?.allocations)
+    ? assetAllocation.allocations.map((a, idx) => ({
+        name: a.assetClass,
+        value: parseFloat(a.amount?.amount || "0"),
+        color: ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"][idx % 5],
+      }))
+    : [];
 
   return (
     <div className="space-y-8">

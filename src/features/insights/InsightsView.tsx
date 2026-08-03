@@ -1,153 +1,91 @@
-import React from "react";
-import { useFinancialHealth, useInsights, useDismissInsight } from "../../hooks/useFinanceQueries";
-import { Insight } from "../../types";
-import { ShieldCheck, AlertCircle, CheckCircle2, X } from "lucide-react";
+import React, { useState } from "react";
+import { useUIStore } from "../../store/useUIStore";
+import { InsightsSubNav } from "./components/InsightsSubNav";
+import { OverviewPage } from "./submodules/OverviewPage";
+import { FinancialHealthPage } from "./submodules/FinancialHealthPage";
+import { NetWorthPage } from "./submodules/NetWorthPage";
+import { CashFlowPage } from "./submodules/CashFlowPage";
+import { SpendingPage } from "./submodules/SpendingPage";
+import { IncomePage } from "./submodules/IncomePage";
+import { BudgetsPage } from "./submodules/BudgetsPage";
+import { GoalsPage } from "./submodules/GoalsPage";
+import { InvestmentsPage } from "./submodules/InvestmentsPage";
+import { DebtsPage } from "./submodules/DebtsPage";
+import { SubscriptionsPage } from "./submodules/SubscriptionsPage";
+import { TrendsPage } from "./submodules/TrendsPage";
+import { ForecastsPage } from "./submodules/ForecastsPage";
+import { RecommendationsPage } from "./submodules/RecommendationsPage";
+import { RisksPage } from "./submodules/RisksPage";
+import { ReportsPage } from "./submodules/ReportsPage";
+import { TimeHorizon } from "./types/insightsTypes";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const InsightsView: React.FC = () => {
-  const { data: health, isLoading: loadingHealth } = useFinancialHealth();
-  const { data: insights = [], isLoading: loadingInsights } = useInsights();
-  const dismissMutation = useDismissInsight();
+  const { activeSubTab, showToast } = useUIStore();
+  const [horizon, setHorizon] = useState<TimeHorizon>("1Y");
+  const queryClient = useQueryClient();
 
-  const activeHealth = health || {
-    overallScore: 78,
-    grade: "B+",
-    emergencyFundMonths: 4.2,
-    savingsRatePercent: 24,
-    debtToIncomeRatio: 0.18,
-    avgCreditUtilization: 22,
-    componentScores: {
-      emergencyFund: 80,
-      savingsRate: 75,
-      debtToIncome: 85,
-      creditUtilization: 70,
-      goalProgress: 80,
-    },
+  const currentTab = activeSubTab || "overview";
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["insights"] });
+    showToast("Analytics workspace data refreshed", "success");
   };
 
-  if (loadingHealth || loadingInsights) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 bg-slate-800 rounded w-1/3" />
-        <div className="h-32 bg-slate-900/60 rounded-3xl border border-slate-800" />
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <div key={n} className="h-28 bg-slate-900/60 rounded-2xl border border-slate-800" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const handleExportPdf = () => {
+    showToast("Generating PDF analytics report download...", "info");
+  };
 
-  const componentMetrics = [
-    { name: "Emergency Fund", weight: "25%", score: activeHealth.componentScores?.emergencyFund ?? 0, detail: `${activeHealth.emergencyFundMonths ?? 0} months covered` },
-    { name: "Savings Rate", weight: "25%", score: activeHealth.componentScores?.savingsRate ?? 0, detail: `${activeHealth.savingsRatePercent ?? 0}% saved` },
-    { name: "Debt-to-Income", weight: "20%", score: activeHealth.componentScores?.debtToIncome ?? 0, detail: `${((activeHealth.debtToIncomeRatio ?? 0) * 100).toFixed(0)}% ratio` },
-    { name: "Credit Utilization", weight: "15%", score: activeHealth.componentScores?.creditUtilization ?? 0, detail: `${activeHealth.avgCreditUtilization ?? 0}% avg utilization` },
-    { name: "Goal Progress", weight: "15%", score: activeHealth.componentScores?.goalProgress ?? 0, detail: `On schedule` },
-  ];
+  const renderActiveSubModule = () => {
+    switch (currentTab) {
+      case "financial-health":
+        return <FinancialHealthPage />;
+      case "net-worth":
+        return <NetWorthPage />;
+      case "cash-flow":
+        return <CashFlowPage />;
+      case "spending":
+        return <SpendingPage />;
+      case "income":
+        return <IncomePage />;
+      case "budgets":
+        return <BudgetsPage />;
+      case "goals":
+        return <GoalsPage />;
+      case "investments":
+        return <InvestmentsPage />;
+      case "debts":
+        return <DebtsPage />;
+      case "subscriptions":
+        return <SubscriptionsPage />;
+      case "trends":
+        return <TrendsPage />;
+      case "forecasts":
+        return <ForecastsPage />;
+      case "recommendations":
+        return <RecommendationsPage />;
+      case "risks":
+        return <RisksPage />;
+      case "reports":
+        return <ReportsPage />;
+      case "overview":
+      default:
+        return <OverviewPage />;
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-100">Financial Health Score & AI Insights</h2>
-        <p className="text-xs text-slate-400">Composite score derived from precomputed snapshot signals & automated rule triggers</p>
-      </div>
+    <div className="space-y-6">
+      {/* Level 1 & Level 2 Hierarchical SubNav + Persistent Filter Toolbar */}
+      <InsightsSubNav
+        horizon={horizon}
+        onHorizonChange={setHorizon}
+        onExportPdf={handleExportPdf}
+        onRefresh={handleRefresh}
+      />
 
-      {/* Composite Health Score Banner */}
-      <div className="p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
-        <div className="flex items-center gap-6">
-          <div className="w-24 h-24 rounded-full bg-slate-950 border-4 border-emerald-500 flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20">
-            <span className="text-3xl font-extrabold text-slate-100">{activeHealth.overallScore}</span>
-            <span className="text-[10px] font-bold text-emerald-400 uppercase">/ 100</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
-              <ShieldCheck className="w-4 h-4" /> Financial Health Score
-            </div>
-            <h3 className="text-xl font-bold text-slate-100">Backend Snapshot Assessment</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-md">
-              Score precomputed by daily health scoring engine based on emergency fund, savings rate, and credit utilization.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 5 Component Breakdown Cards */}
-      <div className="space-y-4">
-        <h3 className="font-bold text-lg text-slate-100">Score Component Breakdown</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {componentMetrics.map((comp) => (
-            <div key={comp.name} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-400">{comp.name}</span>
-                <span className="text-[10px] text-slate-500">{comp.weight}</span>
-              </div>
-              <p className="text-2xl font-extrabold text-slate-100">{comp.score}</p>
-              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${comp.score}%` }} />
-              </div>
-              <p className="text-[11px] text-emerald-400 font-medium">{comp.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Active Insights List */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-lg text-slate-100">Automated Insights & Alerts</h3>
-          <span className="text-xs font-semibold text-slate-400">{insights.length} Active Rules Triggered</span>
-        </div>
-
-        {insights.length === 0 ? (
-          <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-400">
-            No active insights or recommendations at present.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {insights.map((insight: Insight) => (
-              <div key={insight.id} className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`p-3 rounded-xl ${
-                      insight.severity === "WARNING"
-                        ? "bg-amber-500/10 text-amber-400"
-                        : insight.severity === "CRITICAL"
-                        ? "bg-rose-500/10 text-rose-400"
-                        : "bg-emerald-500/10 text-emerald-400"
-                    }`}
-                  >
-                    {insight.severity === "WARNING" ? (
-                      <AlertCircle className="w-5 h-5" />
-                    ) : (
-                      <CheckCircle2 className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-slate-100 text-sm">{insight.title}</h4>
-                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-                        {insight.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">{insight.description}</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => dismissMutation.mutate(insight.id)}
-                  disabled={dismissMutation.isPending}
-                  className="p-1 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-50"
-                  title="Dismiss Insight"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Active Submodule Workspace View */}
+      {renderActiveSubModule()}
     </div>
   );
 };

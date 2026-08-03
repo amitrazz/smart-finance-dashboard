@@ -1,47 +1,47 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useAuthStore } from "../../store/useAuthStore";
-import { useSettingsStore } from "../../store/useSettingsStore";
-import pkg from "../../../package.json";
 import {
-  Sparkles,
-  Lock,
-  Mail,
+  AlertTriangle,
   ArrowRight,
-  RefreshCw,
+  CheckCircle2,
   Eye,
   EyeOff,
-  Sun,
+  Lock,
+  Mail,
   Moon,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle
-} from "lucide-react";
-import { DashboardPreview } from "./components/DashboardPreview";
-import { ForgotPasswordModal } from "./components/ForgotPasswordModal";
-import { SecurityTrustBadges } from "./components/SecurityTrustBadges";
+  RefreshCw,
+  Sparkles,
+  Sun,
+  XCircle,
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import pkg from '../../../package.json';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { DashboardPreview } from './components/DashboardPreview';
+import { ForgotPasswordModal } from './components/ForgotPasswordModal';
+import { SecurityTrustBadges } from './components/SecurityTrustBadges';
 
 export const AuthView: React.FC = () => {
   const { login, isLoading } = useAuthStore();
   const { theme, toggleTheme } = useSettingsStore();
-  const appVersion = pkg.version || "2.5.0";
+  const appVersion = pkg.version || '2.5.0';
 
   // Form State
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
   // UX Features State
   const [showPassword, setShowPassword] = useState(false);
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   // Load remembered email on mount & Auto-focus
   useEffect(() => {
-    const savedEmail = localStorage.getItem("pf_remembered_email");
+    const savedEmail = localStorage.getItem('pf_remembered_email');
     if (savedEmail) {
       setEmail(savedEmail);
     }
@@ -53,27 +53,27 @@ export const AuthView: React.FC = () => {
   // Handle CapsLock Detection
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.getModifierState) {
-      setIsCapsLockOn(e.getModifierState("CapsLock"));
+      setIsCapsLockOn(e.getModifierState('CapsLock'));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg("");
-    setSuccessMsg("");
+    setErrorMsg('');
+    setSuccessMsg('');
 
     // Remember Email in LocalStorage
     if (rememberMe && email) {
-      localStorage.setItem("pf_remembered_email", email);
+      localStorage.setItem('pf_remembered_email', email);
     } else {
-      localStorage.removeItem("pf_remembered_email");
+      localStorage.removeItem('pf_remembered_email');
     }
 
     try {
       await login(email, password);
-      setSuccessMsg("Sign-in successful! Loading your financial OS...");
+      setSuccessMsg('Sign-in successful! Loading your financial OS...');
     } catch (err: unknown) {
-      setErrorMsg((err as Error).message || "Authentication failed. Please check credentials.");
+      setErrorMsg((err as Error).message || 'Authentication failed. Please check credentials.');
     }
   };
 
@@ -86,7 +86,11 @@ export const AuthView: React.FC = () => {
         title="Toggle Light/Dark Theme"
         aria-label="Toggle Light/Dark Theme"
       >
-        {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-300" />}
+        {theme === 'dark' ? (
+          <Sun className="w-4 h-4 text-amber-400" />
+        ) : (
+          <Moon className="w-4 h-4 text-slate-300" />
+        )}
       </button>
 
       {/* LEFT COLUMN: 60% Width - Financial OS Dashboard Hero Preview */}
@@ -106,7 +110,7 @@ export const AuthView: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 mx-auto">
               <Sparkles className="w-6 h-6 text-slate-950" />
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">Smart Finance OS</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">Cashflow</h1>
             <p className="text-xs text-slate-400 font-medium">Personal Finance Operating System</p>
           </div>
 
@@ -173,7 +177,7 @@ export const AuthView: React.FC = () => {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -186,7 +190,7 @@ export const AuthView: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 transition-colors"
-                    title={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>

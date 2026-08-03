@@ -44,81 +44,297 @@ export interface Account {
 export interface FinancialInstitution {
   id: string;
   name: string;
+  code?: string;
+  status?: string;
   type?: string;
   countryCode?: string;
   logoUrl?: string;
 }
 
+export type CardNetwork = "VISA" | "MASTERCARD" | "AMEX" | "RUPAY" | "DINERS" | "OTHER";
+export type CardType = "REWARDS" | "CASHBACK" | "TRAVEL" | "PREMIUM" | "SECURED" | "OTHER";
+export type CardStatus = "ACTIVE" | "BLOCKED" | "CLOSED" | "INACTIVE" | "EXPIRED";
+
 export interface CreditCard {
   id: string;
   name: string;
+  issuer: string;
+  network?: CardNetwork | string;
+  cardType?: CardType | string;
   currency: string;
-  creditLimit: string | number;
+  creditLimit: Money | string | number;
+  currentOutstanding?: Money | string | number;
   currentBalance?: Money | string;
+  availableCredit?: Money | string | number;
+  statementBalance?: Money | string | number;
+  minimumDue?: Money | string | number;
+  billingCycleDay?: number;
   statementDay?: number;
+  paymentDueDay?: number;
   dueDay?: number;
+  nextDueDate?: string;
+  interestRate?: number;
+  annualFee?: Money | string | number;
+  joiningFee?: Money | string | number;
+  openedDate?: string;
+  rewardProgram?: string;
+  rewardBalance?: number;
+  paymentAccountId?: string;
+  paymentAccountName?: string;
+  autoPay?: boolean;
   institutionId?: string;
   institutionName?: string;
   maskedNumber?: string;
-  status?: string;
+  last4Digits?: string;
+  nickname?: string;
+  outstandingBalance?: Money | string | number;
+  creditUtilizationPercent?: number;
+  status: CardStatus | string;
+  notes?: string;
+  version?: number;
   lastSyncedAt?: string;
   updatedAt?: string;
+  createdAt?: string;
 }
+
+export interface CreditCardDashboardData {
+  totalOutstanding: Money;
+  totalCreditLimit: Money;
+  availableCredit: Money;
+  creditUtilizationPercent: number;
+  statementBalance: Money;
+  minimumDue: Money;
+  upcomingDue?: {
+    cardId: string;
+    cardName: string;
+    dueDate: string;
+    amount: Money;
+  } | null;
+  totalCards: number;
+  activeCards: number;
+  blockedCards: number;
+  totalRewardPoints: number;
+  activeEmis: number;
+  outstandingTrend: Array<{ month: string; amount: Money }>;
+  creditUtilizationTrend: Array<{ month: string; utilization: number }>;
+  outstandingByCard: Array<{ cardId: string; cardName: string; amount: Money }>;
+  outstandingByIssuer: Array<{ issuer: string; amount: Money }>;
+  monthlySpending: Array<{ month: string; amount: Money }>;
+  paymentHistory: Array<{ month: string; amount: Money }>;
+  rewardGrowth: Array<{ month: string; points: number }>;
+  emiBreakdown: Array<{ category: string; amount: Money; count: number }>;
+}
+
+export interface CreditCardStatement {
+  id: string;
+  cardId: string;
+  statementDate: string;
+  dueDate: string;
+  openingBalance: Money | string;
+  closingBalance: Money | string;
+  statementBalance: Money | string;
+  minimumDue: Money | string;
+  totalAmountDue?: Money | string;
+  interest: Money | string;
+  fees: Money | string;
+  status: "PAID" | "UNPAID" | "PARTIALLY_PAID" | "OVERDUE";
+  downloadUrl?: string;
+  createdAt?: string;
+}
+
+export interface CreditCardPayment {
+  id: string;
+  cardId: string;
+  statementId?: string;
+  paymentDate: string;
+  amount: Money | string;
+  paymentAccountId?: string;
+  paymentAccountName?: string;
+  method?: string;
+  reference?: string;
+  status: "COMPLETED" | "PENDING" | "FAILED" | "REVERSED";
+  statementPeriod?: string;
+  createdBy?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface CreditCardEmi {
+  id: string;
+  cardId: string;
+  merchant: string;
+  merchantName?: string;
+  purchaseAmount: Money | string;
+  originalPrincipal?: Money | string;
+  outstandingPrincipal: Money | string;
+  remainingPrincipal?: Money | string;
+  monthlyEmi: Money | string;
+  monthlyEmiAmount?: Money | string;
+  remainingInstallments: number;
+  remainingTenureMonths?: number;
+  completedInstallments?: number;
+  totalInstallments: number;
+  totalTenureMonths?: number;
+  interestRate: number;
+  annualInterestRatePercent?: number;
+  nextDueDate: string;
+  startDate?: string;
+  expectedEndDate?: string;
+  originalTransactionDescription?: string;
+  status: "ACTIVE" | "COMPLETED" | "FORECLOSED";
+  category?: string;
+  createdAt?: string;
+}
+
+export interface CreditCardRewardHistoryItem {
+  id: string;
+  date: string;
+  description: string;
+  points: number;
+  type: "EARNED" | "REDEEMED" | "EXPIRED";
+}
+
+export type CreditCardRewardHistory = CreditCardRewardHistoryItem;
+
+export interface CreditCardRewards {
+  rewardBalance: number;
+  lifetimeEarned: number;
+  redeemed: number;
+  expiringSoon: number;
+  expiringDate?: string;
+  history: CreditCardRewardHistoryItem[];
+}
+
+export interface CreditCardDocument {
+  id: string;
+  cardId: string;
+  fileName: string;
+  category: "STATEMENT" | "AGREEMENT" | "TAX" | "OTHER";
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface CreateCreditCardInput {
+  name: string;
+  issuer: string;
+  network?: CardNetwork | string;
+  cardType?: CardType | string;
+  maskedNumber?: string;
+  last4Digits?: string;
+  currency: string;
+  creditLimit: string;
+  currentOutstanding?: string;
+  availableCredit?: string;
+  statementBalance?: string;
+  minimumDue?: string;
+  billingCycleDay?: number;
+  statementDay?: number;
+  paymentDueDay?: number;
+  dueDay?: number;
+  nextDueDate?: string;
+  interestRate?: string;
+  paymentAccountId?: string;
+  autoPay?: boolean;
+  annualFee?: string;
+  joiningFee?: string;
+  openedDate?: string;
+  notes?: string;
+  institutionId?: string;
+}
+
+export interface UpdateCreditCardInput {
+  name?: string;
+  issuer?: string;
+  network?: CardNetwork | string;
+  cardType?: CardType | string;
+  creditLimit?: string;
+  statementDay?: number;
+  dueDay?: number;
+  billingCycleDay?: number;
+  paymentDueDay?: number;
+  nextDueDate?: string;
+  interestRate?: string;
+  paymentAccountId?: string;
+  autoPay?: boolean;
+  status?: CardStatus | string;
+  notes?: string;
+}
+
+export interface RecordCreditCardPaymentInput {
+  cardId: string;
+  statementId?: string;
+  paymentType?: "FULL" | "MINIMUM" | "PARTIAL" | "CUSTOM";
+  paymentDate: string;
+  amount: string;
+  paymentAccountId?: string;
+  reference?: string;
+  notes?: string;
+}
+
 
 export type TransactionDirection = "INFLOW" | "OUTFLOW" | "TRANSFER";
 
+// Matches TransactionResponseDto (GET /finance/transactions, /:id). The
+// backend nests category/merchant as `{id, name}` objects and never returns
+// `version` — the mapper in useFinanceQueries.ts flattens category/merchant
+// into categoryId/categoryName/merchantId/merchantName for convenience, and
+// `version` defaults to 1 for optimistic-concurrency writes since the
+// backend doesn't expose the real value on read.
 export interface Transaction {
   id: string;
-  accountId: string;
-  accountName?: string;
-  counterAccountId?: string;
-  counterAccountName?: string;
-  categoryId: string;
+  accountId?: string | null;
+  accountName?: string; // joined client-side against the accounts list — not returned by the API
+  creditCardId?: string | null;
+  emiId?: string | null;
+  counterAccountId?: string | null;
+  categoryId?: string;
   categoryName?: string;
-  categoryIcon?: string;
   merchantId?: string;
   merchantName?: string;
   amount: Money;
   direction: TransactionDirection;
   description: string;
   date: string;
-  tags?: string[];
-  isSplit?: boolean;
-  splitDetails?: Array<{
-    categoryId: string;
-    categoryName?: string;
-    amount: Money;
-  }>;
-  isRecurring?: boolean;
+  notes?: string | null;
   source?: string;
-  provenance?: {
-    importJobId: string;
-    sourceRowId: string;
-  };
-  createdAt: string;
+  isPending?: boolean;
+  importRowId?: string | null;
+  version: number;
 }
 
+// Matches CreateTransactionDto (POST /finance/transactions).
 export interface CreateTransactionInput {
-  accountId: string;
-  description: string;
-  amount: string | Money;
-  direction: TransactionDirection;
-  categoryName?: string;
+  accountId?: string;
+  creditCardId?: string;
+  counterAccountId?: string;
   categoryId?: string;
   merchantName?: string;
-  transactionDate?: string;
-  date?: string;
-  createdAt?: string;
+  amount: string;
+  direction: TransactionDirection;
+  transactionDate: string;
+  description: string;
+  notes?: string;
 }
 
+// Matches UpdateTransactionDto (PATCH /finance/transactions/:id).
+export interface UpdateTransactionInput {
+  categoryId?: string;
+  notes?: string;
+}
+
+// Matches CategoryResponseDto (GET/POST /finance/categories). The backend
+// field is `kind`, not `type` — `type` is kept as an optional alias since
+// several call sites read it defensively via `c.type ?? c.kind`.
 export interface Category {
   id: string;
   name: string;
+  kind: "INCOME" | "EXPENSE" | "TRANSFER";
+  type?: "INCOME" | "EXPENSE" | "TRANSFER";
   icon?: string;
-  color?: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER";
-  kind?: "INCOME" | "EXPENSE" | "TRANSFER";
-  parentCategoryId?: string;
+  isSystem?: boolean;
+  parentId?: string;
 }
 
 export interface Merchant {
@@ -180,6 +396,8 @@ export interface ImportJob {
   id: string;
   fileName: string;
   sourceType: string;
+  documentType?: string;
+  parsedRowCount?: number;
   status: ImportJobStatus;
   totalRows: number;
   processedRows: number;
@@ -192,25 +410,149 @@ export interface ImportJob {
   createdAt: string;
 }
 
-export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";
+export type BudgetHealthGrade = "EXCELLENT" | "GOOD" | "FAIR" | "WARNING" | "CRITICAL";
+export type BudgetStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
 
-export interface BudgetLine {
+// Matches GET /finance/budgets/:id/categories (BudgetCategoryProgressDto) —
+// the backend does not include categoryName/icon here, those are joined
+// client-side against the master category list for display.
+export interface BudgetCategoryLine {
   id?: string;
   categoryId: string;
   categoryName?: string;
-  limitAmount: Money;
-  spentAmount?: Money;
+  categoryIcon?: string;
+  allocatedAmount: Money;
+  spentAmount: Money;
+  remainingAmount: Money;
+  utilizationPercent: number;
+  warningThreshold?: number;
+  criticalThreshold?: number;
+  healthStatus: "HEALTHY" | "NEAR_LIMIT" | "EXCEEDED";
+  healthGrade: BudgetHealthGrade;
 }
 
+// Matches BudgetResponseDto. Computed spend/health/forecast figures are not
+// part of this resource — those only exist on GET /:id/summary (see
+// useBudget(id), which fetches both and merges them).
 export interface Budget {
   id: string;
   name: string;
+  description?: string;
+  budgetType: string;
+  currency: string;
+  status: BudgetStatus;
   period: BudgetPeriod;
   startDate: string;
+  endDate?: string;
   totalLimit: Money;
   totalSpent?: Money;
-  lines: BudgetLine[];
+  remainingAmount?: Money;
+  availableAmount?: Money;
+  utilizationPercent?: number;
+  safeDailySpend?: Money;
+  forecastMonthEndSpend?: Money;
+  budgetHealthScore?: number;
+  budgetHealthGrade?: BudgetHealthGrade;
+  daysRemaining?: number;
+  carryForwardEnabled: boolean;
+  autoAdjustEnabled: boolean;
+  rolloverPolicy: string;
+  notificationEnabled: boolean;
+  notes?: string;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+// Matches BudgetDashboardDto exactly — a flat aggregate across all of the
+// user's budgets. There is no per-user currency on this DTO; amounts are
+// formatted with the app's default display currency.
+export interface BudgetDashboardData {
+  totalBudget: string;
+  totalSpent: string;
+  remainingBudget: string;
+  availableBudget: string;
+  overallUtilization: string;
+  activeBudgets: Budget[];
+  exceededBudgets: Budget[];
+  nearLimitBudgets: Budget[];
+  topSpendingCategories: Array<{ categoryId: string; spentAmount: string }>;
+  budgetHealthScore: number;
+}
+
+// Matches GET /finance/budgets/:id/analytics (per-budget only, no aggregate route).
+// Matches BudgetAnalyticsDto (GET /finance/budgets/:id/analytics) exactly —
+// scalar spend/variance/forecast figures for the current period, a real
+// per-category breakdown, and a top-5 largest-expenses list. There is no
+// time-series data on this endpoint (no daily/weekly trend arrays, no
+// rolling-average history, no health trend) — those were previously
+// fabricated frontend fields with no backend source.
+export interface BudgetAnalytics {
+  budgetId: string;
+  dailySpend: Money;
+  weeklySpend: Money;
+  monthlySpend: Money;
+  rollingAverageDailySpend: Money;
+  categoryBreakdown: Array<{
+    categoryId: string;
+    categoryName?: string;
+    allocatedAmount: Money;
+    spentAmount: Money;
+    utilizationPercent: number;
+  }>;
+  largestExpenses: Array<{
+    transactionId: string;
+    categoryId: string | null;
+    categoryName?: string;
+    amount: Money;
+    description: string;
+    date: string;
+  }>;
+  trend: "ACCELERATING" | "STEADY" | "DECELERATING";
+  variance: Money;
+  forecastExpectedMonthEndSpend: Money;
+  forecastProjectedOverspend: Money;
+  forecastConfidence: number;
+}
+
+// Matches BudgetAlertResponseDto. Backend has no `title` field — the frontend
+// derives a display title from `type`. `categoryName` is joined client-side
+// from the master category list (backend only returns `categoryId`).
+export interface BudgetAlert {
+  id: string;
+  budgetId: string;
+  budgetPeriodId: string;
+  categoryId?: string;
+  categoryName?: string;
+  type: string;
+  title: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  message: string;
+  isRead: boolean;
+  isDismissed: boolean;
+  triggeredAt: string;
+  version: number;
+}
+
+// Matches BudgetTemplateResponseDto.
+export interface BudgetTemplateAllocation {
+  categoryId: string;
+  categoryName?: string;
+  percentage?: number;
+  fixedAmount?: Money;
+}
+
+export interface BudgetTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  templateType: string;
+  isSystem: boolean;
+  allocations: BudgetTemplateAllocation[];
+  version: number;
+}
+
 
 export interface Holding {
   id: string;
@@ -247,40 +589,470 @@ export interface Portfolio {
   holdingsCount: number;
 }
 
+export type LoanType =
+  | "HOME"
+  | "VEHICLE"
+  | "EDUCATION"
+  | "PERSONAL"
+  | "GOLD"
+  | "MORTGAGE"
+  | "BUSINESS"
+  | "OTHER";
+
+export type LoanStatus =
+  | "ACTIVE"
+  | "PAUSED"
+  | "CLOSED"
+  | "DEFAULTED"
+  | "SETTLED"
+  | "RESTRUCTURED"
+  | "CANCELLED";
+
+export type LoanInterestType = "FIXED" | "FLOATING" | "MIXED";
+
+export type LoanPaymentFrequency =
+  | "WEEKLY"
+  | "BI_WEEKLY"
+  | "MONTHLY"
+  | "QUARTERLY"
+  | "SEMI_ANNUALLY"
+  | "ANNUALLY";
+
 export interface Loan {
   id: string;
   name: string;
-  lenderName: string;
-  principalAmount: Money;
-  outstandingBalance: Money;
+  loanNumber?: string;
+  type: LoanType;
+  lenderName?: string;
+  institutionId?: string;
+  institutionName?: string;
+  accountId?: string;
+  accountName?: string;
+  currency: CurrencyCode;
+  principalAmount?: Money | string;
+  outstandingPrincipal?: Money | string;
+  outstandingBalance?: Money | string;
   interestRate: number;
-  emiAmount: Money;
-  nextDueDate: string;
-  totalTenureMonths: number;
-  remainingTenureMonths: number;
+  interestType?: LoanInterestType;
+  monthlyEmi?: Money | string;
+  emiAmount?: Money | string;
+  installmentAmount?: Money | string;
+  tenureMonths?: number;
+  remainingTenureMonths?: number;
+  installmentCount?: number;
+  paymentFrequency?: LoanPaymentFrequency;
+  startDate?: string;
+  nextDueDate?: string;
+  autoDebit?: boolean;
+  status: LoanStatus;
+  notes?: string;
+  purpose?: string;
+  disbursementDate?: string;
+  openedDate?: string;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface EmiSchedule {
+export interface LoanDashboardData {
+  totalOutstanding: Money;
+  totalMonthlyEmi: Money;
+  averageInterestRate: number;
+  highestInstallment: Money;
+  nextDue?: {
+    loanId: string;
+    loanName: string;
+    dueDate: string;
+    amount: Money;
+  } | null;
+  debtRatio?: number;
+  activeCount: number;
+  closedCount: number;
+  loansByType: Array<{ type: string; count: number; totalOutstanding: Money }>;
+  loansByStatus: Array<{ status: string; count: number; totalOutstanding: Money }>;
+  upcomingInstallments: Array<{
+    id: string;
+    loanId: string;
+    loanName: string;
+    installmentNo: number;
+    dueDate: string;
+    amount: Money;
+    status: string;
+  }>;
+  recentlyPaid: Array<{
+    id: string;
+    loanId: string;
+    loanName: string;
+    amount: Money;
+    paidDate: string;
+  }>;
+}
+
+export interface LoanScheduleItem {
   id: string;
   loanId: string;
   installmentNo: number;
   dueDate: string;
-  emiAmount: Money;
-  principalComponent: Money;
-  interestComponent: Money;
-  status: "PAID" | "UPCOMING" | "OVERDUE";
+  installmentAmount?: Money | string;
+  emiAmount?: Money | string;
+  amount?: Money | string;
+  totalAmount?: Money | string;
+  principalComponent?: Money | string;
+  principalPortion?: Money | string;
+  principal?: Money | string;
+  principalAmount?: Money | string;
+  interestComponent?: Money | string;
+  interestPortion?: Money | string;
+  interest?: Money | string;
+  interestAmount?: Money | string;
+  remainingBalance?: Money | string;
+  status: "UPCOMING" | "PARTIALLY_PAID" | "PAID" | "OVERDUE";
+  paidAmount?: Money | string;
+  paidDate?: string;
+}
+
+export type EmiSchedule = LoanScheduleItem;
+
+export interface LoanPayment {
+  id: string;
+  loanId: string;
+  scheduleId?: string;
+  transactionId?: string;
+  paidAmount?: Money | string;
+  amount?: Money | string;
+  principalPortion?: Money | string;
+  interestPortion?: Money | string;
+  penaltyPortion?: Money | string;
+  paidDate?: string;
+  paymentDate?: string;
+  paymentMethod?: string;
+  reference?: string;
+  notes?: string;
+  isExtraPayment?: boolean;
+  type: "REGULAR_EMI" | "PREPAYMENT";
+  status: "COMPLETED" | "REVERSED";
+  createdAt?: string;
+}
+
+export interface LoanDocument {
+  id: string;
+  loanId: string;
+  category: "SANCTION_LETTER" | "LOAN_AGREEMENT" | "REPAYMENT_SCHEDULE" | "NOC" | "TAX_CERTIFICATE" | "OTHER";
+  fileName: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface LoanInterestRateHistory {
+  id: string;
+  loanId: string;
+  oldRate: number;
+  newRate: number;
+  effectiveDate: string;
+  reason?: string;
+  createdAt: string;
+}
+
+export interface CreateLoanInput {
+  name: string;
+  type: LoanType;
+  currency: string;
+  outstandingPrincipal: string;
+  monthlyEmi: string;
+  remainingTenureMonths: number;
+  nextDueDate: string;
+  interestRate: string;
+  lenderName?: string;
+  institutionId?: string;
+  accountId?: string;
+  interestType?: LoanInterestType;
+  paymentFrequency?: LoanPaymentFrequency;
+  autoDebit?: boolean;
+  principalAmount?: string;
+  tenureMonths?: number;
+  loanNumber?: string;
+  startDate?: string;
+  disbursementDate?: string;
+  purpose?: string;
+  notes?: string;
+}
+
+export interface UpdateLoanInput {
+  name?: string;
+  lenderName?: string;
+  institutionId?: string;
+  loanNumber?: string;
+  purpose?: string;
+  notes?: string;
+  autoDebit?: boolean;
+  accountId?: string;
+  status?: LoanStatus;
+}
+
+export type GoalType =
+  | "EMERGENCY_FUND"
+  | "RETIREMENT"
+  | "HOUSE"
+  | "CAR"
+  | "VACATION"
+  | "WEDDING"
+  | "EDUCATION"
+  | "CHILD_EDUCATION"
+  | "BUSINESS"
+  | "INVESTMENT_CORPUS"
+  | "PASSIVE_INCOME"
+  | "DEBT_FREE"
+  | "INSURANCE_CORPUS"
+  | "MEDICAL_FUND"
+  | "CUSTOM"
+  | "EMERGENCY"
+  | "VEHICLE"
+  | "OTHER";
+
+export type GoalPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
+export type GoalStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
+
+export type RiskProfile = "CONSERVATIVE" | "MODERATE" | "AGGRESSIVE";
+
+export type GoalHealthStatus = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
+
+export type RiskLevel = "ON_TRACK" | "NEEDS_ATTENTION" | "BEHIND_SCHEDULE" | "CRITICAL" | "COMPLETED";
+
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  goalName?: string;
+  date: string;
+  amount: Money;
+  sourceAccountId?: string;
+  sourceName?: string;
+  type: "MANUAL" | "TRANSACTION_LINKED" | string;
+  reference?: string;
+  notes?: string;
+  version: number;
+  createdAt?: string;
+}
+
+export interface GoalMilestone {
+  id: string;
+  goalId: string;
+  goalName?: string;
+  name: string;
+  thresholdPercent?: string | null;
+  targetAmount: Money | null;
+  targetDate: string | null;
+  status: "PENDING" | "ACHIEVED";
+  isStandard?: boolean;
+  achievedDate?: string | null;
+  version: number;
+  createdAt?: string;
+}
+
+// Note: the backend forecast endpoint is a deterministic linear projection —
+// it does not compute a success probability or recommendations, so those
+// fields are intentionally not part of this contract (see GoalDetailsView /
+// ForecastSubmenuView, which hide the corresponding UI when absent).
+// The subset of forecast fields available everywhere (standalone endpoint
+// and embedded in GoalAnalytics). Amounts are plain decimal strings on the
+// wire; the mapper in useGoalQueries.ts wraps them as Money.
+export interface GoalForecastSummary {
+  monthlyContributionRate: Money;
+  fundingGap: Money;
+  expectedCompletionDate: string | null;
+  monthsRemaining: number | null;
+  isBehindSchedule: boolean;
+}
+
+// Matches GoalForecastDto (GET /finance/goals/:id/forecast) — a deterministic
+// linear projection with a few extra fields layered on top of the summary.
+export interface GoalForecast extends GoalForecastSummary {
+  goalId: string;
+  goalName: string;
+  targetDate: string | null;
+  projectedFutureValue: Money;
+  monthlyRequiredContribution: Money | null;
+  inflationAdjustedTarget: Money | null;
+}
+
+// Matches GoalProjectionDto (GET /finance/goals/:id/projection) — a risk
+// classification, not a time-series projection curve. `goalId` is absent
+// when this shape is embedded inside GoalAnalytics.
+export interface GoalProjection {
+  goalId?: string;
+  expectedProgressPercent: number;
+  actualProgressPercent: number;
+  delayMonths: number | null;
+  contributionTrend: "INCREASING" | "STABLE" | "DECREASING";
+  riskLevel: RiskLevel;
+}
+
+// Matches GoalHealthResult, embedded inside GoalAnalyticsDto.health.
+export interface GoalHealthData {
+  score: number;
+  band: GoalHealthStatus;
+  contributionConsistency: number;
+  progressAlignment: number;
+  fundingGap: number;
+}
+
+// Matches GoalAnalyticsDto (GET /finance/goals/:id/analytics) — bundles
+// corpus, forecast, projection risk, and health into one composite response.
+export interface GoalAnalytics {
+  goalId: string;
+  corpus: { corpusValue: Money; contributionValue: Money; investmentValue: Money };
+  forecast: GoalForecastSummary;
+  projection: GoalProjection;
+  health: GoalHealthData;
+  contributionTrend: Array<{ month: string; amount: Money }>;
+  corpusGrowth: Array<{ date: string; corpusValue: Money }>;
+  milestoneProgress: { achieved: number; total: number };
+  investmentAllocation: { linkedHoldingCount: number; investmentValue: Money };
+}
+
+// Matches GoalTemplateResponseDto.
+export interface GoalTemplate {
+  id: string;
+  name: string;
+  goalType: GoalType;
+  description?: string;
+  suggestedTargetAmount?: Money;
+  suggestedDurationMonths?: number;
+  suggestedMonthlyContribution?: Money;
+  icon?: string;
+  color?: string;
+  isPlatformCurated: boolean;
+}
+
+// Matches GoalDocumentResponseDto. `storageKey` is never returned by the
+// backend (write-only, on AddGoalDocumentDto) — only `category` is required
+// on read.
+export interface GoalDocument {
+  id: string;
+  goalId: string;
+  category: "PLAN" | "STATEMENT" | "RECEIPT" | "CERTIFICATE" | "OTHER";
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  notes?: string;
+  uploadedAt: string;
+}
+
+// Matches GoalBeneficiaryResponseDto — allocationPercentage is a decimal
+// string on the wire (mapper in useGoalQueries.ts converts to number).
+export interface GoalBeneficiary {
+  id: string;
+  goalId: string;
+  name: string;
+  relationship: "SPOUSE" | "CHILD" | "PARENT" | "SIBLING" | "FAMILY_MEMBER" | "TRUST" | "OTHER";
+  allocationPercentage: number;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  version: number;
 }
 
 export interface Goal {
   id: string;
   name: string;
-  category: "EMERGENCY" | "RETIREMENT" | "VACATION" | "HOUSE" | "EDUCATION" | "OTHER";
+  type: GoalType;
+  category?: GoalType; // Backwards compatibility
+  priority: GoalPriority;
+  linkedAccountIds: string[];
+  linkedInvestmentIds: string[];
   targetAmount: Money;
-  currentAmount: Money;
+  currentCorpus?: Money; // Not returned by GET /goals/:id — use currentAmount
+  currentAmount?: Money; // Backwards compatibility
+  remainingCorpus?: Money; // Not returned by GET /goals/:id
+  progressPercent: number;
+  currency: CurrencyCode;
   targetDate: string;
-  monthlyContribution: Money;
-  isCompleted: boolean;
-  forecastCompletionDate: string;
+  estimatedCompletionDate?: string; // Not returned by GET /goals/:id — derive from /forecast
+  forecastCompletionDate?: string; // Backwards compatibility
+  monthlyContribution?: Money; // Not returned by GET /goals/:id
+  expectedReturnRate: number;
+  inflationRate: number;
+  riskProfile: RiskProfile;
+  goalHealthScore?: number; // Only available via GET /goals/:id/analytics, not on the goal itself
+  goalHealth?: GoalHealthStatus;
+  riskLevel?: RiskLevel;
+  status: GoalStatus;
+  isCompleted?: boolean; // Backwards compatibility
+  autoContributionEnabled: boolean;
+  autoContributionAmount?: Money;
+  milestones?: GoalMilestone[];
+  recentContributions?: GoalContribution[];
+  // Not embedded in GET /goals/:id — fetch separately via useGoalForecast(id).
+  forecast?: GoalForecast;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type FinancialGoal = Goal;
+
+// Matches GoalsDashboardDto (GET /finance/goals/dashboard) exactly — a flat
+// aggregate across all of the user's goals. Amounts are plain decimal
+// strings on the wire; no currency field exists on this DTO.
+export interface GoalDashboardData {
+  activeGoalsCount: number;
+  completedGoalsCount: number;
+  totalCorpus: string;
+  targetCorpus: string;
+  remainingCorpus: string;
+  overallProgressPercent: string;
+  monthlyContributionTotal: string;
+  goalsAtRisk: Array<{ goalId: string; name: string; riskLevel: string }>;
+  nearestCompletion: { goalId: string; name: string; projectedCompletionDate: string } | null;
+  upcomingMilestones: Array<{ goalId: string; goalName: string; milestoneId: string; title: string; targetDate: string }>;
+}
+
+export interface CreateGoalInput {
+  name: string;
+  type: GoalType;
+  priority?: GoalPriority;
+  targetAmount: string;
+  currency?: string;
+  targetDate: string;
+  currentCorpus?: string;
+  monthlyContribution?: string;
+  expectedReturnRate?: string;
+  inflationRate?: string;
+  riskProfile?: RiskProfile;
+  autoContributionEnabled?: boolean;
+  linkedAssetIds?: string[];
+  milestones?: Array<{ name: string; targetAmount: string; targetDate: string }>;
+}
+
+export interface UpdateGoalInput {
+  name?: string;
+  type?: GoalType;
+  priority?: GoalPriority;
+  targetAmount?: string;
+  targetDate?: string;
+  monthlyContribution?: string;
+  expectedReturnRate?: string;
+  inflationRate?: string;
+  riskProfile?: RiskProfile;
+  status?: GoalStatus;
+  autoContributionEnabled?: boolean;
+}
+
+export interface CreateContributionInput {
+  amount: string;
+  date?: string;
+  sourceAccountId?: string;
+  type?: string;
+  reference?: string;
+  notes?: string;
+}
+
+export interface CreateMilestoneInput {
+  name: string;
+  targetAmount: string;
+  targetDate: string;
 }
 
 export type InsightSeverity = "INFO" | "WARNING" | "CRITICAL";
@@ -298,19 +1070,16 @@ export interface Insight {
 }
 
 export interface FinancialHealthScore {
+  snapshotDate?: string;
   overallScore: number;
-  componentScores: {
-    emergencyFund: number;
-    savingsRate: number;
-    debtToIncome: number;
-    creditUtilization: number;
-    goalProgress: number;
-  };
-  emergencyFundMonths: number;
-  savingsRatePercent: number;
-  debtToIncomeRatio: number;
-  avgCreditUtilization: number;
-  updatedAt: string;
+  rating: FinancialHealthRating;
+  monthlyTrend?: number;
+  lastCalculatedAt?: string;
+  componentScores: Record<HealthDimensionKey, HealthDimensionDetail>;
+  topRecommendations: HealthRecommendation[];
+  // Compatibility fallbacks
+  components?: Record<HealthDimensionKey, HealthDimensionDetail>;
+  updatedAt?: string;
 }
 
 export interface NetWorthSnapshot {
@@ -347,6 +1116,23 @@ export interface UserSettings {
   emergencyFundMonthsTarget: number;
   theme: "light" | "dark" | "system";
   notificationPreferences: Record<string, boolean>;
+}
+
+export type BackendCalendarEventType =
+  | "EMI_DUE"
+  | "CREDIT_CARD_DUE"
+  | "SIP_DUE"
+  | "SUBSCRIPTION_RENEWAL"
+  | "GOAL_TARGET_DATE"
+  | (string & {});
+
+export interface CalendarEventItem {
+  date: string;
+  type: BackendCalendarEventType;
+  title: string;
+  amount: string | null;
+  sourceEntityType: "EmiSchedule" | "CreditCardStatement" | "SipPlan" | "Subscription" | "Goal" | string;
+  sourceEntityId: string;
 }
 
 export interface CalendarItem {
@@ -460,6 +1246,130 @@ export interface BootstrapOnboardingPayload {
   dataImportChoice?: string;
 }
 
+export interface OnboardingStepCatalogItem {
+  key: string;
+  title: string;
+  subtitle: string;
+  category: "WELCOME" | "PROFILE" | "PREFERENCES" | "ACCOUNT" | "CREDIT_CARD" | "LOAN" | "INVESTMENT" | "GOAL" | "COMPLETE";
+  isOptional: boolean;
+  order: number;
+}
+
+export interface OnboardingStatus {
+  status?: string;
+  workflowVersion?: number;
+  currentStep?: string | null;
+  currentStepKey?: string;
+  completedSteps?: string[];
+  completedStepKeys?: string[];
+  skippedSteps?: string[];
+  skippedStepKeys?: string[];
+  remainingSteps?: string[];
+  completionPercentage?: number;
+  progressPercent?: number;
+  isCompleted?: boolean;
+  completedCount?: number;
+  totalCount?: number;
+  steps?: OnboardingStep[];
+  profile?: OnboardingProfileInput;
+  preferences?: OnboardingPreferencesInput;
+  account?: OnboardingAccountInput;
+  creditCards?: OnboardingCreditCardInput[];
+  loans?: OnboardingLoanInput[];
+  investments?: OnboardingInvestmentInput[];
+  goals?: OnboardingGoalInput[];
+}
+
+export interface OnboardingProfileInput {
+  displayName: string;
+  country: string;
+  timezone: string;
+  locale?: string;
+  baseCurrency: string;
+}
+
+export interface OnboardingPreferencesInput {
+  fiscalYearStartMonth: number;
+  primaryIncomeSourceName?: string;
+  payFrequency: "MONTHLY" | "WEEKLY" | "BI_WEEKLY" | "CUSTOM";
+  payDay?: number;
+  monthlyAmount: string;
+  currency: string;
+}
+
+export interface OnboardingAccountInput {
+  name: string;
+  type: "SAVINGS" | "CURRENT" | "CASH" | "WALLET" | "CHECKING";
+  currency: string;
+  openingBalance: string;
+  institutionId?: string;
+}
+
+export interface OnboardingCreditCardInput {
+  name: string;
+  currency: string;
+  creditLimit: string;
+  currentBalance: string;
+  statementDay: number;
+  dueDay: number;
+  institutionId?: string;
+}
+
+export interface OnboardingLoanInput {
+  name: string;
+  type: "HOME" | "VEHICLE" | "EDUCATION" | "PERSONAL" | "GOLD" | "OTHER";
+  currency: string;
+  principalAmount: string;
+  interestRate: string;
+  tenureMonths: number;
+  startDate: string;
+}
+
+export interface OnboardingInvestmentInput {
+  symbol?: string;
+  securityName: string;
+  assetClass: "MUTUAL_FUND" | "STOCK" | "ETF" | "PPF" | "NPS" | "EPF" | "FD" | "GOLD" | "CRYPTO";
+  currency: string;
+  units?: string;
+  costBasis: string;
+  currentValue: string;
+  purchaseDate?: string;
+}
+
+export interface OnboardingGoalInput {
+  name: string;
+  type: "EMERGENCY_FUND" | "VACATION" | "HOUSE" | "RETIREMENT" | "EDUCATION" | "CAR" | "CUSTOM";
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  targetAmount: string;
+  currency: string;
+  targetDate: string;
+}
+
+export interface OnboardingState {
+  status?: string;
+  workflowVersion?: number;
+  currentStep?: string | null;
+  currentStepKey?: string;
+  completedSteps?: string[];
+  completedStepKeys?: string[];
+  skippedSteps?: string[];
+  skippedStepKeys?: string[];
+  remainingSteps?: string[];
+  completionPercentage?: number;
+  progressPercent?: number;
+  isCompleted?: boolean;
+  profile?: OnboardingProfileInput;
+  preferences?: OnboardingPreferencesInput;
+  account?: OnboardingAccountInput;
+  creditCards?: OnboardingCreditCardInput[];
+  loans?: OnboardingLoanInput[];
+  investments?: OnboardingInvestmentInput[];
+  goals?: OnboardingGoalInput[];
+  steps?: OnboardingStep[];
+  completedCount?: number;
+  totalCount?: number;
+}
+
 export interface OnboardingStep {
   id: string;
   title: string;
@@ -503,5 +1413,275 @@ export interface RetirementForecastResponse {
   projectedCorpus?: Money;
   monthlySavingsNeeded?: Money;
 }
+
+export type FinancialHealthRating =
+  | "EXCEPTIONAL"
+  | "EXCELLENT"
+  | "GOOD"
+  | "NEEDS_ATTENTION"
+  | "POOR"
+  | "CRITICAL";
+
+export type HealthDimensionKey =
+  | "CASH_FLOW"
+  | "SAVINGS_RATE"
+  | "EMERGENCY_FUND"
+  | "DEBT_HEALTH"
+  | "CREDIT_UTILIZATION"
+  | "INVESTMENT_DIVERSIFICATION"
+  | "BILL_DISCIPLINE"
+  | "SPENDING_DISCIPLINE";
+
+export interface MetricDetail {
+  label: string;
+  target: string;
+  actual: string;
+}
+
+export interface HealthComponentRecommendation {
+  text: string;
+  estimatedImpact: number;
+  component?: HealthDimensionKey;
+  deepLink?: string;
+}
+
+export interface HealthDimensionDetail {
+  code: HealthDimensionKey;
+  label?: string;
+  score: number;
+  stars: number;
+  why: string;
+  metrics?: Record<string, MetricDetail>;
+  recommendations?: HealthComponentRecommendation[];
+  // Compatibility fields
+  key?: HealthDimensionKey;
+  weight?: number;
+  rating?: string;
+  reason?: string;
+  target?: string;
+  currentValue?: string;
+  gapAmount?: string;
+  scoreImpact?: number;
+  recommendationText?: string;
+  deepLink?: string;
+}
+
+export interface HealthRecommendation {
+  text: string;
+  estimatedImpact: number;
+  component?: HealthDimensionKey;
+  deepLink?: string;
+  // Compatibility fields
+  id?: string;
+  title?: string;
+  description?: string;
+  scoreImpact?: number;
+}
+
+export type TopRecommendation = HealthRecommendation;
+
+export type DetailedFinancialHealthScore = FinancialHealthScore;
+
+export interface FinancialHealthHistoryPoint {
+  snapshotDate?: string;
+  date?: string;
+  overallScore: number;
+  score?: number;
+  rating: FinancialHealthRating;
+  delta: number | null;
+  reasons: string[];
+  componentScores?: Record<HealthDimensionKey, HealthDimensionDetail>;
+  components?: Record<HealthDimensionKey, HealthDimensionDetail>;
+  topRecommendations?: HealthRecommendation[];
+}
+
+export interface CreditCardStatementPaymentInput {
+  paidAmount: string;
+  paidDate?: string;
+}
+
+export type ActionPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
+
+export type ActionCategory =
+  | "PAYMENT"
+  | "INCOME"
+  | "SPENDING"
+  | "SAVINGS"
+  | "INVESTMENT"
+  | "CREDIT"
+  | "GOALS"
+  | "DATA_QUALITY"
+  | "IMPORT"
+  | "ACCOUNT"
+  | "OPPORTUNITY"
+  | "SYSTEM"
+  | (string & {});
+
+export type ActionStatus = "ACTIVE" | "COMPLETED" | "DISMISSED" | "SNOOZED" | "EXPIRED";
+
+export interface SmartActionItem {
+  id: string;
+  type: string;
+  category: ActionCategory;
+  priority: ActionPriority;
+  status: ActionStatus;
+  title: string;
+  description: string;
+  explanation: string;
+  recommendation?: string | null;
+  deepLink?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  financialImpact?: string | null;
+  healthScoreImpact?: number | null;
+  scoreImpact?: number | null; // Compatibility fallback for healthScoreImpact
+  dismissible: boolean;
+  actionable: boolean;
+  metadata?: Record<string, unknown>;
+  version: number;
+  createdAt: string;
+  updatedAt?: string;
+  expiresAt?: string | null;
+  completedAt?: string | null;
+  dismissedAt?: string | null;
+  snoozedUntil?: string | null;
+  dueInDays?: number;
+  amount?: Money | string;
+}
+
+export interface ActionCategoryCount {
+  category: string;
+  count: number;
+}
+
+export interface ActionPreferences {
+  mutedCategories: string[];
+  quietHoursStart: number | null;
+  quietHoursEnd: number | null;
+  notifyMinPriority: ActionPriority;
+}
+
+// ==========================================
+// Accounts & Cash Management Module Interfaces
+// ==========================================
+
+export interface CashPositionData {
+  totalCash: Money;
+  availableCash: Money;
+  pendingCash: Money;
+  lockedFunds: Money;
+  emergencyFund: Money;
+  investmentCash: Money;
+  currencyBreakdown: Array<{ currency: string; amount: Money; percentage: number }>;
+  institutionBreakdown: Array<{ institutionId: string; institutionName: string; logoUrl?: string; amount: Money; percentage: number }>;
+  cashAllocation: Array<{ category: string; amount: Money; percentage: number }>;
+  historical30DayTrend: Array<{ date: string; balance: number }>;
+}
+
+export interface WalletAccount extends Account {
+  provider: "Paytm" | "PhonePe" | "Google Pay" | "Amazon Pay" | "PayPal" | "Other";
+  monthlySpend?: Money;
+  topCategories?: Array<{ categoryName: string; amount: Money }>;
+  recentTransactions?: Transaction[];
+}
+
+export interface FixedDeposit {
+  id: string;
+  accountNumber: string;
+  accountName: string;
+  institutionId: string;
+  institutionName: string;
+  logoUrl?: string;
+  principal: Money;
+  currentValue: Money;
+  interestEarned: Money;
+  interestRate: number;
+  maturityDate: string;
+  startDate: string;
+  tenureMonths: number;
+  status: "ACTIVE" | "MATURED" | "CLOSED" | "LOCKED";
+  currency: string;
+}
+
+export interface InvestmentCashPosition {
+  brokerId: string;
+  brokerName: string;
+  logoUrl?: string;
+  totalCash: Money;
+  availableToTrade: Money;
+  pendingSettlement: Money;
+  withdrawable: Money;
+  recentTradesCount: number;
+  currency: string;
+}
+
+export type TransferStatus = "COMPLETED" | "SCHEDULED" | "RECURRING" | "FAILED" | "IN_PROGRESS";
+
+export interface AccountTransfer {
+  id: string;
+  fromAccountId: string;
+  fromAccountName: string;
+  toAccountId: string;
+  toAccountName: string;
+  amount: Money;
+  fee?: Money;
+  exchangeRate?: number;
+  transferDate: string;
+  scheduledDate?: string;
+  status: TransferStatus;
+  recurringFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY";
+  note?: string;
+  referenceId?: string;
+  createdAt: string;
+}
+
+export type ReconciliationStatus = "MATCHED" | "PENDING" | "EXCEPTION" | "MANUAL_REVIEW" | "UNMATCHED";
+
+export interface ReconciliationItem {
+  id: string;
+  accountId: string;
+  accountName: string;
+  statementDate: string;
+  importedTransaction: {
+    id: string;
+    date: string;
+    description: string;
+    amount: Money;
+    fitId?: string;
+  };
+  matchedTransaction?: Transaction;
+  status: ReconciliationStatus;
+  confidenceScore?: number; // 0 - 100% match score
+  discrepancyNote?: string;
+  reconciledAt?: string;
+  reconciledBy?: string;
+}
+
+export type StatementType = "BANK" | "CREDIT_CARD" | "WALLET" | "INVESTMENT" | "IMPORTED";
+
+export interface AccountStatementItem {
+  id: string;
+  accountId: string;
+  accountName: string;
+  type: StatementType;
+  periodStart: string;
+  periodEnd: string;
+  openingBalance: Money;
+  closingBalance: Money;
+  downloadUrl?: string;
+  status: "READY" | "PROCESSING" | "FAILED";
+  importedAt?: string;
+}
+
+export interface AccountSettingsConfig {
+  autoSyncFrequencyMinutes: number;
+  lowBalanceThreshold: Money;
+  highBalanceAlertThreshold?: Money;
+  defaultCurrency: string;
+  autoReconcileThreshold: number;
+  hideInDashboardAccounts: string[];
+}
+
+
 
 

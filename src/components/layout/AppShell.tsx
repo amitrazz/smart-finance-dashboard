@@ -1,31 +1,61 @@
-import React, { useEffect, lazy, Suspense } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Sidebar } from "./Sidebar";
-import { Navbar } from "./Navbar";
-import { Toast } from "../common/Toast";
-import { ErrorBoundary } from "../common/ErrorBoundary";
-import { CommandPaletteModal } from "../../features/search/CommandPaletteModal";
-import { useUIStore, VALID_TABS, NavTab } from "../../store/useUIStore";
-import { useSettingsStore } from "../../store/useSettingsStore";
-import { useAuthStore } from "../../store/useAuthStore";
-import { useOnboardingProgress } from "../../hooks/useFinanceQueries";
+import { AnimatePresence, motion } from 'framer-motion';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { useOnboardingStatus } from '../../features/onboarding/hooks/useOnboarding';
+import { CommandPaletteModal } from '../../features/search/CommandPaletteModal';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { parseHashRoute, useUIStore } from '../../store/useUIStore';
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import { Toast } from '../common/Toast';
+import { Navbar } from './Navbar';
+import { Sidebar } from './Sidebar';
 
-import { AuthView } from "../../features/auth/AuthView";
-import { OnboardingView } from "../../features/onboarding/OnboardingView";
-import { DashboardView } from "../../features/dashboard/DashboardView";
+import { AuthView } from '../../features/auth/AuthView';
+import { DashboardView } from '../../features/dashboard/DashboardView';
+import { OnboardingView } from '../../features/onboarding/OnboardingView';
 
 // Lazy-loaded routes for optimal bundle code-splitting
-const AccountsView = lazy(() => import("../../features/accounts/AccountsView").then(m => ({ default: m.AccountsView })));
-const TransactionsView = lazy(() => import("../../features/transactions/TransactionsView").then(m => ({ default: m.TransactionsView })));
-const ImportsView = lazy(() => import("../../features/imports/ImportsView").then(m => ({ default: m.ImportsView })));
-const BudgetsView = lazy(() => import("../../features/budgets/BudgetsView").then(m => ({ default: m.BudgetsView })));
-const InvestmentsView = lazy(() => import("../../features/investments/InvestmentsView").then(m => ({ default: m.InvestmentsView })));
-const LoansView = lazy(() => import("../../features/loans/LoansView").then(m => ({ default: m.LoansView })));
-const GoalsView = lazy(() => import("../../features/goals/GoalsView").then(m => ({ default: m.GoalsView })));
-const AnalyticsView = lazy(() => import("../../features/analytics/AnalyticsView").then(m => ({ default: m.AnalyticsView })));
-const InsightsView = lazy(() => import("../../features/insights/InsightsView").then(m => ({ default: m.InsightsView })));
-const NotificationsView = lazy(() => import("../../features/notifications/NotificationsView").then(m => ({ default: m.NotificationsView })));
-const SettingsView = lazy(() => import("../../features/settings/SettingsView").then(m => ({ default: m.SettingsView })));
+const AccountsView = lazy(() =>
+  import('../../features/accounts/AccountsView').then((m) => ({ default: m.AccountsView })),
+);
+const CreditCardsView = lazy(() =>
+  import('../../features/credit-cards/CreditCardsView').then((m) => ({
+    default: m.CreditCardsView,
+  })),
+);
+const TransactionsView = lazy(() =>
+  import('../../features/transactions/TransactionsView').then((m) => ({
+    default: m.TransactionsView,
+  })),
+);
+const ImportsView = lazy(() =>
+  import('../../features/imports/ImportsView').then((m) => ({ default: m.ImportsView })),
+);
+const PlanningView = lazy(() =>
+  import('../../features/planning/PlanningView').then((m) => ({ default: m.PlanningView })),
+);
+const InvestmentsView = lazy(() =>
+  import('../../features/investments/InvestmentsView').then((m) => ({
+    default: m.InvestmentsView,
+  })),
+);
+const LoansView = lazy(() =>
+  import('../../features/loans/LoansView').then((m) => ({ default: m.LoansView })),
+);
+const AnalyticsView = lazy(() =>
+  import('../../features/analytics/AnalyticsView').then((m) => ({ default: m.AnalyticsView })),
+);
+const InsightsView = lazy(() =>
+  import('../../features/insights/InsightsView').then((m) => ({ default: m.InsightsView })),
+);
+const NotificationsView = lazy(() =>
+  import('../../features/notifications/NotificationsView').then((m) => ({
+    default: m.NotificationsView,
+  })),
+);
+const SettingsView = lazy(() =>
+  import('../../features/settings/SettingsView').then((m) => ({ default: m.SettingsView })),
+);
 
 const TabFallbackSkeleton: React.FC = () => (
   <div className="space-y-6 animate-pulse p-4">
@@ -40,66 +70,79 @@ const TabFallbackSkeleton: React.FC = () => (
 );
 
 export const AppShell: React.FC = () => {
-  const { activeTab, setActiveTab } = useUIStore();
+  const { activeTab, activeSubTab, setActiveTab } = useUIStore();
   const { theme } = useSettingsStore();
   const { isAuthenticated } = useAuthStore();
-  const { data: onboardingProgress } = useOnboardingProgress();
+  const { data: onboardingStatus } = useOnboardingStatus();
 
   // Listen to Network Online / Offline status changes
   useEffect(() => {
     const handleOnline = () => {
-      useUIStore.getState().showToast("Internet connection restored", "success");
+      useUIStore.getState().showToast('Internet connection restored', 'success');
     };
     const handleOffline = () => {
-      useUIStore.getState().showToast("You are offline. Network requests may fail.", "error");
+      useUIStore.getState().showToast('You are offline. Network requests may fail.', 'error');
     };
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
   // Listen to Browser Back / Forward & URL Hash navigation changes
   useEffect(() => {
     const handlePopState = () => {
-      const hash = window.location.hash.replace(/^#\/?/, "");
-      if (hash && VALID_TABS.includes(hash as NavTab)) {
-        useUIStore.setState({ activeTab: hash as NavTab });
-      }
+      const { tab, subTab } = parseHashRoute();
+      useUIStore.setState({ activeTab: tab, activeSubTab: subTab });
     };
 
-    window.addEventListener("hashchange", handlePopState);
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    window.addEventListener('popstate', handlePopState);
     return () => {
-      window.removeEventListener("hashchange", handlePopState);
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
+
+  // Dynamic document title update based on activeTab & activeSubTab
+  useEffect(() => {
+    const tabName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ');
+    const subName = activeSubTab
+      ? ` > ${activeSubTab.charAt(0).toUpperCase() + activeSubTab.slice(1).replace('-', ' ')}`
+      : '';
+    document.title = `Cashflow | ${tabName}${subName}`;
+  }, [activeTab, activeSubTab]);
 
   // Theme Sync to HTML Root & Body
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
+    if (theme === 'dark') {
+      root.classList.add('dark');
     } else {
-      root.classList.remove("dark");
+      root.classList.remove('dark');
     }
   }, [theme]);
 
   // Auto-navigate newly registered/un-onboarded users to Setup Checklist on initial session load if no hash set
   useEffect(() => {
-    const hasHash = Boolean(window.location.hash.replace(/^#\/?/, ""));
-    if (!hasHash && isAuthenticated && onboardingProgress && !onboardingProgress.isComplete && onboardingProgress.completedCount === 0) {
-      const hasPrompted = sessionStorage.getItem("pf_prompted_onboarding");
+    const hasHash = Boolean(window.location.hash.replace(/^#\/?/, ''));
+    if (
+      !hasHash &&
+      isAuthenticated &&
+      onboardingStatus &&
+      !onboardingStatus.isCompleted &&
+      onboardingStatus.completedCount === 0
+    ) {
+      const hasPrompted = sessionStorage.getItem('pf_prompted_onboarding');
       if (!hasPrompted) {
-        sessionStorage.setItem("pf_prompted_onboarding", "true");
-        setActiveTab("onboarding");
+        sessionStorage.setItem('pf_prompted_onboarding', 'true');
+        setActiveTab('onboarding');
       }
     }
-  }, [isAuthenticated, onboardingProgress, setActiveTab]);
+  }, [isAuthenticated, onboardingStatus, setActiveTab]);
 
   if (!isAuthenticated) {
     return <AuthView />;
@@ -107,31 +150,31 @@ export const AppShell: React.FC = () => {
 
   const renderActiveTab = () => {
     switch (activeTab) {
-      case "dashboard":
+      case 'dashboard':
         return <DashboardView />;
-      case "onboarding":
+      case 'onboarding':
         return <OnboardingView />;
-      case "accounts":
+      case 'accounts':
         return <AccountsView />;
-      case "transactions":
+      case 'credit-cards':
+        return <CreditCardsView />;
+      case 'transactions':
         return <TransactionsView />;
-      case "imports":
+      case 'imports':
         return <ImportsView />;
-      case "budgets":
-        return <BudgetsView />;
-      case "investments":
+      case 'planning':
+        return <PlanningView />;
+      case 'investments':
         return <InvestmentsView />;
-      case "loans":
+      case 'loans':
         return <LoansView />;
-      case "goals":
-        return <GoalsView />;
-      case "analytics":
+      case 'analytics':
         return <AnalyticsView />;
-      case "insights":
+      case 'insights':
         return <InsightsView />;
-      case "notifications":
+      case 'notifications':
         return <NotificationsView />;
-      case "settings":
+      case 'settings':
         return <SettingsView />;
       default:
         return <DashboardView />;
@@ -141,7 +184,7 @@ export const AppShell: React.FC = () => {
   return (
     <div
       className={`min-h-screen font-sans antialiased transition-colors duration-200 flex ${
-        theme === "dark" ? "bg-slate-950 text-slate-100 dark" : "bg-slate-50 text-slate-900"
+        theme === 'dark' ? 'bg-slate-950 text-slate-100 dark' : 'bg-slate-50 text-slate-900'
       }`}
     >
       <Sidebar />
@@ -155,12 +198,10 @@ export const AppShell: React.FC = () => {
                 initial={{ opacity: 0, y: 6, scale: 0.995 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.995 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
                 className="space-y-8"
               >
-                <Suspense fallback={<TabFallbackSkeleton />}>
-                  {renderActiveTab()}
-                </Suspense>
+                <Suspense fallback={<TabFallbackSkeleton />}>{renderActiveTab()}</Suspense>
               </motion.div>
             </AnimatePresence>
           </ErrorBoundary>

@@ -1,15 +1,25 @@
 import { create } from "zustand";
 
+const MONEY_VISIBILITY_KEY = "finance.moneyVisibility";
+
+const getInitialMoneyVisible = (): boolean => {
+  try {
+    return localStorage.getItem(MONEY_VISIBILITY_KEY) === "visible";
+  } catch {
+    return false;
+  }
+};
+
 export type NavTab =
   | "dashboard"
   | "onboarding"
   | "accounts"
+  | "credit-cards"
   | "transactions"
   | "imports"
-  | "budgets"
+  | "planning"
   | "investments"
   | "loans"
-  | "goals"
   | "analytics"
   | "insights"
   | "notifications"
@@ -17,7 +27,16 @@ export type NavTab =
 
 interface UIState {
   activeTab: NavTab;
-  setActiveTab: (tab: NavTab) => void;
+  activeSubTab: string | null;
+  setActiveTab: (tab: NavTab, subTab?: string | null) => void;
+  setActiveSubTab: (subTab: string | null) => void;
+  navigateToRoute: (tab: NavTab, subTab?: string | null) => void;
+
+  // Privacy Mode
+  moneyVisible: boolean;
+  toggleMoneyVisibility: () => void;
+  setMoneyVisible: (visible: boolean) => void;
+
   isSearchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
   toggleSearch: () => void;
@@ -44,42 +63,107 @@ export const VALID_TABS: NavTab[] = [
   "dashboard",
   "onboarding",
   "accounts",
+  "credit-cards",
   "transactions",
   "imports",
-  "budgets",
+  "planning",
   "investments",
   "loans",
-  "goals",
   "analytics",
   "insights",
   "notifications",
   "settings",
 ];
 
-const getInitialTab = (): NavTab => {
+// Goals and Budgets were merged into the unified "planning" tab. Old
+// bookmarked/shared #/goals/... and #/budgets/... hashes are redirected here
+// instead of silently falling back to the dashboard.
+const LEGACY_TAB_REDIRECTS: Record<string, string> = {
+  goals: "goals",
+  budgets: "budgets",
+};
+
+export const parseHashRoute = (): { tab: NavTab; subTab: string | null } => {
   try {
-    const hash = window.location.hash.replace(/^#\/?/, "");
-    if (hash && VALID_TABS.includes(hash as NavTab)) {
-      return hash as NavTab;
+    const raw = window.location.hash.replace(/^#\/?/, "");
+    const parts = raw.split("/");
+    const mainTab = parts[0];
+    const rest = parts.slice(1).join("/") || null;
+
+    if (mainTab && mainTab in LEGACY_TAB_REDIRECTS) {
+      const section = LEGACY_TAB_REDIRECTS[mainTab];
+      return { tab: "planning", subTab: rest ? `${section}/${rest}` : section };
+    }
+
+    if (mainTab && VALID_TABS.includes(mainTab as NavTab)) {
+      return { tab: mainTab as NavTab, subTab: rest };
     }
   } catch {
     // Ignore location errors
   }
-  return "dashboard";
+  return { tab: "dashboard", subTab: null };
 };
 
-export const useUIStore = create<UIState>((set) => ({
-  activeTab: getInitialTab(),
-  setActiveTab: (activeTab) => {
+const initialRoute = parseHashRoute();
+
+export const useUIStore = create<UIState>((set, get) => ({
+  activeTab: initialRoute.tab,
+  activeSubTab: initialRoute.subTab,
+
+  // Privacy Mode — hidden by default, persisted to localStorage
+  moneyVisible: getInitialMoneyVisible(),
+  toggleMoneyVisibility: () =>
+    set((state) => {
+      const next = !state.moneyVisible;
+      try {
+        localStorage.setItem(MONEY_VISIBILITY_KEY, next ? "visible" : "hidden");
+      } catch { /* ignore */ }
+      return { moneyVisible: next };
+    }),
+  setMoneyVisible: (visible: boolean) => {
     try {
-      if (window.location.hash.replace(/^#\/?/, "") !== activeTab) {
-        window.history.pushState(null, "", `#/${activeTab}`);
+      localStorage.setItem(MONEY_VISIBILITY_KEY, visible ? "visible" : "hidden");
+    } catch { /* ignore */ }
+    set({ moneyVisible: visible });
+  },
+
+  setActiveTab: (activeTab, subTab = null) => {
+    try {
+      const targetHash = subTab ? `#/${activeTab}/${subTab}` : `#/${activeTab}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, "", targetHash);
       }
     } catch {
       // Ignore location errors
     }
-    set({ activeTab });
+    set({ activeTab, activeSubTab: subTab });
   },
+
+  setActiveSubTab: (activeSubTab) => {
+    const { activeTab } = get();
+    try {
+      const targetHash = activeSubTab ? `#/${activeTab}/${activeSubTab}` : `#/${activeTab}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, "", targetHash);
+      }
+    } catch {
+      // Ignore location errors
+    }
+    set({ activeSubTab });
+  },
+
+  navigateToRoute: (tab, subTab = null) => {
+    try {
+      const targetHash = subTab ? `#/${tab}/${subTab}` : `#/${tab}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, "", targetHash);
+      }
+    } catch {
+      // Ignore location errors
+    }
+    set({ activeTab: tab, activeSubTab: subTab });
+  },
+
   isSearchOpen: false,
   setSearchOpen: (isSearchOpen) => set({ isSearchOpen }),
   toggleSearch: () => set((state) => ({ isSearchOpen: !state.isSearchOpen })),
@@ -121,6 +205,7 @@ export const useUIStore = create<UIState>((set) => ({
   resetUIState: () =>
     set({
       activeTab: "dashboard",
+      activeSubTab: null,
       isSearchOpen: false,
       isAddTransactionOpen: false,
       isAddAccountOpen: false,

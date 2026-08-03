@@ -12,7 +12,7 @@ A production-ready web application for managing personal finances through intuit
 
 # Overview
 
-Smart Finance Dashboard (Smart Finance OS) provides users with a comprehensive personal wealth management experience.
+Smart Finance Dashboard (Cashflow) provides users with a comprehensive personal wealth management experience.
 
 The application enables users to monitor balances across multiple financial accounts, record and categorize transactions, set and track monthly budgets, monitor investment portfolios and stock holdings, track loan EMI schedules, and receive AI-driven financial insights.
 
@@ -21,32 +21,38 @@ The application enables users to monitor balances across multiple financial acco
 # Key Features
 
 ## 📊 Overview Dashboard
+
 - Total net worth & cash balance overview
 - Real-time income and expense breakdowns
 - Monthly cash flow charts & spending heatmaps
 - Quick transaction entry & account summary widgets
 
 ## 💸 Transaction & Account Management
+
 - Multi-account management (Bank accounts, Credit Cards, Cash)
 - Expense and income categorization with bulk tag actions
 - Date range filtering and full-text transaction search
 - Statement file import wizard (CSV/PDF statement parsing)
 
 ## 🎯 Budgeting & Financial Goals
+
 - Category-level monthly budget targets with real-time utilization bars
 - Overspending alerts and remaining balance forecasting
 - Interactive savings goals with milestone progress indicators
 
 ## 📈 Investments & Portfolio Tracking
+
 - Portfolio asset distribution and sector allocation charts
 - Trade logging (Buy/Sell) and profit/loss calculation
 - Holdings table with real-time market value indicators
 
 ## 🛡️ Loans & Credit Management
+
 - Credit card statement cycle monitoring & utilization indicators
 - Loan EMI schedules and payment tracking
 
 ## 💡 AI Financial Insights & Health Score
+
 - Dynamic financial health score algorithm
 - Automated alerts for high spending categories and recurring bill reminders
 
@@ -125,28 +131,34 @@ smart-finance-dashboard/
 # Local Development Setup
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/amitrazz/smart-finance-dashboard.git
 cd smart-finance-dashboard
 ```
 
 ### 2. Install dependencies
+
 ```bash
 npm install
 ```
 
 ### 3. Start the development server
+
 ```bash
 npm run dev
 ```
+
 The application will be accessible at `http://localhost:5173`.
 
 ### 4. Build for production
+
 ```bash
 npm run build
 ```
 
 ### 5. Lint code
+
 ```bash
 npm run lint
 ```
@@ -161,6 +173,6 @@ Distributed under the [MIT License](LICENSE.md).
 
 # Author
 
-**Amit Kumar**  
-Portfolio: [amitrazz.in](https://amitrazz.in)  
+**Amit Kumar**
+Portfolio: [amitrazz.in](https://amitrazz.in)
 GitHub: [@amitrazz](https://github.com/amitrazz)

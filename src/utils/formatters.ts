@@ -27,6 +27,33 @@ export function formatCurrency(
   }).format(val);
 }
 
+/**
+ * Returns the masked representation of a currency value.
+ * Used by chart formatters and non-React contexts that need
+ * to respect privacy mode without consuming hooks.
+ */
+export function maskCurrency(currency = "INR"): string {
+  const symbol = currency === "INR" ? "₹" : currency;
+  return `${symbol}••••••••`;
+}
+
+/**
+ * Convenience helper for Recharts formatter callbacks:
+ * returns the masked string when moneyVisible is false,
+ * or the formatted value when visible.
+ *
+ * Usage in chart: formatter={(val) => getMaskedOrFormatted(val, moneyVisible, currency)}
+ */
+export function getMaskedOrFormatted(
+  val: unknown,
+  moneyVisible: boolean,
+  currency = "INR"
+): string {
+  if (!moneyVisible) return maskCurrency(currency);
+  if (val === null || val === undefined) return "₹0.00";
+  return formatCurrency({ amount: String(val), currency });
+}
+
 export function formatPercent(
   value?: number | string | null,
   decimals = 1

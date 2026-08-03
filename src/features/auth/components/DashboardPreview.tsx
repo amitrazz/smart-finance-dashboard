@@ -1,16 +1,16 @@
-import React from "react";
 import {
-  TrendingUp,
-  ShieldCheck,
-  Zap,
+  Activity,
   ArrowUpRight,
-  PieChart as PieIcon,
-  CreditCard,
   Building2,
   Calendar,
+  CreditCard,
+  PieChart as PieIcon,
+  ShieldCheck,
   Sparkles,
-  Activity
-} from "lucide-react";
+  TrendingUp,
+  Zap,
+} from 'lucide-react';
+import React from 'react';
 
 export const DashboardPreview: React.FC = () => {
   return (
@@ -27,7 +27,8 @@ export const DashboardPreview: React.FC = () => {
             ◉
           </div>
           <span className="text-xs font-bold tracking-widest uppercase text-slate-300">
-            Smart Finance OS <span className="text-slate-500 font-normal">| Financial Operating System</span>
+            Cashflow{' '}
+            <span className="text-slate-500 font-normal">| Financial Operating System</span>
           </span>
         </div>
 
@@ -59,7 +60,9 @@ export const DashboardPreview: React.FC = () => {
           </div>
           <div className="flex items-center gap-1.5 text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] font-semibold tracking-wider text-emerald-500">LIVE SYNC</span>
+            <span className="text-[10px] font-semibold tracking-wider text-emerald-500">
+              LIVE SYNC
+            </span>
           </div>
         </div>
 
@@ -117,17 +120,21 @@ export const DashboardPreview: React.FC = () => {
               <div className="flex justify-between items-baseline pt-1">
                 <div>
                   <div className="text-[10px] text-slate-400">Income</div>
-                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹ 4,50,000</div>
+                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    ₹ 4,50,000
+                  </div>
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-400">Expenses</div>
-                  <div className="text-sm font-bold text-rose-500 dark:text-rose-400">₹ 1,44,000</div>
+                  <div className="text-sm font-bold text-rose-500 dark:text-rose-400">
+                    ₹ 1,44,000
+                  </div>
                 </div>
               </div>
               {/* Progress Bar */}
               <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex">
-                <div className="h-full bg-emerald-500 rounded-l-full" style={{ width: "68%" }} />
-                <div className="h-full bg-rose-500 rounded-r-full" style={{ width: "32%" }} />
+                <div className="h-full bg-emerald-500 rounded-l-full" style={{ width: '68%' }} />
+                <div className="h-full bg-rose-500 rounded-r-full" style={{ width: '32%' }} />
               </div>
             </div>
 
@@ -140,18 +147,34 @@ export const DashboardPreview: React.FC = () => {
                 <span className="text-[10px] font-mono text-slate-400">6 Asset Types</span>
               </div>
               <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex gap-0.5">
-                <div className="h-full bg-emerald-500" style={{ width: "42%" }} title="Stocks 42%" />
-                <div className="h-full bg-teal-400" style={{ width: "28%" }} title="Mutual Funds 28%" />
-                <div className="h-full bg-indigo-500" style={{ width: "12%" }} title="FDs 12%" />
-                <div className="h-full bg-amber-400" style={{ width: "8%" }} title="Gold 8%" />
-                <div className="h-full bg-violet-500" style={{ width: "6%" }} title="Crypto 6%" />
-                <div className="h-full bg-slate-400" style={{ width: "4%" }} title="Cash 4%" />
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: '42%' }}
+                  title="Stocks 42%"
+                />
+                <div
+                  className="h-full bg-teal-400"
+                  style={{ width: '28%' }}
+                  title="Mutual Funds 28%"
+                />
+                <div className="h-full bg-indigo-500" style={{ width: '12%' }} title="FDs 12%" />
+                <div className="h-full bg-amber-400" style={{ width: '8%' }} title="Gold 8%" />
+                <div className="h-full bg-violet-500" style={{ width: '6%' }} title="Crypto 6%" />
+                <div className="h-full bg-slate-400" style={{ width: '4%' }} title="Cash 4%" />
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-600 dark:text-slate-400 pt-0.5">
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Stocks 42%</span>
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> MF 28%</span>
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> FDs 12%</span>
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Gold 8%</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Stocks 42%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> MF 28%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> FDs 12%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Gold 8%
+                </span>
               </div>
             </div>
           </div>
@@ -170,11 +193,15 @@ export const DashboardPreview: React.FC = () => {
                       SIP
                     </div>
                     <div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">Zerodha Nifty 50 Index</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">
+                        Zerodha Nifty 50 Index
+                      </div>
                       <div className="text-[9px] text-slate-400">Investment</div>
                     </div>
                   </div>
-                  <span className="font-mono font-bold text-emerald-500 text-[11px]">+₹ 50,000</span>
+                  <span className="font-mono font-bold text-emerald-500 text-[11px]">
+                    +₹ 50,000
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs p-1.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/40">
@@ -183,7 +210,9 @@ export const DashboardPreview: React.FC = () => {
                       CC
                     </div>
                     <div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">HDFC Infinia Statement</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">
+                        HDFC Infinia Statement
+                      </div>
                       <div className="text-[9px] text-slate-400">Credit Card</div>
                     </div>
                   </div>
@@ -201,18 +230,26 @@ export const DashboardPreview: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
                   <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">HDFC Home Loan EMI</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">
+                      HDFC Home Loan EMI
+                    </div>
                     <div className="text-[9px] text-amber-500 font-medium">Due in 3 days</div>
                   </div>
-                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">₹ 68,500</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">
+                    ₹ 68,500
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/30">
                   <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">ICICI Health Policy</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">
+                      ICICI Health Policy
+                    </div>
                     <div className="text-[9px] text-slate-400">Due in 12 days</div>
                   </div>
-                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">₹ 24,000</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">
+                    ₹ 24,000
+                  </span>
                 </div>
               </div>
             </div>
