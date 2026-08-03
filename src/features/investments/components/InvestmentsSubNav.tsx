@@ -6,8 +6,6 @@ import {
   TrendingUp,
   Activity,
   Target,
-  FileText,
-  Search,
   UploadCloud,
   Plus,
   RefreshCw,
@@ -17,20 +15,22 @@ import { InvestmentsBreadcrumb } from "./InvestmentsBreadcrumb";
 import { InvestmentsMobileNavDrawer, NavCategoryConfig } from "./InvestmentsMobileNavDrawer";
 
 interface InvestmentsSubNavProps {
-  onOpenSearch: () => void;
-  onOpenImport: () => void;
-  onOpenReports: () => void;
   onOpenTrade: () => void;
   onRefresh?: () => void;
 }
 
+// Backend-accurate navigation — every leaf tab maps to a real, live
+// finance-service endpoint (see src/hooks/useFinanceQueries.ts). Watchlists,
+// corporate actions, dividend/income tracking, and advanced performance
+// metrics (Sharpe/Alpha/Beta/CAGR/benchmark) have no backend support and
+// were removed rather than kept as dead tabs.
 export const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
   {
     id: "dashboard",
     label: "Dashboard",
     defaultSubTab: "dashboard",
     icon: LayoutDashboard,
-    subTabs: [{ id: "dashboard", label: "Executive Wealth Summary" }],
+    subTabs: [{ id: "dashboard", label: "Wealth Summary" }],
   },
   {
     id: "portfolio",
@@ -38,65 +38,52 @@ export const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
     defaultSubTab: "portfolio",
     icon: PieChart,
     subTabs: [
-      { id: "portfolio", label: "Overview & Cash" },
+      { id: "portfolio", label: "Portfolio Overview" },
       { id: "holdings", label: "Holdings & FIFO Lots" },
-      { id: "watchlist", label: "Target Watchlist" },
     ],
   },
   {
     id: "insights",
-    label: "Performance & Insights",
+    label: "Performance & Allocation",
     defaultSubTab: "performance",
     icon: TrendingUp,
     subTabs: [
-      { id: "performance", label: "CAGR, XIRR & Analytics" },
-      { id: "allocation", label: "Asset & Sector Allocation" },
+      { id: "performance", label: "XIRR & Returns" },
+      { id: "allocation", label: "Asset Class Allocation" },
     ],
   },
   {
     id: "activity",
-    label: "Activity & Income",
+    label: "Activity",
     defaultSubTab: "transactions",
     icon: Activity,
     subTabs: [
-      { id: "transactions", label: "Trade Log & Transactions" },
-      { id: "income", label: "Passive Income & Dividends" },
-      { id: "corporate-actions", label: "Corporate Actions Timeline" },
+      { id: "transactions", label: "Trade Log & SIPs" },
+      { id: "realized-gains", label: "Realized Gains" },
     ],
   },
   {
     id: "goals",
-    label: "Goal Mapping",
+    label: "Goals",
     defaultSubTab: "goals",
     icon: Target,
-    subTabs: [{ id: "goals", label: "Goal Progress & Funding Gaps" }],
+    subTabs: [{ id: "goals", label: "Investment-Linked Goals" }],
   },
   {
-    id: "tools",
-    label: "Tools & Reports",
+    id: "imports",
+    label: "Import",
     defaultSubTab: "imports",
-    icon: FileText,
-    subTabs: [
-      { id: "imports", label: "Statement Import Wizard" },
-      { id: "reports", label: "Tax & Capital Gains Reports" },
-      { id: "settings", label: "Preferences & Guardrails" },
-    ],
+    icon: UploadCloud,
+    subTabs: [{ id: "imports", label: "CAS / MF Statement Import" }],
   },
 ];
 
-export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
-  onOpenSearch,
-  onOpenImport,
-  onOpenReports,
-  onOpenTrade,
-  onRefresh,
-}) => {
+export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrade, onRefresh }) => {
   const { activeSubTab, setActiveSubTab } = useUIStore();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   const currentSubTab = activeSubTab || "dashboard";
 
-  // Active Category finding
   const activeCategory =
     NAVIGATION_CATEGORIES.find((cat) => cat.subTabs.some((s) => s.id === currentSubTab)) ||
     NAVIGATION_CATEGORIES[0];
@@ -108,14 +95,13 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
       {/* Header Action Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-100 tracking-tight">Investments & Wealth Hub</h2>
+          <h2 className="text-2xl font-black text-slate-100 tracking-tight">Investments</h2>
           <p className="text-xs text-slate-400">
-            Hierarchical domain navigation across portfolio positions, tax lots, performance & income
+            Portfolio positions, tax lots, returns & goal-linked holdings — backed entirely by live data
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Mobile Menu Drawer Button */}
           <button
             onClick={() => setIsMobileDrawerOpen(true)}
             className="md:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold"
@@ -124,35 +110,11 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
             <span>Navigation Menu</span>
           </button>
 
-          <button
-            onClick={onOpenSearch}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold transition-all"
-          >
-            <Search className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Search Assets & Goals</span>
-          </button>
-
-          <button
-            onClick={onOpenImport}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold transition-all"
-          >
-            <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Import Statement</span>
-          </button>
-
-          <button
-            onClick={onOpenReports}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold transition-all"
-          >
-            <FileText className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Tax Reports</span>
-          </button>
-
           {onRefresh && (
             <button
               onClick={onRefresh}
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all"
-              title="Refresh Analytics"
+              title="Refresh Investment Data"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -216,11 +178,7 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
       )}
 
       {/* Dynamic Breadcrumbs Trail */}
-      <InvestmentsBreadcrumb
-        categoryLabel={activeCategory.label}
-        subTabLabel={activeSubTabItem?.label}
-        onSearchClick={onOpenSearch}
-      />
+      <InvestmentsBreadcrumb categoryLabel={activeCategory.label} subTabLabel={activeSubTabItem?.label} />
 
       {/* Mobile Drawer Component */}
       <InvestmentsMobileNavDrawer

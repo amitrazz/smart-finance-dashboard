@@ -1,6 +1,6 @@
 import React from "react";
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
-import { AllocationBreakdownItem } from "../types/investmentTypes";
+import { AllocationBreakdownItem } from "../types";
 import { formatCurrency } from "../../../utils/formatters";
 
 interface AllocationTreemapProps {

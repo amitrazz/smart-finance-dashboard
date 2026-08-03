@@ -101,7 +101,11 @@ export const DashboardView: React.FC = () => {
         monthlyIncome={dashboard.monthlyIncome}
         monthlySpend={dashboard.thisMonthSpend || dashboard.monthlySpend}
         savingsRate={dashboard.savingsRate}
-        totalInvestments={investmentReturnsData?.totalValue}
+        totalInvestments={
+          investmentReturnsData && investmentReturnsData.length > 0
+            ? { amount: investmentReturnsData[0].totalMarketValue, currency: "INR" }
+            : undefined
+        }
         totalDebt={liabilitiesData?.totalLiabilities}
         creditUtilizationPercent={realCreditUtilization}
         upcomingDuesCount={dashboard.topActions?.length || 0}

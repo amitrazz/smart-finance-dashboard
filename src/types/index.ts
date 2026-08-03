@@ -554,39 +554,187 @@ export interface BudgetTemplate {
 }
 
 
+// Matches AssetClass enum (packages/finance/prisma/schema.prisma). LOT_BASED
+// (tradable via the investments ledger): STOCK/ETF/MUTUAL_FUND/BOND/GOLD/
+// SILVER/CRYPTO/REIT/INVIT. ACCRUAL_UNSUPPORTED (enum exists, no trade flow
+// yet): FIXED_DEPOSIT/PPF/EPF/NPS/REAL_ESTATE/VEHICLE/CASH/OTHER.
+export type InvestmentAssetClass =
+  | "STOCK"
+  | "ETF"
+  | "MUTUAL_FUND"
+  | "BOND"
+  | "FIXED_DEPOSIT"
+  | "GOLD"
+  | "SILVER"
+  | "CRYPTO"
+  | "REAL_ESTATE"
+  | "VEHICLE"
+  | "PPF"
+  | "EPF"
+  | "NPS"
+  | "CASH"
+  | "REIT"
+  | "INVIT"
+  | "OTHER";
+
+// Matches TradeType enum.
+export type InvestmentTradeType = "BUY" | "SELL" | "BONUS" | "SPLIT" | "DIVIDEND_REINVEST" | "SIP_INSTALLMENT";
+
+export type LotStatus = "OPEN" | "CLOSED";
+
+// Matches RecurrenceFrequency enum.
+export type InvestmentRecurrenceFrequency = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "IRREGULAR";
+
+// Matches AssetResponseDto — the traded instrument. Global (no userId), so
+// symbol/ISIN are shared across users. No live market-data feed exists;
+// latestPrice/latestPriceAt only update as a side effect of trade recording.
+export interface Asset {
+  id: string;
+  symbol: string;
+  isin: string | null;
+  name: string;
+  assetClass: InvestmentAssetClass;
+  exchangeCode: string | null;
+  sector: string | null;
+  currency: CurrencyCode;
+  latestPrice: string | null;
+  latestPriceAt: string | null;
+}
+
+// Matches HoldingResponseDto. A cached rollup of a portfolio's open Lots for
+// one asset — a pure projection, recomputed after every trade, never written
+// directly. NOTE: the wire field for the embedded instrument is "security",
+// not "asset" — kept stable for backend API compatibility.
 export interface Holding {
   id: string;
-  securityId: string;
-  securityName: string;
-  symbol: string;
-  assetClass: "MUTUAL_FUND" | "EQUITY" | "GOLD" | "FIXED_DEPOSIT" | "PF" | "CRYPTO";
-  quantity: number;
-  avgCostPrice: Money;
-  currentPrice: Money;
-  currentValue: Money;
+  portfolioId: string;
+  security: Asset | null;
+  quantity: string;
+  averageCost: string;
+  costBasis: Money;
+  marketValue: Money;
   unrealizedGain: Money;
-  unrealizedGainPercent: number;
+  unrealizedGainPercent: string;
+  lastValuedAt: string;
 }
 
+// Matches LotResponseDto — a single tax lot in the FIFO cost-basis ledger a
+// Holding's market value/cost basis is derived from.
+export interface Lot {
+  id: string;
+  holdingId: string;
+  originalQuantity: string;
+  remainingQuantity: string;
+  unitCost: string;
+  status: LotStatus;
+  openedTradeId: string;
+  openDate: string;
+}
+
+// Matches RealizedGainResponseDto — one row per Lot consumed by a SELL.
+export interface RealizedGain {
+  id: string;
+  portfolioId: string;
+  holdingId: string;
+  assetId: string;
+  tradeId: string;
+  quantity: string;
+  costBasis: Money;
+  proceeds: Money;
+  gain: Money;
+  holdingPeriodDays: number;
+  realizedDate: string;
+}
+
+// Matches TradeResponseDto — the immutable trade ledger. Same "security"
+// wire-name quirk as Holding.
 export interface Trade {
   id: string;
-  securityId: string;
-  securityName: string;
-  type: "BUY" | "SELL";
-  quantity: number;
-  price: Money;
-  totalAmount: Money;
-  date: string;
+  holdingId: string;
+  security: Asset | null;
+  type: InvestmentTradeType;
+  quantity: string;
+  price: string;
+  amount: Money;
+  fees: Money;
+  tradeDate: string;
 }
 
+// Matches CreateTradeDto exactly (POST /finance/investments/trades body).
+export interface CreateTradeInput {
+  portfolioId?: string;
+  symbol: string;
+  isin?: string;
+  securityName: string;
+  assetClass: InvestmentAssetClass;
+  exchangeCode?: string;
+  sector?: string;
+  currency: CurrencyCode;
+  type: InvestmentTradeType;
+  quantity: string;
+  price: string;
+  amount: string;
+  fees?: string;
+  tradeDate: string;
+}
+
+// Matches SipPlanResponseDto. Read-only this phase — SIPs are only created
+// as a byproduct of CAS/mutual-fund import, there is no create/update route.
+export interface SipPlan {
+  id: string;
+  security: Asset | null;
+  amount: Money;
+  frequency: InvestmentRecurrenceFrequency;
+  startDate: string;
+  endDate: string | null;
+  isActive: boolean;
+}
+
+// Matches PortfolioResponseDto (GET /finance/portfolio).
 export interface Portfolio {
   id: string;
   name: string;
-  totalValue: Money;
-  totalGain: Money;
-  totalGainPercent: number;
-  xirr: number;
-  holdingsCount: number;
+  baseCurrency: CurrencyCode;
+  isDefault: boolean;
+}
+
+// Matches PortfolioSnapshotResponseDto — computed by
+// PortfolioSnapshotComputationService, refreshed on every trade plus a daily
+// cron sweep. xirr is null when it can't be computed (not fabricated).
+export interface PortfolioSnapshot {
+  snapshotDate: string;
+  totalMarketValue: Money;
+  totalCostBasis: Money;
+  totalUnrealizedGain: Money;
+  totalRealizedGain: Money;
+  allocationByAssetClass: Record<string, number>;
+  xirr: string | null;
+}
+
+// Matches PortfolioDetailResponseDto (GET /finance/portfolio/:id).
+export interface PortfolioDetail extends Portfolio {
+  holdings: Holding[];
+  latestSnapshot: PortfolioSnapshot;
+}
+
+// Matches InvestmentReturnsPortfolioDto (GET /finance/analytics/investment-returns).
+// The endpoint returns an array of these directly, not wrapped in an envelope.
+export interface InvestmentReturnsPortfolio {
+  portfolioId: string;
+  name: string;
+  xirr: string | null;
+  totalMarketValue: string;
+  totalCostBasis: string;
+  totalUnrealizedGain: string;
+  holdings: Array<{
+    securityId: string;
+    symbol: string | null;
+    name: string | null;
+    marketValue: string;
+    costBasis: string;
+    unrealizedGain: string;
+    unrealizedGainPercent: string;
+  }>;
 }
 
 export type LoanType =
@@ -1383,14 +1531,6 @@ export interface OnboardingProgress {
   totalCount: number;
   isComplete: boolean;
   steps: OnboardingStep[];
-}
-
-export interface InvestmentReturnsResponse {
-  totalInvested?: Money;
-  totalValue?: Money;
-  unrealizedGain?: Money;
-  returnsPercentage?: number;
-  holdings?: Array<{ id: string; name: string; returns: number; value: Money }>;
 }
 
 export interface AssetAllocationResponse {

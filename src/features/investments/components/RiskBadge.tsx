@@ -1,10 +1,10 @@
 import React from "react";
 import { ShieldAlert, ShieldCheck, Shield } from "lucide-react";
-import { RiskMetric, RiskLevel } from "../types/investmentTypes";
+import { RiskProfile } from "../../../types";
 
 interface RiskBadgeProps {
   riskScore?: number;
-  category?: RiskMetric["riskCategory"] | RiskLevel;
+  category?: RiskProfile;
   size?: "sm" | "md" | "lg";
 }
 

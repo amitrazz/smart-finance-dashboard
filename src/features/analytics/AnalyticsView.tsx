@@ -169,19 +169,23 @@ export const AnalyticsView: React.FC = () => {
         {/* Investment Returns Card */}
         <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
           <h3 className="font-bold text-base text-slate-100">Investment Returns</h3>
-          {investmentReturns ? (
+          {investmentReturns && investmentReturns.length > 0 ? (
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Total Value</span>
-                <span className="font-bold text-slate-200">{formatCurrency(investmentReturns.totalValue)}</span>
+                <span className="font-bold text-slate-200">{formatCurrency(investmentReturns[0].totalMarketValue)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Unrealized Gain</span>
-                <span className="font-bold text-emerald-400">{formatCurrency(investmentReturns.unrealizedGain)}</span>
+                <span className="font-bold text-emerald-400">{formatCurrency(investmentReturns[0].totalUnrealizedGain)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Returns Rate</span>
-                <span className="font-bold text-indigo-400">{formatPercent(investmentReturns.returnsPercentage || 0)}</span>
+                <span className="text-slate-400">XIRR</span>
+                <span className="font-bold text-indigo-400">
+                  {investmentReturns[0].xirr !== null
+                    ? formatPercent(parseFloat(investmentReturns[0].xirr) * 100)
+                    : "—"}
+                </span>
               </div>
             </div>
           ) : (

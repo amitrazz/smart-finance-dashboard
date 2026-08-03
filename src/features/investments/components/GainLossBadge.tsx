@@ -1,6 +1,6 @@
 import React from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Money } from "../types/investmentTypes";
+import { Money } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 
 interface GainLossBadgeProps {

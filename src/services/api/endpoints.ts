@@ -23,6 +23,13 @@ import {
   CreateGoalInput,
   UpdateGoalInput,
   Holding,
+  Lot,
+  RealizedGain,
+  SipPlan,
+  PortfolioDetail,
+  PortfolioSnapshot,
+  CreateTradeInput,
+  InvestmentReturnsPortfolio,
   ImportJob,
   ImportRowStaging,
   Insight,
@@ -74,7 +81,6 @@ import {
   CreateCreditCardInput,
   UpdateCreditCardInput,
   RecordCreditCardPaymentInput,
-  InvestmentReturnsResponse,
   AssetAllocationResponse,
   DebtBreakdownResponse,
   IncomeTrendResponse,
@@ -445,25 +451,27 @@ export const api = {
   downloadDocument: (id: string) => fetchWithAuth<Blob>(`/finance/documents/${encodeURIComponent(id)}/download`),
 
   // Investments
-  getHoldings: (params?: { limit?: number }) =>
+  getHoldings: (params?: { cursor?: string; limit?: number }) =>
     fetchWithAuth<PaginatedResponse<Holding>>(`/finance/investments/holdings${buildQuery(params)}`),
-  getTrades: (params?: { limit?: number }) =>
+  getHoldingLots: (holdingId: string) =>
+    fetchWithAuth<Lot[]>(`/finance/investments/holdings/${encodeURIComponent(holdingId)}/lots`),
+  getTrades: (params?: { assetId?: string; portfolioId?: string; cursor?: string; limit?: number }) =>
     fetchWithAuth<PaginatedResponse<Trade>>(`/finance/investments/trades${buildQuery(params)}`),
-  createTrade: (data: Partial<Trade>) =>
+  createTrade: (data: CreateTradeInput) =>
     fetchWithAuth<Trade>("/finance/investments/trades", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  getSIPs: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<{ id: string; name: string; amount: Money; frequency: string; status: string }>>(
-      `/finance/investments/sips${buildQuery(params)}`
-    ),
+  getSIPs: (params?: { cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<SipPlan>>(`/finance/investments/sips${buildQuery(params)}`),
+  getRealizedGains: (params?: { dateFrom?: string; dateTo?: string; cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<RealizedGain>>(`/finance/investments/realized-gains${buildQuery(params)}`),
 
   // Portfolio
   getPortfolios: () => fetchWithAuth<PaginatedResponse<Portfolio> | Portfolio[]>("/finance/portfolio"),
-  getPortfolio: (id: string) => fetchWithAuth<Portfolio>(`/finance/portfolio/${encodeURIComponent(id)}`),
-  getPortfolioHistory: (id: string, params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<{ date: string; value: Money }>>(`/finance/portfolio/${encodeURIComponent(id)}/history${buildQuery(params)}`),
+  getPortfolio: (id: string) => fetchWithAuth<PortfolioDetail>(`/finance/portfolio/${encodeURIComponent(id)}`),
+  getPortfolioHistory: (id: string, params?: { dateFrom?: string; dateTo?: string; cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<PortfolioSnapshot>>(`/finance/portfolio/${encodeURIComponent(id)}/history${buildQuery(params)}`),
 
   // Loans
   getLoans: (params?: { status?: string; type?: string; search?: string; limit?: number; cursor?: string }) =>
@@ -672,7 +680,7 @@ export const api = {
     fetchWithAuth<PaginatedResponse<NetWorthSnapshot>>(`/finance/net-worth/history${buildQuery(params)}`),
   getCashFlow: (params?: { limit?: number }) =>
     fetchWithAuth<PaginatedResponse<CashFlowSnapshot>>(`/finance/analytics/cash-flow${buildQuery(params)}`),
-  getInvestmentReturns: () => fetchWithAuth<InvestmentReturnsResponse>("/finance/analytics/investment-returns"),
+  getInvestmentReturns: () => fetchWithAuth<InvestmentReturnsPortfolio[]>("/finance/analytics/investment-returns"),
   getAssetAllocation: () => fetchWithAuth<AssetAllocationResponse>("/finance/analytics/asset-allocation"),
   getDebtBreakdown: () => fetchWithAuth<DebtBreakdownResponse>("/finance/analytics/debt-breakdown"),
   getIncomeTrend: (params?: { limit?: number; dateFrom?: string; dateTo?: string }) =>

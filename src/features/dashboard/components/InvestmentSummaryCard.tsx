@@ -1,16 +1,27 @@
 import React from "react";
 import { PieChart as PieIcon, ArrowRight, PlusCircle } from "lucide-react";
 import { formatCurrency, formatPercent } from "../../../utils/formatters";
-import { useInvestmentReturns, useAssetAllocation, useHoldings } from "../../../hooks/useFinanceQueries";
+import { useInvestmentReturns, usePortfolios, usePortfolio, useHoldings } from "../../../hooks/useFinanceQueries";
 import { useUIStore } from "../../../store/useUIStore";
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
+  STOCK: "#10b981",
+  ETF: "#14b8a6",
   MUTUAL_FUND: "#6366f1",
-  EQUITY: "#10b981",
+  BOND: "#3b82f6",
+  FIXED_DEPOSIT: "#0ea5e9",
   GOLD: "#f59e0b",
-  FIXED_DEPOSIT: "#3b82f6",
-  PF: "#8b5cf6",
+  SILVER: "#94a3b8",
   CRYPTO: "#ec4899",
+  REAL_ESTATE: "#a855f7",
+  VEHICLE: "#64748b",
+  PPF: "#8b5cf6",
+  EPF: "#8b5cf6",
+  NPS: "#8b5cf6",
+  CASH: "#22c55e",
+  REIT: "#f97316",
+  INVIT: "#eab308",
+  OTHER: "#6b7280",
 };
 
 const getAssetClassLabel = (ac: string) =>
@@ -18,17 +29,25 @@ const getAssetClassLabel = (ac: string) =>
 
 export const InvestmentSummaryCard: React.FC = () => {
   const { data: returnsData, isLoading: isReturnsLoading } = useInvestmentReturns();
-  const { data: allocationData, isLoading: isAllocLoading } = useAssetAllocation();
+  const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
+  const defaultPortfolioId = portfolios?.find((p) => p.isDefault)?.id || portfolios?.[0]?.id || "";
+  const { data: portfolioDetail, isLoading: isPortfolioLoading } = usePortfolio(defaultPortfolioId);
   const { data: holdings = [], isLoading: isHoldingsLoading } = useHoldings();
   const { setActiveTab } = useUIStore();
 
-  const totalValue = returnsData?.totalValue || { amount: "0", currency: "INR" };
-  const totalInvested = returnsData?.totalInvested || { amount: "0", currency: "INR" };
-  const overallReturnVal = returnsData?.unrealizedGain || { amount: "0", currency: "INR" };
-  const overallReturnPercent = returnsData?.returnsPercentage || 0;
+  const portfolioReturns = returnsData?.[0];
+  const totalValue = { amount: portfolioReturns?.totalMarketValue || "0", currency: "INR" };
+  const totalInvested = { amount: portfolioReturns?.totalCostBasis || "0", currency: "INR" };
+  const overallReturnVal = { amount: portfolioReturns?.totalUnrealizedGain || "0", currency: "INR" };
+  const xirr = portfolioReturns?.xirr ? parseFloat(portfolioReturns.xirr) * 100 : null;
+  const overallReturnPositive = parseFloat(overallReturnVal.amount) >= 0;
 
-  const allocationList = Array.isArray(allocationData?.allocations) ? allocationData.allocations : [];
-  const isLoading = isReturnsLoading || isAllocLoading || isHoldingsLoading;
+  const allocationByAssetClass = portfolioDetail?.latestSnapshot?.allocationByAssetClass || {};
+  const allocationList = Object.entries(allocationByAssetClass).map(([assetClass, fraction]) => ({
+    assetClass,
+    percentage: Math.round(fraction * 1000) / 10,
+  }));
+  const isLoading = isReturnsLoading || isPortfoliosLoading || isPortfolioLoading || isHoldingsLoading;
   const hasInvestments = holdings.length > 0 || parseFloat(totalValue.amount) > 0;
 
   return (
@@ -90,12 +109,12 @@ export const InvestmentSummaryCard: React.FC = () => {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
-              <span className="text-[11px] text-slate-400 block font-semibold">Overall Return</span>
-              <p className={`text-base font-extrabold font-sans truncate ${overallReturnPercent >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                {overallReturnPercent >= 0 ? "+" : ""}{formatCurrency(overallReturnVal)}
+              <span className="text-[11px] text-slate-400 block font-semibold">Unrealized Gain</span>
+              <p className={`text-base font-extrabold font-sans truncate ${overallReturnPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                {overallReturnPositive ? "+" : ""}{formatCurrency(overallReturnVal)}
               </p>
-              <span className={`text-[10px] font-bold block ${overallReturnPercent >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                {overallReturnPercent >= 0 ? "+" : ""}{formatPercent(overallReturnPercent)}
+              <span className={`text-[10px] font-bold block ${overallReturnPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                {xirr !== null ? `XIRR ${formatPercent(xirr)}` : "XIRR unavailable"}
               </span>
             </div>
           </div>

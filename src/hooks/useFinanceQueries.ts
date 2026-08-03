@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, ReconciliationStatus, AccountStatementItem } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, BootstrapOnboardingPayload, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, ReconciliationStatus, AccountStatementItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -49,8 +49,10 @@ export const QUERY_KEYS = {
   documents: (params?: Record<string, unknown>) => ["documents", params],
   document: (id: string) => ["documents", id],
   holdings: (params?: Record<string, unknown>) => ["holdings", params],
+  holdingLots: (holdingId: string) => ["holdings", holdingId, "lots"],
   trades: (params?: Record<string, unknown>) => ["trades", params],
   sips: (params?: Record<string, unknown>) => ["sips", params],
+  realizedGains: (params?: Record<string, unknown>) => ["realizedGains", params],
   portfolios: ["portfolios"],
   portfolioDetail: (id: string) => ["portfolios", id],
   portfolioHistory: (id: string, params?: Record<string, unknown>) => ["portfolios", id, "history", params],
@@ -957,7 +959,7 @@ export function useDocuments(params?: { limit?: number }) {
 }
 
 // Investments & Portfolio
-export function useHoldings(params?: { limit?: number }) {
+export function useHoldings(params?: { cursor?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.holdings(params),
     queryFn: () => api.getHoldings(params),
@@ -966,7 +968,28 @@ export function useHoldings(params?: { limit?: number }) {
   });
 }
 
-export function useTrades(params?: { limit?: number }) {
+export function useHoldingsInfinite(params?: { limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.holdings(params), "infinite"],
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const page = await api.getHoldings({ ...params, cursor: pageParam });
+      return { ...page, data: unwrapList<Holding>(page) };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
+  });
+}
+
+export function useHoldingLots(holdingId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.holdingLots(holdingId),
+    queryFn: () => api.getHoldingLots(holdingId),
+    enabled: isAuth() && Boolean(holdingId),
+  });
+}
+
+export function useTrades(params?: { assetId?: string; portfolioId?: string; cursor?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.trades(params),
     queryFn: () => api.getTrades(params),
@@ -975,26 +998,62 @@ export function useTrades(params?: { limit?: number }) {
   });
 }
 
+export function useTradesInfinite(params?: { assetId?: string; portfolioId?: string; limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.trades(params), "infinite"],
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const page = await api.getTrades({ ...params, cursor: pageParam });
+      return { ...page, data: unwrapList<Trade>(page) };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
+  });
+}
+
 export function useCreateTrade() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Trade>) => api.createTrade(data),
+    mutationFn: (data: CreateTradeInput) => api.createTrade(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["trades"] });
       queryClient.invalidateQueries({ queryKey: ["holdings"] });
       queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.investmentReturns });
       useUIStore.getState().showToast("Trade recorded successfully", "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });
 }
 
-export function useSIPs(params?: { limit?: number }) {
+export function useSIPs(params?: { cursor?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.sips(params),
     queryFn: () => api.getSIPs(params),
     enabled: isAuth(),
-    select: (res) => unwrapList<{ id: string; name: string; amount: Money; frequency: string; status: string }>(res),
+    select: (res) => unwrapList<SipPlan>(res),
+  });
+}
+
+export function useRealizedGains(params?: { dateFrom?: string; dateTo?: string; cursor?: string; limit?: number }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.realizedGains(params),
+    queryFn: () => api.getRealizedGains(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<RealizedGain>(res),
+  });
+}
+
+export function useRealizedGainsInfinite(params?: { dateFrom?: string; dateTo?: string; limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.realizedGains(params), "infinite"],
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const page = await api.getRealizedGains({ ...params, cursor: pageParam });
+      return { ...page, data: unwrapList<RealizedGain>(page) };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
   });
 }
 
@@ -1015,12 +1074,12 @@ export function usePortfolio(id: string) {
   });
 }
 
-export function usePortfolioHistory(id: string, params?: { limit?: number }) {
+export function usePortfolioHistory(id: string, params?: { dateFrom?: string; dateTo?: string; cursor?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.portfolioHistory(id, params),
     queryFn: () => api.getPortfolioHistory(id, params),
     enabled: isAuth() && Boolean(id),
-    select: (res) => unwrapList<{ date: string; value: Money }>(res),
+    select: (res) => unwrapList<PortfolioSnapshot>(res),
   });
 }
 

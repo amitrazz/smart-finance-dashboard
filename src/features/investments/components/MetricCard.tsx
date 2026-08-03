@@ -1,5 +1,5 @@
 import React from "react";
-import { Money } from "../types/investmentTypes";
+import { Money } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import { GainLossBadge } from "./GainLossBadge";
 

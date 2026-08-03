@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, TrendingUp, CheckCircle2 } from "lucide-react";
 import { useCreateTrade } from "../../../hooks/useFinanceQueries";
+import { InvestmentAssetClass, InvestmentTradeType } from "../../../types";
 
 interface AddTradeModalProps {
   isOpen: boolean;
@@ -13,10 +14,10 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose })
   const [symbol, setSymbol] = useState("");
   const [securityName, setSecurityName] = useState("");
   const [isin, setIsin] = useState("");
-  const [assetClass, setAssetClass] = useState("EQUITY");
+  const [assetClass, setAssetClass] = useState<InvestmentAssetClass>("STOCK");
   const [exchangeCode, setExchangeCode] = useState("NSE");
   const [currency, setCurrency] = useState("INR");
-  const [type, setType] = useState<"BUY" | "SELL">("BUY");
+  const [type, setType] = useState<InvestmentTradeType>("BUY");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [fees, setFees] = useState("0.00");
@@ -32,18 +33,17 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose })
       {
         symbol: symbol.toUpperCase(),
         securityName,
-        isin,
+        isin: isin || undefined,
         assetClass,
-        exchangeCode,
+        exchangeCode: exchangeCode || undefined,
         currency,
         type,
-        quantity: parseFloat(quantity) || 0,
-        price: { amount: price, currency },
-        totalAmount: { amount: totalAmount, currency },
+        quantity,
+        price,
         amount: totalAmount,
-        fees,
+        fees: fees || undefined,
         tradeDate,
-      } as unknown as Partial<import("../../../types").Trade>,
+      },
       {
         onSuccess: () => {
           onClose();
@@ -115,13 +115,18 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose })
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Asset Class</label>
               <select
                 value={assetClass}
-                onChange={(e) => setAssetClass(e.target.value)}
+                onChange={(e) => setAssetClass(e.target.value as InvestmentAssetClass)}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
               >
-                <option value="EQUITY">Equity</option>
+                <option value="STOCK">Stock</option>
+                <option value="ETF">ETF</option>
                 <option value="MUTUAL_FUND">Mutual Fund</option>
-                <option value="GOLD">Gold / SGB</option>
-                <option value="FIXED_INCOME">Fixed Income</option>
+                <option value="BOND">Bond</option>
+                <option value="GOLD">Gold</option>
+                <option value="SILVER">Silver</option>
+                <option value="CRYPTO">Crypto</option>
+                <option value="REIT">REIT</option>
+                <option value="INVIT">InvIT</option>
               </select>
             </div>
           </div>
