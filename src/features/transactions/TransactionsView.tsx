@@ -50,7 +50,7 @@ export const TransactionsView: React.FC = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useTransactionsInfinite();
+  } = useTransactionsInfinite(filterDirection !== "ALL" ? { direction: filterDirection } : undefined);
   const { data: accounts = [] } = useAccounts();
   const { data: categories = [] } = useCategories();
   const createTxnMutation = useCreateTransaction();
@@ -89,8 +89,7 @@ export const TransactionsView: React.FC = () => {
   // Memoize filtered transactions to avoid recomputing on every render
   const filteredTxns = useMemo(() => {
     return allTxns.filter((t: Transaction) => {
-      const matchesDirection = filterDirection === "ALL" || t.direction === filterDirection;
-
+      // Direction is now filtered server-side (see useTransactionsInfinite call above).
       let matchesSubFilter = true;
       if (activeSubTab === "recurring") {
         matchesSubFilter = t.description.toLowerCase().includes("subscription");
@@ -102,9 +101,9 @@ export const TransactionsView: React.FC = () => {
         (t.categoryName && t.categoryName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.merchantName && t.merchantName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return matchesDirection && matchesSubFilter && matchesSearch;
+      return matchesSubFilter && matchesSearch;
     });
-  }, [allTxns, filterDirection, activeSubTab, searchQuery]);
+  }, [allTxns, activeSubTab, searchQuery]);
 
   // Virtualize the (potentially large) loaded row set
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -161,34 +160,6 @@ export const TransactionsView: React.FC = () => {
       }
     );
   };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-8 bg-slate-800 rounded w-1/4" />
-        <div className="h-12 bg-slate-900/60 rounded-2xl border border-slate-800" />
-        <div className="h-96 bg-slate-900/60 rounded-2xl border border-slate-800" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="p-8 rounded-3xl bg-slate-900/60 border border-rose-500/20 text-center space-y-4">
-        <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
-        <h3 className="text-lg font-bold text-slate-100">Failed to Load Transactions</h3>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
-          {(error as Error)?.message || "Could not fetch transaction audit trail."}
-        </p>
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all"
-        >
-          <RefreshCw className="w-4 h-4" /> Retry
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -291,8 +262,25 @@ export const TransactionsView: React.FC = () => {
         </div>
       )}
 
-      {/* Transaction Table */}
+      {/* Transaction Table — only this container swaps between loading/error/
+          data states; the header, search box, and filter pills above stay
+          mounted so selecting a filter doesn't blank the whole page. */}
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden shadow-xl">
+        {isError ? (
+          <div className="p-8 text-center space-y-4">
+            <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
+            <h3 className="text-lg font-bold text-slate-100">Failed to Load Transactions</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              {(error as Error)?.message || "Could not fetch transaction audit trail."}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all"
+            >
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
+          </div>
+        ) : (
         <div ref={scrollRef} className="overflow-auto max-h-[640px]">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 sticky top-0 z-10">
@@ -315,7 +303,15 @@ export const TransactionsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredTxns.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} className="animate-pulse">
+                    <td className="p-4" colSpan={6}>
+                      <div className="h-6 bg-slate-800/80 rounded-lg" />
+                    </td>
+                  </tr>
+                ))
+              ) : filteredTxns.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
                     No transactions matching current filters.
@@ -397,33 +393,36 @@ export const TransactionsView: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Load More / Status Footer */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-t border-slate-800 text-xs text-slate-400">
-          <span>
-            Loaded <span className="font-bold text-slate-200">{filteredTxns.length}</span>
-            {typeof totalCount === "number" && (
-              <>
-                {" "}of <span className="font-bold text-slate-200">{totalCount}</span> total
-              </>
-            )}
-          </span>
-          {hasNextPage && (
-            <button
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all disabled:opacity-50 self-start sm:self-auto"
-            >
-              {isFetchingNextPage ? (
+        {!isError && !isLoading && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-t border-slate-800 text-xs text-slate-400">
+            <span>
+              Loaded <span className="font-bold text-slate-200">{filteredTxns.length}</span>
+              {typeof totalCount === "number" && (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                  {" "}of <span className="font-bold text-slate-200">{totalCount}</span> total
                 </>
-              ) : (
-                "Load More"
               )}
-            </button>
-          )}
-        </div>
+            </span>
+            {hasNextPage && (
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition-all disabled:opacity-50 self-start sm:self-auto"
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading more...
+                  </>
+                ) : (
+                  "Load More"
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Detail Drawer */}

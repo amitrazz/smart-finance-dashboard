@@ -1478,7 +1478,7 @@ export const api = {
     }),
   markNotificationRead: (id: string) =>
     fetchWithAuth<{ success: boolean }>(`/finance/notifications/${encodeURIComponent(id)}/read`, {
-      method: 'POST',
+      method: 'PATCH',
     }),
   archiveNotification: (id: string) =>
     fetchWithAuth<{ success: boolean }>(

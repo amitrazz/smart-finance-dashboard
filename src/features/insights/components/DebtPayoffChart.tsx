@@ -72,7 +72,7 @@ export const DebtPayoffChart: React.FC<DebtPayoffChartProps> = ({ data }) => {
             <div>
               <span className="text-slate-400 block">Interest Saved</span>
               <span className="text-xl font-bold text-slate-300 font-mono">
-                ₹85,000.00
+                Baseline
               </span>
             </div>
           </div>

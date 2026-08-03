@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TimeHorizon } from "../types/insightsTypes";
 import { Calendar, Download, RefreshCw, Landmark } from "lucide-react";
+import { useAccounts } from "../../../hooks/useFinanceQueries";
 
 interface InsightsAnalyticsToolbarProps {
   horizon?: TimeHorizon;
@@ -17,6 +18,7 @@ export const InsightsAnalyticsToolbar: React.FC<InsightsAnalyticsToolbarProps> =
 }) => {
   const [selectedAccount, setSelectedAccount] = useState<string>("ALL");
   const [selectedCurrency, setSelectedCurrency] = useState<string>("INR");
+  const { data: accounts = [] } = useAccounts({ limit: 50 });
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl">
@@ -30,9 +32,11 @@ export const InsightsAnalyticsToolbar: React.FC<InsightsAnalyticsToolbarProps> =
             className="bg-transparent text-slate-200 font-bold focus:outline-none cursor-pointer"
           >
             <option value="ALL" className="bg-slate-900">All Accounts & Cards</option>
-            <option value="HDFC" className="bg-slate-900">HDFC Primary Salary Account</option>
-            <option value="ICICI" className="bg-slate-900">ICICI Wealth Account</option>
-            <option value="ZERODHA" className="bg-slate-900">Zerodha Demat Portfolio</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id} className="bg-slate-900">
+                {account.institution?.name ? `${account.institution.name} • ${account.name}` : account.name}
+              </option>
+            ))}
           </select>
         </div>
 

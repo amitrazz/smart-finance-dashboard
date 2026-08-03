@@ -1,513 +1,806 @@
-import { fetchWithAuth } from "../../../services/api/client";
+import { api } from "../../../services/api/endpoints";
+import { HEALTH_DIMENSION_LABELS, getRatingLabel } from "../../health/hooks/useFinancialHealth";
+import {
+  Money,
+  HealthDimensionDetail,
+  LoanType,
+} from "../../../types";
 import {
   FinancialHealthOverview,
+  HealthDimension,
   NetWorthAnalytics,
+  NetWorthPoint,
   CashFlowAnalytics,
+  CashFlowPoint,
   SpendingAnalytics,
+  CategorySpending,
+  MerchantSpending,
+  DailySpendingPoint,
   IncomeAnalytics,
+  IncomeSource,
   BudgetAnalytics,
+  BudgetHealthItem,
   GoalAnalytics,
+  GoalAnalyticsItem,
   InvestmentAnalyticsOverview,
   DebtAnalytics,
+  DebtItem,
   SubscriptionAnalytics,
+  SubscriptionItem,
   TrendAnalytics,
+  TrendPoint,
   ForecastAnalytics,
+  ForecastPoint,
   SmartRecommendation,
   RiskMatrixAnalytics,
+  RiskItem,
   AnalyticsReportPayload,
   AnalyticsReportType,
   TimeHorizon,
 } from "../types/insightsTypes";
 
-// Mock Fallback Generator when backend API endpoints are booting
-const MOCK_FINANCIAL_HEALTH: FinancialHealthOverview = {
-  overallScore: 82,
-  rating: "Excellent",
-  scoreTrend: "UPWARD",
-  historicalScores: [
-    { date: "2026-03-01", score: 74 },
-    { date: "2026-04-01", score: 76 },
-    { date: "2026-05-01", score: 78 },
-    { date: "2026-06-01", score: 80 },
-    { date: "2026-07-01", score: 81 },
-    { date: "2026-08-01", score: 82 },
-  ],
-  dimensions: [
-    {
-      code: "CASH_FLOW",
-      label: "Net Cash Flow",
-      score: 88,
-      stars: 5,
-      why: "Positive net cash flow run rate with +28.5% savings rate.",
-      recommendation: "Maintain current expenditure controls.",
-      improvementTip: "Automate monthly surplus sweep to index funds.",
-      historicalTrendPercent: 4.2,
-    },
-    {
-      code: "SAVINGS_RATE",
-      label: "Savings Rate",
-      score: 85,
-      stars: 4,
-      why: "Saving ₹74,500/mo out of ₹2,60,000 monthly income.",
-      recommendation: "Increase SIP by 5% on next salary appraisal.",
-      improvementTip: "Cap un-budgeted weekend dining expenses.",
-      historicalTrendPercent: 2.1,
-    },
-    {
-      code: "EMERGENCY_FUND",
-      label: "Emergency Liquidity",
-      score: 95,
-      stars: 5,
-      why: "5.8 months of liquid expenses saved in high-yield FDs & liquid MFs.",
-      recommendation: "Emergency corpus is optimal.",
-      improvementTip: "Review liquid fund yield quarterly.",
-      historicalTrendPercent: 0,
-    },
-    {
-      code: "DEBT_HEALTH",
-      label: "Debt-to-Income Ratio",
-      score: 76,
-      stars: 4,
-      why: "EMI outflow is 22.4% of net monthly income (Ceiling: 35%).",
-      recommendation: "Prepay home loan principal with annual bonus.",
-      improvementTip: "Accelerate high-rate debt payoff.",
-      historicalTrendPercent: 5.4,
-    },
-    {
-      code: "CREDIT_UTILIZATION",
-      label: "Credit Card Usage",
-      score: 92,
-      stars: 5,
-      why: "Credit card utilization is 14% across 3 active card accounts.",
-      recommendation: "Excellent credit score maintenance.",
-      improvementTip: "Keep card balances below 30% statement limit.",
-      historicalTrendPercent: 1.0,
-    },
-    {
-      code: "INVESTMENT_DIVERSIFICATION",
-      label: "Asset Diversification",
-      score: 72,
-      stars: 3,
-      why: "Technology sector weight (28.5%) exceeds target ceiling (20%).",
-      recommendation: "Rebalance technology profits into gold or debt funds.",
-      improvementTip: "Add international index fund exposure.",
-      historicalTrendPercent: -1.5,
-    },
-    {
-      code: "BILL_DISCIPLINE",
-      label: "Bill Payment Discipline",
-      score: 100,
-      stars: 5,
-      why: "100% on-time payment track record across 48 bill cycles.",
-      recommendation: "Flawless discipline maintained.",
-      improvementTip: "Continue auto-debit triggers.",
-      historicalTrendPercent: 0,
-    },
-    {
-      code: "SPENDING_DISCIPLINE",
-      label: "Budget Adherence",
-      score: 80,
-      stars: 4,
-      why: "Adhering to budget in 7 out of 9 active spend categories.",
-      recommendation: "Dining out category exceeded budget by ₹4,200.",
-      improvementTip: "Set weekly food delivery caps.",
-      historicalTrendPercent: 3.0,
-    },
-  ],
+// ---- Shared helpers -------------------------------------------------------
+
+const n = (v: string | number | null | undefined): number => {
+  const parsed = typeof v === "number" ? v : parseFloat(v ?? "0");
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const MOCK_NET_WORTH: NetWorthAnalytics = {
-  currentNetWorth: { amount: "6485400.00", currency: "INR" },
-  monthlyChangeAmount: { amount: "+148500.00", currency: "INR" },
-  monthlyChangePercent: 2.34,
-  annualChangeAmount: { amount: "+1245000.00", currency: "INR" },
-  annualChangePercent: 23.75,
-  history: [
-    { date: "2025-08-01", netWorth: 5240400, totalAssets: 6840400, totalLiabilities: 1600000 },
-    { date: "2025-11-01", netWorth: 5580000, totalAssets: 7120000, totalLiabilities: 1540000 },
-    { date: "2026-02-01", netWorth: 5920000, totalAssets: 7400000, totalLiabilities: 1480000 },
-    { date: "2026-05-01", netWorth: 6210000, totalAssets: 7630000, totalLiabilities: 1420000 },
-    { date: "2026-08-01", netWorth: 6485400, totalAssets: 7845400, totalLiabilities: 1360000 },
-  ],
-  topGrowthDrivers: [
-    { name: "Parag Parikh Flexi Cap Fund", category: "MUTUAL_FUND", growthAmount: { amount: "166431.00", currency: "INR" }, growthPercent: 49.24 },
-    { name: "Sovereign Gold Bond 2028 IX", category: "GOLD", growthAmount: { amount: "186400.00", currency: "INR" }, growthPercent: 48.34 },
-    { name: "Reliance Industries Ltd", category: "EQUITY", growthAmount: { amount: "100500.00", currency: "INR" }, growthPercent: 27.35 },
-  ],
-  assetBreakdown: [
-    { category: "Equity & Mutual Funds", value: { amount: "3135000.00", currency: "INR" }, percentage: 39.96, color: "#6366f1" },
-    { category: "Real Estate Property", value: { amount: "2500000.00", currency: "INR" }, percentage: 31.86, color: "#10b981" },
-    { category: "Gold & SGBs", value: { amount: "673400.00", currency: "INR" }, percentage: 8.58, color: "#f59e0b" },
-    { category: "Fixed Deposits & Provident Fund", value: { amount: "1052000.00", currency: "INR" }, percentage: 13.41, color: "#3b82f6" },
-    { category: "Cash & Savings Accounts", value: { amount: "485000.00", currency: "INR" }, percentage: 6.18, color: "#64748b" },
-  ],
-  liabilityBreakdown: [
-    { category: "Housing Loan Outstanding", value: { amount: "1280000.00", currency: "INR" }, percentage: 94.12, color: "#rose-500" },
-    { category: "Credit Card Balances", value: { amount: "80000.00", currency: "INR" }, percentage: 5.88, color: "#amber-500" },
-  ],
+const toMoney = (amount: string | number | null | undefined, currency = "INR"): Money => ({
+  amount: String(amount ?? "0"),
+  currency,
+});
+
+function unwrapList<T>(res: T[] | { data: T[] } | null | undefined): T[] {
+  if (Array.isArray(res)) return res;
+  if (res && Array.isArray((res as { data: T[] }).data)) return (res as { data: T[] }).data;
+  return [];
+}
+
+const EMPTY_HEALTH: FinancialHealthOverview = { overallScore: 0, rating: "Critical", scoreTrend: "STABLE", historicalScores: [], dimensions: [] };
+const EMPTY_NET_WORTH: NetWorthAnalytics = {
+  currentNetWorth: toMoney(0),
+  monthlyChangeAmount: toMoney(0),
+  monthlyChangePercent: 0,
+  annualChangeAmount: toMoney(0),
+  annualChangePercent: 0,
+  history: [],
+  topGrowthDrivers: [],
+  assetBreakdown: [],
+  liabilityBreakdown: [],
+};
+const EMPTY_CASH_FLOW: CashFlowAnalytics = {
+  totalIncomeThisMonth: toMoney(0),
+  totalExpensesThisMonth: toMoney(0),
+  netCashFlowThisMonth: toMoney(0),
+  savingsRatePercent: 0,
+  history: [],
+  largestIncomeSource: { name: "N/A", amount: toMoney(0) },
+  largestExpenseCategory: { name: "N/A", amount: toMoney(0) },
+  forecastNextMonth: toMoney(0),
+};
+const EMPTY_SPENDING: SpendingAnalytics = {
+  totalSpent: toMoney(0),
+  needsTotal: toMoney(0),
+  wantsTotal: toMoney(0),
+  needsPercent: 0,
+  wantsPercent: 0,
+  categories: [],
+  topMerchants: [],
+  dailyVelocity: [],
+  detectedAnomalies: [],
+};
+const EMPTY_INCOME: IncomeAnalytics = {
+  totalMonthlyIncome: toMoney(0),
+  annualIncomeRunRate: toMoney(0),
+  sources: [],
+  monthlyHistory: [],
+  incomeGrowthPercent1Y: 0,
+};
+const EMPTY_BUDGETS: BudgetAnalytics = { totalBudgeted: toMoney(0), totalSpent: toMoney(0), overallPercentUsed: 0, budgets: [], successHistoryPercent: 0 };
+const EMPTY_GOALS: GoalAnalytics = { totalGoalsCount: 0, onTrackCount: 0, behindCount: 0, goals: [] };
+const EMPTY_INVESTMENTS: InvestmentAnalyticsOverview = {
+  totalValuation: toMoney(0),
+  totalGain: toMoney(0),
+  cagrPercent: 0,
+  xirrPercent: 0,
+  sharpeRatio: 0,
+  volatilityPercent: 0,
+  allocationDriftPercent: 0,
+  bestHolding: { symbol: "", name: "No Holdings", returnPercent: 0 },
+  worstHolding: { symbol: "", name: "No Holdings", returnPercent: 0 },
+};
+const EMPTY_DEBTS: DebtAnalytics = {
+  totalDebt: toMoney(0),
+  totalMonthlyEMI: toMoney(0),
+  debtToIncomeRatioPercent: 0,
+  snowballPayoffMonths: 0,
+  avalanchePayoffMonths: 0,
+  interestSavedAvalanche: toMoney(0),
+  debts: [],
+};
+const EMPTY_SUBSCRIPTIONS: SubscriptionAnalytics = {
+  totalMonthlyCost: toMoney(0),
+  totalAnnualCost: toMoney(0),
+  totalSubscriptionsCount: 0,
+  unusedCount: 0,
+  potentialAnnualSavings: toMoney(0),
+  subscriptions: [],
+};
+const EMPTY_TRENDS: TrendAnalytics = { timeframe: "MONTHLY", trends: [], accelerationCategory: "N/A", decelerationCategory: "N/A" };
+const EMPTY_FORECASTS: ForecastAnalytics = { horizon: "1Y", forecasts: [], confidenceScorePercent: 0 };
+const EMPTY_RISKS: RiskMatrixAnalytics = { criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, risks: [] };
+
+const mapLoanType = (type: LoanType): DebtItem["type"] => {
+  switch (type) {
+    case "HOME":
+    case "MORTGAGE":
+      return "HOME_LOAN";
+    case "VEHICLE":
+      return "CAR_LOAN";
+    default:
+      return "PERSONAL_LOAN";
+  }
 };
 
-const MOCK_CASH_FLOW: CashFlowAnalytics = {
-  totalIncomeThisMonth: { amount: "260000.00", currency: "INR" },
-  totalExpensesThisMonth: { amount: "115500.00", currency: "INR" },
-  netCashFlowThisMonth: { amount: "+144500.00", currency: "INR" },
-  savingsRatePercent: 55.57,
-  largestIncomeSource: { name: "Primary Salary", amount: { amount: "240000.00", currency: "INR" } },
-  largestExpenseCategory: { name: "Housing Rent & Maintenance", amount: { amount: "38000.00", currency: "INR" } },
-  forecastNextMonth: { amount: "+148000.00", currency: "INR" },
-  history: [
-    { month: "Mar 2026", income: 250000, expenses: 122000, netCashFlow: 128000, rollingAverage: 125000 },
-    { month: "Apr 2026", income: 250000, expenses: 118000, netCashFlow: 132000, rollingAverage: 128000 },
-    { month: "May 2026", income: 255000, expenses: 110000, netCashFlow: 145000, rollingAverage: 132000 },
-    { month: "Jun 2026", income: 255000, expenses: 114000, netCashFlow: 141000, rollingAverage: 135000 },
-    { month: "Jul 2026", income: 260000, expenses: 119000, netCashFlow: 141000, rollingAverage: 138000 },
-    { month: "Aug 2026", income: 260000, expenses: 115500, netCashFlow: 144500, rollingAverage: 142000 },
-  ],
-};
-
-const MOCK_SPENDING: SpendingAnalytics = {
-  totalSpent: { amount: "115500.00", currency: "INR" },
-  needsTotal: { amount: "74000.00", currency: "INR" },
-  wantsTotal: { amount: "41500.00", currency: "INR" },
-  needsPercent: 64.07,
-  wantsPercent: 35.93,
-  categories: [
-    { categoryId: "cat-housing", categoryName: "Housing & Utilities", amount: { amount: "38000.00", currency: "INR" }, percentage: 32.90, needsVsWants: "NEEDS", previousMonthAmount: { amount: "38000.00", currency: "INR" }, monthOverMonthPercent: 0 },
-    { categoryId: "cat-groceries", categoryName: "Groceries & Supplies", amount: { amount: "18500.00", currency: "INR" }, percentage: 16.02, needsVsWants: "NEEDS", previousMonthAmount: { amount: "17800.00", currency: "INR" }, monthOverMonthPercent: 3.93 },
-    { categoryId: "cat-dining", categoryName: "Dining & Food Outing", amount: { amount: "16200.00", currency: "INR" }, percentage: 14.03, needsVsWants: "WANTS", previousMonthAmount: { amount: "12000.00", currency: "INR" }, monthOverMonthPercent: 35.00 },
-    { categoryId: "cat-travel", categoryName: "Transport & Fuel", amount: { amount: "14500.00", currency: "INR" }, percentage: 12.55, needsVsWants: "NEEDS", previousMonthAmount: { amount: "14000.00", currency: "INR" }, monthOverMonthPercent: 3.57 },
-    { categoryId: "cat-shopping", categoryName: "Shopping & Gadgets", amount: { amount: "12800.00", currency: "INR" }, percentage: 11.08, needsVsWants: "WANTS", previousMonthAmount: { amount: "15500.00", currency: "INR" }, monthOverMonthPercent: -17.42 },
-    { categoryId: "cat-subscriptions", categoryName: "Subscriptions & SaaS", amount: { amount: "6500.00", currency: "INR" }, percentage: 5.63, needsVsWants: "WANTS", previousMonthAmount: { amount: "6500.00", currency: "INR" }, monthOverMonthPercent: 0 },
-    { categoryId: "cat-misc", categoryName: "Entertainment & Misc", amount: { amount: "9000.00", currency: "INR" }, percentage: 7.79, needsVsWants: "WANTS", previousMonthAmount: { amount: "8000.00", currency: "INR" }, monthOverMonthPercent: 12.50 },
-  ],
-  topMerchants: [
-    { merchantName: "Swiggy / Zomato", amount: { amount: "11200.00", currency: "INR" }, transactionCount: 14, category: "Dining Out" },
-    { merchantName: "Blinkit / Zepto", amount: { amount: "12400.00", currency: "INR" }, transactionCount: 18, category: "Groceries" },
-    { merchantName: "Amazon India", amount: { amount: "9800.00", currency: "INR" }, transactionCount: 4, category: "Shopping" },
-    { merchantName: "HPCL Fuel Outlet", amount: { amount: "6500.00", currency: "INR" }, transactionCount: 3, category: "Fuel" },
-  ],
-  dailyVelocity: [
-    { date: "2026-08-01", amount: 2400, velocityRating: "NORMAL" },
-    { date: "2026-08-02", amount: 18500, velocityRating: "SPIKE" },
-    { date: "2026-08-03", amount: 1200, velocityRating: "NORMAL" },
-  ],
-  detectedAnomalies: [
-    { id: "anom-1", title: "Dining Out Spend Spike (+35%)", description: "Weekend restaurant expenditures exceeded historical 3-month average by ₹4,200.", date: "2026-08-02", amount: { amount: "4200.00", currency: "INR" } },
-  ],
-};
-
-const MOCK_INCOME: IncomeAnalytics = {
-  totalMonthlyIncome: { amount: "260000.00", currency: "INR" },
-  annualIncomeRunRate: { amount: "3120000.00", currency: "INR" },
-  incomeGrowthPercent1Y: 12.5,
-  sources: [
-    { id: "inc-1", name: "Primary Employment Salary", type: "SALARY", monthlyAmount: { amount: "240000.00", currency: "INR" }, volatilityRating: "STABLE" },
-    { id: "inc-2", name: "Equity Dividends & Interest", type: "PASSIVE_DIVIDEND", monthlyAmount: { amount: "12000.00", currency: "INR" }, volatilityRating: "MODERATE" },
-    { id: "inc-3", name: "Freelance Tech Consulting", type: "FREELANCE", monthlyAmount: { amount: "8000.00", currency: "INR" }, volatilityRating: "HIGHLY_VOLATILE" },
-  ],
-  monthlyHistory: [
-    { month: "Mar 2026", salary: 230000, passive: 10000, investment: 10000 },
-    { month: "Apr 2026", salary: 230000, passive: 12000, investment: 8000 },
-    { month: "May 2026", salary: 240000, passive: 9000, investment: 6000 },
-    { month: "Jun 2026", salary: 240000, passive: 11000, investment: 4000 },
-    { month: "Jul 2026", salary: 240000, passive: 14000, investment: 6000 },
-    { month: "Aug 2026", salary: 240000, passive: 12000, investment: 8000 },
-  ],
-};
-
-const MOCK_BUDGETS: BudgetAnalytics = {
-  totalBudgeted: { amount: "120000.00", currency: "INR" },
-  totalSpent: { amount: "115500.00", currency: "INR" },
-  overallPercentUsed: 96.25,
-  successHistoryPercent: 88,
-  budgets: [
-    { budgetId: "b-1", categoryName: "Housing & Utilities", allocatedAmount: { amount: "40000.00", currency: "INR" }, spentAmount: { amount: "38000.00", currency: "INR" }, remainingAmount: { amount: "2000.00", currency: "INR" }, percentUsed: 95.0, status: "HEALTHY", forecastEndMonthAmount: { amount: "38000.00", currency: "INR" }, recommendation: "On track." },
-    { budgetId: "b-2", categoryName: "Groceries & Supplies", allocatedAmount: { amount: "20000.00", currency: "INR" }, spentAmount: { amount: "18500.00", currency: "INR" }, remainingAmount: { amount: "1500.00", currency: "INR" }, percentUsed: 92.5, status: "HEALTHY", forecastEndMonthAmount: { amount: "19500.00", currency: "INR" }, recommendation: "Within safety margin." },
-    { budgetId: "b-3", categoryName: "Dining Out", allocatedAmount: { amount: "12000.00", currency: "INR" }, spentAmount: { amount: "16200.00", currency: "INR" }, remainingAmount: { amount: "-4200.00", currency: "INR" }, percentUsed: 135.0, status: "EXCEEDED", forecastEndMonthAmount: { amount: "17500.00", currency: "INR" }, recommendation: "Budget exceeded. Limit food delivery orders." },
-  ],
-};
-
-const MOCK_GOALS: GoalAnalytics = {
-  totalGoalsCount: 3,
-  onTrackCount: 2,
-  behindCount: 1,
-  goals: [
-    { goalId: "g-1", name: "Early Retirement Corpus", targetAmount: { amount: "50000000.00", currency: "INR" }, currentAmount: { amount: "2450000.00", currency: "INR" }, progressPercent: 4.9, requiredMonthlySavings: { amount: "65000.00", currency: "INR" }, projectedCompletionDate: "2039-06-15", isBehindSchedule: false, velocityScore: 94 },
-    { goalId: "g-2", name: "Villa Down Payment", targetAmount: { amount: "10000000.00", currency: "INR" }, currentAmount: { amount: "1250000.00", currency: "INR" }, progressPercent: 12.5, requiredMonthlySavings: { amount: "115000.00", currency: "INR" }, projectedCompletionDate: "2030-03-31", isBehindSchedule: true, velocityScore: 68 },
-    { goalId: "g-3", name: "Emergency Liquidity Corpus", targetAmount: { amount: "600000.00", currency: "INR" }, currentAmount: { amount: "585400.00", currency: "INR" }, progressPercent: 97.57, requiredMonthlySavings: { amount: "5000.00", currency: "INR" }, projectedCompletionDate: "2026-11-15", isBehindSchedule: false, velocityScore: 99 },
-  ],
-};
-
-const MOCK_INVESTMENTS: InvestmentAnalyticsOverview = {
-  totalValuation: { amount: "4285400.00", currency: "INR" },
-  totalGain: { amount: "+1035400.00", currency: "INR" },
-  cagrPercent: 16.75,
-  xirrPercent: 18.42,
-  sharpeRatio: 1.64,
-  volatilityPercent: 12.4,
-  allocationDriftPercent: 8.5,
-  bestHolding: { symbol: "PPFCF", name: "Parag Parikh Flexi Cap Fund", returnPercent: 49.24 },
-  worstHolding: { symbol: "PAYTM", name: "One97 Communications Ltd", returnPercent: -1.78 },
-};
-
-const MOCK_DEBTS: DebtAnalytics = {
-  totalDebt: { amount: "1360000.00", currency: "INR" },
-  totalMonthlyEMI: { amount: "58200.00", currency: "INR" },
-  debtToIncomeRatioPercent: 22.38,
-  snowballPayoffMonths: 28,
-  avalanchePayoffMonths: 24,
-  interestSavedAvalanche: { amount: "142500.00", currency: "INR" },
-  debts: [
-    { id: "d-1", name: "HDFC Housing Loan", type: "HOME_LOAN", principalOutstanding: { amount: "1280000.00", currency: "INR" }, interestRatePercent: 8.5, monthlyEMI: { amount: "52000.00", currency: "INR" }, remainingTenureMonths: 28 },
-    { id: "d-2", name: "ICICI Sapphiro Credit Card", type: "CREDIT_CARD", principalOutstanding: { amount: "80000.00", currency: "INR" }, interestRatePercent: 42.0, monthlyEMI: { amount: "6200.00", currency: "INR" }, remainingTenureMonths: 2 },
-  ],
-};
-
-const MOCK_SUBSCRIPTIONS: SubscriptionAnalytics = {
-  totalMonthlyCost: { amount: "6500.00", currency: "INR" },
-  totalAnnualCost: { amount: "78000.00", currency: "INR" },
-  totalSubscriptionsCount: 8,
-  unusedCount: 2,
-  potentialAnnualSavings: { amount: "18000.00", currency: "INR" },
-  subscriptions: [
-    { id: "s-1", name: "ChatGPT Plus Subscription", monthlyCost: { amount: "1650.00", currency: "INR" }, billingFrequency: "MONTHLY", category: "AI Tools", lastUsedDate: "2026-08-01", isUnused: false, priceIncreaseFlag: false },
-    { id: "s-2", name: "Netflix Premium 4K", monthlyCost: { amount: "649.00", currency: "INR" }, billingFrequency: "MONTHLY", category: "Streaming", lastUsedDate: "2026-05-10", isUnused: true, priceIncreaseFlag: true },
-    { id: "s-3", name: "Spotify Family Plan", monthlyCost: { amount: "179.00", currency: "INR" }, billingFrequency: "MONTHLY", category: "Music", lastUsedDate: "2026-08-02", isUnused: false, priceIncreaseFlag: false },
-  ],
-};
-
-const MOCK_TRENDS: TrendAnalytics = {
-  timeframe: "MONTHLY",
-  accelerationCategory: "Mutual Fund SIP Growth",
-  decelerationCategory: "Credit Card Impulse Spend",
-  trends: [
-    { period: "Mar 2026", netWorthTrend: 5920000, incomeTrend: 250000, expenseTrend: 122000, savingsRateTrend: 51.2, movingAverage3M: 125000 },
-    { period: "Apr 2026", netWorthTrend: 6050000, incomeTrend: 250000, expenseTrend: 118000, savingsRateTrend: 52.8, movingAverage3M: 128000 },
-    { period: "May 2026", netWorthTrend: 6210000, incomeTrend: 255000, expenseTrend: 110000, savingsRateTrend: 56.8, movingAverage3M: 132000 },
-    { period: "Jun 2026", netWorthTrend: 6320000, incomeTrend: 255000, expenseTrend: 114000, savingsRateTrend: 55.2, movingAverage3M: 135000 },
-    { period: "Jul 2026", netWorthTrend: 6410000, incomeTrend: 260000, expenseTrend: 119000, savingsRateTrend: 54.2, movingAverage3M: 138000 },
-    { period: "Aug 2026", netWorthTrend: 6485400, incomeTrend: 260000, expenseTrend: 115500, savingsRateTrend: 55.5, movingAverage3M: 142000 },
-  ],
-};
-
-const MOCK_FORECASTS: ForecastAnalytics = {
-  horizon: "1Y",
-  confidenceScorePercent: 92,
-  forecasts: [
-    { date: "2026-09-01", projectedNetWorth: 6630000, projectedSavings: 630000, projectedDebt: 1310000, projectedInvestment: 4430000 },
-    { date: "2026-12-01", projectedNetWorth: 7080000, projectedSavings: 780000, projectedDebt: 1160000, projectedInvestment: 4860000 },
-    { date: "2027-03-01", projectedNetWorth: 7550000, projectedSavings: 930000, projectedDebt: 1010000, projectedInvestment: 5310000 },
-    { date: "2027-06-01", projectedNetWorth: 8040000, projectedSavings: 1090000, projectedDebt: 860000, projectedInvestment: 5780000 },
-  ],
-};
-
-const MOCK_RECOMMENDATIONS: SmartRecommendation[] = [
-  {
-    id: "rec-1",
-    title: "Cancel Unused Netflix Premium Subscription",
-    reason: "Zero stream activity detected in last 84 days while monthly cost is ₹649.",
-    impactType: "QUICK_WIN",
-    category: "SUBSCRIPTIONS",
-    estimatedMonthlySavings: { amount: "649.00", currency: "INR" },
-    difficulty: "EASY",
-    confidencePercent: 98,
-    actionLabel: "Manage Subscriptions",
-    actionRoute: "#insights/subscriptions",
-  },
-  {
-    id: "rec-2",
-    title: "Prepay High-Interest Credit Card Outstanding",
-    reason: "Paying off ₹80,000 credit card balance @ 42% p.a. saves ₹33,600 annual interest penalty.",
-    impactType: "HIGH_IMPACT",
-    category: "DEBT",
-    estimatedMonthlySavings: { amount: "2800.00", currency: "INR" },
-    difficulty: "EASY",
-    confidencePercent: 99,
-    actionLabel: "Payoff Debt Now",
-    actionRoute: "#insights/debts",
-  },
-  {
-    id: "rec-3",
-    title: "Increase Parag Parikh Flexi Cap SIP by 10%",
-    reason: "Monthly surplus of ₹1,44,500 allows increasing SIP to accelerate Early Retirement goal by 14 months.",
-    impactType: "LONG_TERM",
-    category: "INVESTMENT",
-    estimatedMonthlySavings: { amount: "15000.00", currency: "INR" },
-    difficulty: "MEDIUM",
-    confidencePercent: 91,
-    actionLabel: "Boost SIP",
-    actionRoute: "#insights/investments",
-  },
+const NEEDS_KEYWORDS = [
+  "hous", "rent", "emi", "loan", "utilit", "grocer", "insurance", "fuel",
+  "transport", "medical", "health", "electric", "water", "gas", "maintenance",
+  "school", "tuition", "bill",
 ];
+const isNeedCategory = (name: string) => NEEDS_KEYWORDS.some((k) => name.toLowerCase().includes(k));
 
-const MOCK_RISKS: RiskMatrixAnalytics = {
-  criticalCount: 0,
-  highCount: 1,
-  mediumCount: 2,
-  lowCount: 1,
-  risks: [
-    {
-      id: "risk-1",
-      title: "Technology Sector Over-Concentration",
-      category: "INVESTMENTS",
-      severity: "HIGH",
-      confidencePercent: 94,
-      reason: "28.5% of total portfolio value is concentrated in tech stocks (Target Ceiling: 20%).",
-      affectedAccount: "Zerodha Demat Account",
-      resolutionSteps: [
-        "Pause fresh SIP buys in Tech index funds for 3 months.",
-        "Allocate monthly surplus to Nifty 50 or Sovereign Gold Bonds.",
-      ],
-    },
-    {
-      id: "risk-2",
-      title: "Dining Out Budget Exceeded (+35%)",
-      category: "OVERSPENDING",
-      severity: "MEDIUM",
-      confidencePercent: 89,
-      reason: "Swiggy & restaurant charges reached ₹16,200 (Allocated budget: ₹12,000).",
-      affectedAccount: "HDFC Primary Bank Account",
-      resolutionSteps: [
-        "Set weekly meal delivery spending cap.",
-        "Use prepaid card for entertainment expenses.",
-      ],
-    },
-  ],
-};
+// Simulates minimum-payment-plus-surplus debt paydown to compare payoff order
+// strategies with real balances/rates/EMIs instead of guessed figures.
+function simulatePayoff(
+  debts: { balance: number; rate: number; emi: number }[],
+  extraBudget: number,
+  order: "rate" | "balance",
+): { months: number; totalInterest: number } {
+  const items = debts.filter((d) => d.balance > 0).map((d) => ({ ...d }));
+  let months = 0;
+  let totalInterest = 0;
+  const maxMonths = 480;
+  while (items.some((d) => d.balance > 1) && months < maxMonths) {
+    months++;
+    for (const d of items) {
+      if (d.balance <= 0) continue;
+      const interest = (d.rate / 1200) * d.balance;
+      totalInterest += interest;
+      d.balance = Math.max(0, d.balance + interest - d.emi);
+    }
+    const active = [...items]
+      .filter((d) => d.balance > 0)
+      .sort((a, b) => (order === "rate" ? b.rate - a.rate : a.balance - b.balance));
+    let extra = extraBudget;
+    for (const d of active) {
+      if (extra <= 0) break;
+      const pay = Math.min(extra, d.balance);
+      d.balance -= pay;
+      extra -= pay;
+    }
+  }
+  return { months, totalInterest };
+}
+
+// ---- API -------------------------------------------------------------------
 
 export const insightsApi = {
   getFinancialHealth: async (): Promise<FinancialHealthOverview> => {
-    try {
-      const res = await fetchWithAuth<FinancialHealthOverview>("/analytics/health");
-      return res || MOCK_FINANCIAL_HEALTH;
-    } catch {
-      return MOCK_FINANCIAL_HEALTH;
-    }
+    const [health, historyRes] = await Promise.all([
+      api.getFinancialHealth().catch(() => null),
+      api.getFinancialHealthHistory({ limit: 6 }).catch(() => null),
+    ]);
+    if (!health || typeof health.overallScore !== "number") return EMPTY_HEALTH;
+
+    const componentScores = health.componentScores || health.components || {};
+    const topRecommendations = health.topRecommendations || [];
+    const dimensions: HealthDimension[] = Object.values(componentScores).map((d: HealthDimensionDetail) => ({
+      code: d.code,
+      label: d.label || HEALTH_DIMENSION_LABELS[d.code] || d.code,
+      score: d.score,
+      stars: d.stars,
+      why: d.why || d.reason || "",
+      recommendation: topRecommendations.find((r) => r.component === d.code)?.text || d.recommendationText || "",
+      improvementTip: d.recommendations?.[0]?.text || d.recommendationText || "",
+      historicalTrendPercent: d.scoreImpact ?? 0,
+    }));
+
+    const historyList = unwrapList(historyRes);
+    const historicalScores = historyList.map((h) => ({
+      date: h.snapshotDate || h.date || "",
+      score: h.overallScore ?? h.score ?? 0,
+    }));
+
+    const trend = health.monthlyTrend ?? 0;
+    return {
+      overallScore: health.overallScore,
+      rating: getRatingLabel(health.rating),
+      scoreTrend: trend > 0 ? "UPWARD" : trend < 0 ? "DOWNWARD" : "STABLE",
+      historicalScores,
+      dimensions,
+    };
   },
 
   getNetWorthAnalytics: async (): Promise<NetWorthAnalytics> => {
-    try {
-      const res = await fetchWithAuth<NetWorthAnalytics>("/analytics/net-worth");
-      return res || MOCK_NET_WORTH;
-    } catch {
-      return MOCK_NET_WORTH;
-    }
+    const [current, historyRes] = await Promise.all([
+      api.getNetWorth().catch(() => null),
+      api.getNetWorthHistory({ limit: 12 }).catch(() => null),
+    ]);
+    if (!current) return EMPTY_NET_WORTH;
+
+    const currency = current.netWorth.currency;
+    const sortedHistory = [...unwrapList(historyRes)].sort((a, b) => a.date.localeCompare(b.date));
+    const history: NetWorthPoint[] = sortedHistory.map((snap) => ({
+      date: snap.date,
+      netWorth: n(snap.netWorth.amount),
+      totalAssets: n(snap.totalAssets.amount),
+      totalLiabilities: n(snap.totalLiabilities.amount),
+    }));
+
+    const latestNetWorth = n(current.netWorth.amount);
+    const prevMonth = sortedHistory.length >= 2 ? sortedHistory[sortedHistory.length - 2] : null;
+    const yearAgo = sortedHistory.length >= 1 ? sortedHistory[0] : null;
+    const monthlyChange = prevMonth ? latestNetWorth - n(prevMonth.netWorth.amount) : 0;
+    const monthlyChangePercent = prevMonth && n(prevMonth.netWorth.amount) !== 0 ? (monthlyChange / n(prevMonth.netWorth.amount)) * 100 : 0;
+    const annualChange = yearAgo ? latestNetWorth - n(yearAgo.netWorth.amount) : 0;
+    const annualChangePercent = yearAgo && n(yearAgo.netWorth.amount) !== 0 ? (annualChange / n(yearAgo.netWorth.amount)) * 100 : 0;
+
+    const totalAssets = n(current.totalAssets.amount);
+    const totalLiabilities = n(current.totalLiabilities.amount);
+    const b = current.breakdown;
+
+    const assetBreakdown = (
+      [
+        ["Liquid Cash & Savings", n(b.liquidCash)],
+        ["Investments", n(b.investments)],
+        ["Real Estate", n(b.realEstate)],
+      ] as const
+    )
+      .filter(([, value]) => value > 0)
+      .map(([category, value]) => ({
+        category,
+        value: toMoney(value, currency),
+        percentage: totalAssets > 0 ? (value / totalAssets) * 100 : 0,
+      }));
+
+    const liabilityBreakdown = (
+      [
+        ["Loans Outstanding", n(b.loans)],
+        ["Credit Card Balances", n(b.creditCards)],
+      ] as const
+    )
+      .filter(([, value]) => value > 0)
+      .map(([category, value]) => ({
+        category,
+        value: toMoney(value, currency),
+        percentage: totalLiabilities > 0 ? (value / totalLiabilities) * 100 : 0,
+      }));
+
+    return {
+      currentNetWorth: current.netWorth,
+      monthlyChangeAmount: toMoney(monthlyChange, currency),
+      monthlyChangePercent,
+      annualChangeAmount: toMoney(annualChange, currency),
+      annualChangePercent,
+      history,
+      topGrowthDrivers: [],
+      assetBreakdown,
+      liabilityBreakdown,
+    };
   },
 
   getCashFlowAnalytics: async (): Promise<CashFlowAnalytics> => {
-    try {
-      const res = await fetchWithAuth<CashFlowAnalytics>("/analytics/cash-flow");
-      return res || MOCK_CASH_FLOW;
-    } catch {
-      return MOCK_CASH_FLOW;
-    }
+    const [historyRes, incomeSourcesRes] = await Promise.all([
+      api.getCashFlow({ limit: 6 }).catch(() => null),
+      api.getIncomeSources({ limit: 5 }).catch(() => null),
+    ]);
+    const sorted = [...unwrapList(historyRes)].sort((a, b) => a.period.localeCompare(b.period));
+    if (sorted.length === 0) return EMPTY_CASH_FLOW;
+
+    const history: CashFlowPoint[] = sorted.map((snap, idx, arr) => {
+      const window = arr.slice(Math.max(0, idx - 2), idx + 1);
+      const rollingAverage = window.reduce((sum, w) => sum + n(w.netSavings.amount), 0) / window.length;
+      return {
+        month: snap.period,
+        income: n(snap.totalIncome.amount),
+        expenses: n(snap.totalExpense.amount),
+        netCashFlow: n(snap.netSavings.amount),
+        rollingAverage,
+      };
+    });
+
+    const latest = sorted[sorted.length - 1];
+    const currency = latest.totalIncome.currency;
+    const largestExpenseCategory = [...latest.categoryBreakdown].sort((a, b) => n(b.amount.amount) - n(a.amount.amount))[0];
+    const incomeSources = unwrapList(incomeSourcesRes);
+    const largestIncomeSourceRaw = [...incomeSources].sort((a, b) => n(b.expectedAmount.amount) - n(a.expectedAmount.amount))[0];
+    const recentNet = history.slice(-3).map((h) => h.netCashFlow);
+    const forecastNextMonth = recentNet.length ? recentNet.reduce((s, v) => s + v, 0) / recentNet.length : 0;
+
+    return {
+      totalIncomeThisMonth: latest.totalIncome,
+      totalExpensesThisMonth: latest.totalExpense,
+      netCashFlowThisMonth: latest.netSavings,
+      savingsRatePercent: latest.savingsRate,
+      history,
+      largestIncomeSource: largestIncomeSourceRaw
+        ? { name: largestIncomeSourceRaw.name, amount: largestIncomeSourceRaw.expectedAmount }
+        : { name: "N/A", amount: toMoney(0, currency) },
+      largestExpenseCategory: largestExpenseCategory
+        ? { name: largestExpenseCategory.categoryName, amount: largestExpenseCategory.amount }
+        : { name: "N/A", amount: toMoney(0, currency) },
+      forecastNextMonth: toMoney(forecastNextMonth, currency),
+    };
   },
 
   getSpendingAnalytics: async (): Promise<SpendingAnalytics> => {
-    try {
-      const res = await fetchWithAuth<SpendingAnalytics>("/analytics/spending");
-      return res || MOCK_SPENDING;
-    } catch {
-      return MOCK_SPENDING;
+    const [categoriesRes, merchantsRes, txRes] = await Promise.all([
+      api.getExpensesByCategory().catch(() => []),
+      api.getExpensesByMerchant().catch(() => []),
+      api.getTransactions({ direction: "OUTFLOW", limit: 100 }).catch(() => null),
+    ]);
+    const categoriesRaw = Array.isArray(categoriesRes) ? categoriesRes : [];
+    if (categoriesRaw.length === 0) return EMPTY_SPENDING;
+
+    const currency = categoriesRaw[0].amount.currency;
+    const totalSpentAmount = categoriesRaw.reduce((s, c) => s + n(c.amount.amount), 0);
+
+    const categories: CategorySpending[] = categoriesRaw.map((c) => ({
+      categoryId: c.categoryId,
+      categoryName: c.categoryName,
+      amount: c.amount,
+      percentage: c.percentage,
+      needsVsWants: isNeedCategory(c.categoryName) ? "NEEDS" : "WANTS",
+      previousMonthAmount: c.amount,
+      monthOverMonthPercent: 0,
+    }));
+
+    const needsTotalAmount = categories.filter((c) => c.needsVsWants === "NEEDS").reduce((s, c) => s + n(c.amount.amount), 0);
+    const wantsTotalAmount = Math.max(0, totalSpentAmount - needsTotalAmount);
+
+    const transactions = unwrapList(txRes);
+    const merchantsRaw = Array.isArray(merchantsRes) ? merchantsRes : [];
+    const topMerchants: MerchantSpending[] = merchantsRaw.slice(0, 6).map((m) => {
+      const matching = transactions.filter((t) => t.merchantName === m.merchantName);
+      return {
+        merchantName: m.merchantName,
+        amount: m.amount,
+        transactionCount: matching.length,
+        category: matching[0]?.categoryName || "Uncategorized",
+      };
+    });
+
+    const byDay = new Map<string, number>();
+    for (const t of transactions) {
+      const day = t.date.slice(0, 10);
+      byDay.set(day, (byDay.get(day) || 0) + n(t.amount.amount));
     }
+    const dailyEntries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-14);
+    const avgDaily = dailyEntries.length ? dailyEntries.reduce((s, [, v]) => s + v, 0) / dailyEntries.length : 0;
+    const dailyVelocity: DailySpendingPoint[] = dailyEntries.map(([date, amount]) => {
+      let velocityRating: DailySpendingPoint["velocityRating"] = "NORMAL";
+      if (avgDaily > 0) {
+        if (amount > avgDaily * 2) velocityRating = "SPIKE";
+        else if (amount > avgDaily * 1.3) velocityRating = "HIGH";
+        else if (amount < avgDaily * 0.5) velocityRating = "LOW";
+      }
+      return { date, amount, velocityRating };
+    });
+
+    const spikeDay = dailyVelocity.find((d) => d.velocityRating === "SPIKE");
+    const detectedAnomalies = spikeDay
+      ? [
+          {
+            id: `anom-${spikeDay.date}`,
+            title: "Unusual Daily Spend Detected",
+            description: `Outflow on ${spikeDay.date} was ${avgDaily > 0 ? Math.round((spikeDay.amount / avgDaily - 1) * 100) : 0}% above the recent daily average.`,
+            date: spikeDay.date,
+            amount: toMoney(spikeDay.amount, currency),
+          },
+        ]
+      : [];
+
+    return {
+      totalSpent: toMoney(totalSpentAmount, currency),
+      needsTotal: toMoney(needsTotalAmount, currency),
+      wantsTotal: toMoney(wantsTotalAmount, currency),
+      needsPercent: totalSpentAmount > 0 ? (needsTotalAmount / totalSpentAmount) * 100 : 0,
+      wantsPercent: totalSpentAmount > 0 ? (wantsTotalAmount / totalSpentAmount) * 100 : 0,
+      categories,
+      topMerchants,
+      dailyVelocity,
+      detectedAnomalies,
+    };
   },
 
   getIncomeAnalytics: async (): Promise<IncomeAnalytics> => {
-    try {
-      const res = await fetchWithAuth<IncomeAnalytics>("/analytics/income");
-      return res || MOCK_INCOME;
-    } catch {
-      return MOCK_INCOME;
-    }
+    const [sourcesRes, trendRes] = await Promise.all([
+      api.getIncomeSources({ limit: 20 }).catch(() => null),
+      api.getIncomeTrend({ limit: 12 }).catch(() => null),
+    ]);
+    const sourcesRaw = unwrapList(sourcesRes);
+    if (sourcesRaw.length === 0) return EMPTY_INCOME;
+
+    const currency = sourcesRaw[0].expectedAmount.currency;
+    const monthlyMultiplier = (freq: string) => {
+      switch ((freq || "").toUpperCase()) {
+        case "WEEKLY": return 4.33;
+        case "BIWEEKLY": return 2.17;
+        case "ANNUAL":
+        case "YEARLY": return 1 / 12;
+        case "QUARTERLY": return 1 / 3;
+        default: return 1;
+      }
+    };
+    const sources: IncomeSource[] = sourcesRaw.map((s) => ({
+      id: s.id,
+      name: s.name,
+      type: "OTHER",
+      monthlyAmount: toMoney(n(s.expectedAmount.amount) * monthlyMultiplier(s.frequency), s.expectedAmount.currency),
+      volatilityRating: "STABLE",
+    }));
+    const totalMonthlyIncome = sources.reduce((sum, s) => sum + n(s.monthlyAmount.amount), 0);
+
+    const trendPoints = trendRes && typeof trendRes === "object" && "points" in trendRes && trendRes.points
+      ? trendRes.points
+      : unwrapList(trendRes as { data: { date: string; amount: Money }[] } | null);
+    const sortedTrend = [...trendPoints].sort((a, b) => a.date.localeCompare(b.date));
+    const first = sortedTrend[0];
+    const last = sortedTrend[sortedTrend.length - 1];
+    const incomeGrowthPercent1Y = first && last && n(first.amount.amount) !== 0
+      ? ((n(last.amount.amount) - n(first.amount.amount)) / n(first.amount.amount)) * 100
+      : 0;
+
+    return {
+      totalMonthlyIncome: toMoney(totalMonthlyIncome, currency),
+      annualIncomeRunRate: toMoney(totalMonthlyIncome * 12, currency),
+      sources,
+      monthlyHistory: [],
+      incomeGrowthPercent1Y,
+    };
   },
 
   getBudgetAnalytics: async (): Promise<BudgetAnalytics> => {
-    try {
-      const res = await fetchWithAuth<BudgetAnalytics>("/analytics/budgets");
-      return res || MOCK_BUDGETS;
-    } catch {
-      return MOCK_BUDGETS;
-    }
+    const dashboard = await api.getBudgetDashboard().catch(() => null);
+    if (!dashboard) return EMPTY_BUDGETS;
+
+    const allBudgets = [
+      ...(dashboard.activeBudgets || []),
+      ...(dashboard.exceededBudgets || []),
+      ...(dashboard.nearLimitBudgets || []),
+    ];
+    const currency = allBudgets[0]?.currency || "INR";
+
+    const budgets: BudgetHealthItem[] = allBudgets.map((budget) => {
+      const allocated = n(budget.totalLimit.amount);
+      const spent = n(budget.totalSpent?.amount ?? 0);
+      const remaining = allocated - spent;
+      const percentUsed = allocated > 0 ? (spent / allocated) * 100 : 0;
+      const status: BudgetHealthItem["status"] = percentUsed > 100 ? "EXCEEDED" : percentUsed >= 85 ? "WARNING" : "HEALTHY";
+      return {
+        budgetId: budget.id,
+        categoryName: budget.name,
+        allocatedAmount: toMoney(allocated, budget.currency),
+        spentAmount: toMoney(spent, budget.currency),
+        remainingAmount: toMoney(remaining, budget.currency),
+        percentUsed,
+        status,
+        forecastEndMonthAmount: budget.forecastMonthEndSpend ?? toMoney(spent, budget.currency),
+        recommendation: status === "EXCEEDED"
+          ? "Budget exceeded — review category spend."
+          : status === "WARNING"
+            ? "Approaching limit — monitor closely."
+            : "On track.",
+      };
+    });
+
+    return {
+      totalBudgeted: toMoney(dashboard.totalBudget, currency),
+      totalSpent: toMoney(dashboard.totalSpent, currency),
+      overallPercentUsed: n(dashboard.overallUtilization),
+      budgets,
+      successHistoryPercent: dashboard.budgetHealthScore,
+    };
   },
 
   getGoalAnalytics: async (): Promise<GoalAnalytics> => {
-    try {
-      const res = await fetchWithAuth<GoalAnalytics>("/analytics/goals");
-      return res || MOCK_GOALS;
-    } catch {
-      return MOCK_GOALS;
-    }
+    const [dashboard, goalsRes] = await Promise.all([
+      api.getGoalDashboard().catch(() => null),
+      api.getGoals({ limit: 50 }).catch(() => null),
+    ]);
+    const goalsRaw = unwrapList(goalsRes);
+    if (!dashboard && goalsRaw.length === 0) return EMPTY_GOALS;
+
+    const goals: GoalAnalyticsItem[] = goalsRaw.map((g) => {
+      const isBehindSchedule = g.goalHealth === "FAIR" || g.goalHealth === "POOR";
+      return {
+        goalId: g.id,
+        name: g.name,
+        targetAmount: g.targetAmount,
+        currentAmount: g.currentAmount || g.currentCorpus || toMoney(0, g.currency),
+        progressPercent: g.progressPercent,
+        requiredMonthlySavings: g.monthlyContribution || g.autoContributionAmount || toMoney(0, g.currency),
+        projectedCompletionDate: g.estimatedCompletionDate || g.forecastCompletionDate || g.targetDate,
+        isBehindSchedule,
+        velocityScore: g.goalHealthScore ?? 0,
+      };
+    });
+    const onTrackCount = goals.filter((g) => !g.isBehindSchedule).length;
+
+    return {
+      totalGoalsCount: dashboard ? dashboard.activeGoalsCount + dashboard.completedGoalsCount : goals.length,
+      onTrackCount,
+      behindCount: goals.length - onTrackCount,
+      goals,
+    };
   },
 
   getInvestmentAnalytics: async (): Promise<InvestmentAnalyticsOverview> => {
-    try {
-      const res = await fetchWithAuth<InvestmentAnalyticsOverview>("/analytics/investments");
-      return res || MOCK_INVESTMENTS;
-    } catch {
-      return MOCK_INVESTMENTS;
-    }
+    const portfolios = await api.getInvestmentReturns().catch(() => []);
+    const list = Array.isArray(portfolios) ? portfolios : [];
+    if (list.length === 0) return EMPTY_INVESTMENTS;
+
+    const totalValuation = list.reduce((s, p) => s + n(p.totalMarketValue), 0);
+    const totalGain = list.reduce((s, p) => s + n(p.totalUnrealizedGain), 0);
+    const xirrValues = list.map((p) => n(p.xirr)).filter((v) => v !== 0);
+    const avgXirr = xirrValues.length ? xirrValues.reduce((s, v) => s + v, 0) / xirrValues.length : 0;
+
+    const allHoldings = list.flatMap((p) => p.holdings);
+    const sortedHoldings = [...allHoldings].sort((a, b) => n(b.unrealizedGainPercent) - n(a.unrealizedGainPercent));
+    const best = sortedHoldings[0];
+    const worst = sortedHoldings[sortedHoldings.length - 1];
+
+    return {
+      totalValuation: toMoney(totalValuation),
+      totalGain: toMoney(totalGain),
+      cagrPercent: avgXirr,
+      xirrPercent: avgXirr,
+      sharpeRatio: 0,
+      volatilityPercent: 0,
+      allocationDriftPercent: 0,
+      bestHolding: best ? { symbol: best.symbol || "", name: best.name || "", returnPercent: n(best.unrealizedGainPercent) } : EMPTY_INVESTMENTS.bestHolding,
+      worstHolding: worst ? { symbol: worst.symbol || "", name: worst.name || "", returnPercent: n(worst.unrealizedGainPercent) } : EMPTY_INVESTMENTS.worstHolding,
+    };
   },
 
   getDebtAnalytics: async (): Promise<DebtAnalytics> => {
-    try {
-      const res = await fetchWithAuth<DebtAnalytics>("/analytics/debts");
-      return res || MOCK_DEBTS;
-    } catch {
-      return MOCK_DEBTS;
-    }
+    const [loansRes, breakdown, summary] = await Promise.all([
+      api.getLoans({ status: "ACTIVE" }).catch(() => []),
+      api.getDebtBreakdown().catch(() => null),
+      api.getLiabilitiesSummary().catch(() => null),
+    ]);
+    const loans = unwrapList(loansRes);
+    if (loans.length === 0 && !breakdown) return EMPTY_DEBTS;
+
+    const currency = "INR";
+    const debts: DebtItem[] = loans.map((l) => {
+      const outstandingRaw = l.outstandingPrincipal ?? l.outstandingBalance ?? l.principalAmount ?? "0";
+      const emiRaw = l.monthlyEmi ?? l.emiAmount ?? l.installmentAmount ?? "0";
+      const principalOutstanding = typeof outstandingRaw === "object" ? outstandingRaw : toMoney(outstandingRaw, currency);
+      const monthlyEMI = typeof emiRaw === "object" ? emiRaw : toMoney(emiRaw, currency);
+      return {
+        id: l.id,
+        name: l.name,
+        type: mapLoanType(l.type),
+        principalOutstanding,
+        interestRatePercent: l.interestRate,
+        monthlyEMI,
+        remainingTenureMonths: l.remainingTenureMonths ?? l.tenureMonths ?? 0,
+      };
+    });
+
+    const totalDebtAmount = breakdown?.totalDebt ? n(breakdown.totalDebt.amount) : debts.reduce((s, d) => s + n(d.principalOutstanding.amount), 0);
+    const totalMonthlyEMI = debts.reduce((s, d) => s + n(d.monthlyEMI.amount), 0);
+    const debtToIncomeRatioPercent = summary ? n(summary.debtToIncomeRatio) * 100 : 0;
+
+    const simDebts = debts
+      .map((d) => ({ balance: n(d.principalOutstanding.amount), rate: d.interestRatePercent, emi: n(d.monthlyEMI.amount) }))
+      .filter((d) => d.balance > 0 && d.emi > 0);
+    // Extra monthly budget beyond minimum EMIs: half of current EMI outflow,
+    // used only to differentiate payoff order strategies (not a claimed cash figure).
+    const extraBudget = totalMonthlyEMI * 0.5;
+    const avalanche = simDebts.length ? simulatePayoff(simDebts, extraBudget, "rate") : { months: 0, totalInterest: 0 };
+    const snowball = simDebts.length ? simulatePayoff(simDebts, extraBudget, "balance") : { months: 0, totalInterest: 0 };
+    const interestSavedAvalanche = Math.max(0, snowball.totalInterest - avalanche.totalInterest);
+
+    return {
+      totalDebt: toMoney(totalDebtAmount, currency),
+      totalMonthlyEMI: toMoney(totalMonthlyEMI, currency),
+      debtToIncomeRatioPercent,
+      snowballPayoffMonths: snowball.months,
+      avalanchePayoffMonths: avalanche.months,
+      interestSavedAvalanche: toMoney(interestSavedAvalanche, currency),
+      debts,
+    };
   },
 
   getSubscriptionAnalytics: async (): Promise<SubscriptionAnalytics> => {
-    try {
-      const res = await fetchWithAuth<SubscriptionAnalytics>("/analytics/subscriptions");
-      return res || MOCK_SUBSCRIPTIONS;
-    } catch {
-      return MOCK_SUBSCRIPTIONS;
-    }
+    const res = await api.getSubscriptions({ limit: 50 }).catch(() => null);
+    const list = unwrapList(res);
+    if (list.length === 0) return EMPTY_SUBSCRIPTIONS;
+
+    const currency = list[0].amount.currency;
+    const subscriptions: SubscriptionItem[] = list.map((s) => {
+      const isAnnual = ["ANNUAL", "YEARLY"].includes((s.billingCycle || "").toUpperCase());
+      return {
+        id: s.id,
+        name: s.name,
+        monthlyCost: isAnnual ? toMoney(n(s.amount.amount) / 12, s.amount.currency) : s.amount,
+        billingFrequency: isAnnual ? "ANNUAL" : "MONTHLY",
+        category: "Subscription",
+        lastUsedDate: "",
+        isUnused: false,
+        priceIncreaseFlag: false,
+      };
+    });
+    const totalMonthlyCost = subscriptions.reduce((sum, s) => sum + n(s.monthlyCost.amount), 0);
+
+    return {
+      totalMonthlyCost: toMoney(totalMonthlyCost, currency),
+      totalAnnualCost: toMoney(totalMonthlyCost * 12, currency),
+      totalSubscriptionsCount: subscriptions.length,
+      unusedCount: 0,
+      potentialAnnualSavings: toMoney(0, currency),
+      subscriptions,
+    };
   },
 
   getTrendAnalytics: async (): Promise<TrendAnalytics> => {
-    try {
-      const res = await fetchWithAuth<TrendAnalytics>("/analytics/trends");
-      return res || MOCK_TRENDS;
-    } catch {
-      return MOCK_TRENDS;
+    const [incomeTrendRes, expenseTrendRes, incomeSourcesRes, expenseCategoriesRes] = await Promise.all([
+      api.getIncomeTrend({ limit: 6 }).catch(() => null),
+      api.getExpenseTrendAnalytics({ limit: 6 }).catch(() => null),
+      api.getIncomeSources({ limit: 5 }).catch(() => null),
+      api.getExpensesByCategory().catch(() => []),
+    ]);
+    const incomePoints = incomeTrendRes && typeof incomeTrendRes === "object" && "points" in incomeTrendRes && incomeTrendRes.points
+      ? incomeTrendRes.points
+      : unwrapList(incomeTrendRes as { data: { date: string; amount: Money }[] } | null);
+    const expensePoints = unwrapList(expenseTrendRes);
+    if (incomePoints.length === 0 && expensePoints.length === 0) return EMPTY_TRENDS;
+
+    const byMonth = new Map<string, { income: number; expense: number }>();
+    for (const p of incomePoints) {
+      const key = p.date.slice(0, 7);
+      byMonth.set(key, { ...(byMonth.get(key) || { income: 0, expense: 0 }), income: n(p.amount.amount) });
     }
+    for (const p of expensePoints) {
+      const key = (p.month || "").slice(0, 7);
+      const existing = byMonth.get(key) || { income: 0, expense: 0 };
+      byMonth.set(key, { ...existing, expense: n(p.amount.amount) });
+    }
+    const months = [...byMonth.keys()].sort();
+    let runningSum = 0;
+    const trends: TrendPoint[] = months.map((month, idx) => {
+      const { income, expense } = byMonth.get(month)!;
+      const net = income - expense;
+      runningSum += net;
+      const window = months.slice(Math.max(0, idx - 2), idx + 1).map((m) => byMonth.get(m)!);
+      const movingAverage3M = window.reduce((s, w) => s + (w.income - w.expense), 0) / window.length;
+      return {
+        period: month,
+        netWorthTrend: runningSum,
+        incomeTrend: income,
+        expenseTrend: expense,
+        savingsRateTrend: income > 0 ? (net / income) * 100 : 0,
+        movingAverage3M,
+      };
+    });
+
+    const incomeSources = unwrapList(incomeSourcesRes);
+    const topIncomeSource = [...incomeSources].sort((a, b) => n(b.expectedAmount.amount) - n(a.expectedAmount.amount))[0];
+    const expenseCategories = Array.isArray(expenseCategoriesRes) ? expenseCategoriesRes : [];
+    const topExpenseCategory = [...expenseCategories].sort((a, b) => n(b.amount.amount) - n(a.amount.amount))[0];
+
+    return {
+      timeframe: "MONTHLY",
+      trends,
+      accelerationCategory: topIncomeSource?.name || "Income Growth",
+      decelerationCategory: topExpenseCategory?.categoryName || "Expense Control",
+    };
   },
 
   getForecastAnalytics: async (horizon: TimeHorizon = "1Y"): Promise<ForecastAnalytics> => {
-    try {
-      const res = await fetchWithAuth<ForecastAnalytics>(`/analytics/forecasts?horizon=${horizon}`);
-      return res || { ...MOCK_FORECASTS, horizon };
-    } catch {
-      return { ...MOCK_FORECASTS, horizon };
-    }
+    // currentAge/retirementAge are required by the backend (no user-profile
+    // age field exists in this app), so default to the same 30/60 starting
+    // point used by AnalyticsView's retirement forecast inputs.
+    const [forecast, netWorth] = await Promise.all([
+      api.getRetirementForecast({ currentAge: 30, retirementAge: 60 }).catch(() => null),
+      api.getNetWorth().catch(() => null),
+    ]);
+    if (!forecast || !forecast.projectedCorpus) return { ...EMPTY_FORECASTS, horizon };
+
+    const currentNetWorth = netWorth ? n(netWorth.netWorth.amount) : 0;
+    const projectedCorpus = n(forecast.projectedCorpus.amount);
+    const yearsToRetirement = Math.max(1, (forecast.retirementAge ?? 60) - (forecast.currentAge ?? 30));
+
+    const HORIZON_YEARS: Record<TimeHorizon, number> = { "30D": 1 / 12, "90D": 0.25, "6M": 0.5, "1Y": 1, "3Y": 3, "5Y": 5, ALL: yearsToRetirement };
+    const years = Math.min(yearsToRetirement, HORIZON_YEARS[horizon] ?? 1);
+    const monthlySavingsNeeded = n(forecast.monthlySavingsNeeded?.amount);
+
+    const steps = 4;
+    const today = new Date();
+    const forecasts: ForecastPoint[] = Array.from({ length: steps }, (_, i) => {
+      const fraction = ((i + 1) / steps) * years;
+      const date = new Date(today);
+      date.setMonth(date.getMonth() + Math.round(fraction * 12));
+      const projectedNetWorth = currentNetWorth + (projectedCorpus - currentNetWorth) * (fraction / yearsToRetirement);
+      return {
+        date: date.toISOString().slice(0, 10),
+        projectedNetWorth,
+        projectedSavings: monthlySavingsNeeded * fraction * 12,
+        projectedDebt: 0,
+        projectedInvestment: projectedNetWorth,
+      };
+    });
+
+    const definedFields = [forecast.currentAge, forecast.retirementAge, forecast.expectedReturnPercent].filter((v) => v !== undefined).length;
+    const confidenceScorePercent = Math.min(95, 60 + definedFields * 10);
+
+    return { horizon, forecasts, confidenceScorePercent };
   },
 
   getRecommendations: async (): Promise<SmartRecommendation[]> => {
-    try {
-      const res = await fetchWithAuth<SmartRecommendation[]>("/analytics/recommendations");
-      return Array.isArray(res) && res.length > 0 ? res : MOCK_RECOMMENDATIONS;
-    } catch {
-      return MOCK_RECOMMENDATIONS;
-    }
+    const list = await api.getHealthRecommendations().catch(() => []);
+    if (!Array.isArray(list) || list.length === 0) return [];
+
+    const CATEGORY_MAP: Record<string, SmartRecommendation["category"]> = {
+      CASH_FLOW: "SAVINGS",
+      SAVINGS_RATE: "SAVINGS",
+      EMERGENCY_FUND: "SAVINGS",
+      DEBT_HEALTH: "DEBT",
+      CREDIT_UTILIZATION: "DEBT",
+      INVESTMENT_DIVERSIFICATION: "INVESTMENT",
+      BILL_DISCIPLINE: "BUDGETS",
+      SPENDING_DISCIPLINE: "BUDGETS",
+    };
+
+    return list.map((r, idx) => ({
+      id: r.id || `rec-${idx}`,
+      title: r.title || r.text,
+      reason: r.description || r.text,
+      impactType: Math.abs(r.estimatedImpact ?? r.scoreImpact ?? 0) >= 5 ? "HIGH_IMPACT" : "QUICK_WIN",
+      category: (r.component && CATEGORY_MAP[r.component]) || "SAVINGS",
+      estimatedMonthlySavings: toMoney(0),
+      difficulty: "MEDIUM",
+      confidencePercent: Math.min(99, 60 + Math.abs(r.estimatedImpact ?? r.scoreImpact ?? 0)),
+      actionLabel: "View Details",
+      actionRoute: r.deepLink || "#insights/recommendations",
+    }));
   },
 
   getRiskMatrix: async (): Promise<RiskMatrixAnalytics> => {
-    try {
-      const res = await fetchWithAuth<RiskMatrixAnalytics>("/analytics/risks");
-      return res || MOCK_RISKS;
-    } catch {
-      return MOCK_RISKS;
-    }
+    const res = await api.getInsights({ limit: 50 }).catch(() => null);
+    const list = unwrapList(res).filter((i) => !i.isDismissed);
+    if (list.length === 0) return EMPTY_RISKS;
+
+    const CATEGORY_SET: RiskItem["category"][] = ["OVERSPENDING", "CASH_FLOW", "DEBT", "CREDIT", "INVESTMENTS", "EMERGENCY_FUND"];
+    const risks: RiskItem[] = list.map((insight) => ({
+      id: insight.id,
+      title: insight.title,
+      category: (CATEGORY_SET.includes(insight.category as RiskItem["category"]) ? insight.category : "OVERSPENDING") as RiskItem["category"],
+      severity: insight.severity === "CRITICAL" ? "CRITICAL" : insight.severity === "WARNING" ? "HIGH" : "LOW",
+      confidencePercent: 85,
+      reason: insight.description,
+      affectedAccount: insight.category,
+      resolutionSteps: insight.actionableLink ? [insight.actionableLink] : [],
+    }));
+
+    return {
+      criticalCount: risks.filter((r) => r.severity === "CRITICAL").length,
+      highCount: risks.filter((r) => r.severity === "HIGH").length,
+      mediumCount: risks.filter((r) => r.severity === "MEDIUM").length,
+      lowCount: risks.filter((r) => r.severity === "LOW").length,
+      risks,
+    };
   },
 
   generateAnalyticsReport: async (reportType: AnalyticsReportType): Promise<AnalyticsReportPayload> => {
     return {
       reportType,
       generatedAt: new Date().toISOString(),
-      period: "FY 2025-2026",
-      summaryText: "Precomputed comprehensive financial intelligence assessment report.",
+      period: new Date().toISOString().slice(0, 7),
+      summaryText: "Report generation from live account data is not yet available from the backend.",
     };
   },
 };

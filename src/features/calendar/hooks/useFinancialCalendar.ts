@@ -87,10 +87,11 @@ export function mapCalendarItemToEvent(item: CalendarEventItem): FinancialCalend
     status = "OVERDUE";
   }
 
+  const isAutoDebit = item.type === "EMI_DUE" || item.type === "SIP_DUE" || item.type === "SUBSCRIPTION_RENEWAL";
+
   return {
     id: `${item.sourceEntityType}-${item.sourceEntityId}-${item.date}`,
     title: item.title,
-    description: `Source: ${item.sourceEntityType} (${item.sourceEntityId.slice(0, 8)})`,
     category,
     date: item.date,
     amount: item.amount ? { amount: item.amount, currency: "INR" } : undefined,
@@ -100,8 +101,10 @@ export function mapCalendarItemToEvent(item: CalendarEventItem): FinancialCalend
     linkedEntityId: item.sourceEntityId,
     linkedEntityType,
     deepLink,
-    notes: `Derived calendar event for ${item.sourceEntityType}.`,
-    isAutoDebit: item.type === "EMI_DUE" || item.type === "SIP_DUE" || item.type === "SUBSCRIPTION_RENEWAL",
+    notes: isAutoDebit
+      ? "This will be auto-debited from your linked account on the due date."
+      : "Manual payment required — pay before the due date to avoid penalties.",
+    isAutoDebit,
   };
 }
 
@@ -275,23 +278,47 @@ export function useFinancialCalendarSummary() {
   return summary;
 }
 
+// Calendar events are derived read models (not persisted records), so the
+// only action here with a real, no-extra-input backend endpoint is
+// confirming a subscription renewal. Everything else (EMI/credit-card
+// payments) needs an amount/account the compact action buttons don't
+// collect, so we're honest about that instead of faking a persisted state.
 export function useMarkEventAction() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, action }: { id: string; action: "PAY" | "DISMISS" | "COMPLETE" | "SNOOZE" | "ARCHIVE" }) => {
-      return { id, action };
-    },
-    onSuccess: (_, { action }) => {
-      const msg =
-        action === "PAY"
-          ? "Payment record highlighted"
-          : action === "COMPLETE"
-          ? "Event marked complete"
-          : "Action completed!";
+      const segments = id.split("-");
+      const sourceEntityType = segments[0];
+      const sourceEntityId = segments.slice(1, -1).join("-");
 
-      useUIStore.getState().showToast(msg, "info");
+      if (sourceEntityType === "Subscription" && (action === "PAY" || action === "COMPLETE") && sourceEntityId) {
+        await api.confirmSubscription(sourceEntityId);
+        return { id, action, persisted: true };
+      }
+
+      return { id, action, persisted: false };
+    },
+    onSuccess: (result, { action }) => {
+      if (result.persisted) {
+        useUIStore.getState().showToast(
+          action === "PAY" ? "Subscription payment confirmed" : "Subscription marked complete",
+          "success",
+        );
+        queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      } else if (action === "PAY" || action === "COMPLETE") {
+        useUIStore.getState().showToast(
+          "Reminder hidden here — open the related module to record the actual payment.",
+          "info",
+        );
+      } else {
+        useUIStore.getState().showToast("Reminder hidden", "info");
+      }
       queryClient.invalidateQueries({ queryKey: ["financialCalendar"] });
+    },
+    onError: (err) => {
+      const message = (err as { message?: string })?.message || "Action failed. Please try again.";
+      useUIStore.getState().showToast(message, "error");
     },
   });
 }
