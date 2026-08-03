@@ -8,18 +8,22 @@ import {
   useUploadImport,
   useAccounts,
   useCreditCards,
+  useCategories,
   useConfirmColumnMapping,
+  useUpdateImportRow,
+  useRetryImport,
+  useRollbackImport,
   useImportPreviewInfinite,
 } from "../../hooks/useFinanceQueries";
-import { ImportJob, ImportRowStaging, Account } from "../../types";
-
-type StagedRowDisplay = ImportRowStaging & {
-  transactionDate?: string;
-  description?: string;
-  direction?: string;
-  amount?: string | number;
-  categoryName?: string;
-};
+import {
+  ImportJob,
+  ImportJobStatus,
+  ImportRowStaging,
+  NormalizedTransactionRowData,
+  NormalizedTradeRowData,
+  ColumnMappingData,
+  Account,
+} from "../../types";
 import {
   UploadCloud,
   CheckCircle2,
@@ -27,7 +31,83 @@ import {
   RefreshCw,
   FileText,
   ArrowRight,
+  Undo2,
+  XCircle,
 } from "lucide-react";
+
+function isTradeRow(
+  data: NormalizedTransactionRowData | NormalizedTradeRowData | null | undefined
+): data is NormalizedTradeRowData {
+  return !!data && "tradeDate" in data;
+}
+
+// The row's `normalizedData` shape depends on whether the source routed into
+// `transactions` (bank/CSV/Excel) or `investments` (CAS/broker PDF) — see the
+// Institution Detection stage in packages/finance/docs/03-import-pipeline.md.
+function getRowDisplay(row: ImportRowStaging) {
+  const data = row.normalizedData;
+  if (isTradeRow(data)) {
+    return {
+      date: data.tradeDate,
+      description: data.schemeName,
+      direction: data.tradeType,
+      amount: data.amount,
+      categoryName: data.isin || "—",
+    };
+  }
+  return {
+    date: data?.transactionDate,
+    description: data?.description,
+    direction: data?.direction,
+    amount: data?.amount,
+    categoryName: data?.merchantName || "General",
+  };
+}
+
+// Renders the actual CSV/Excel header names (from the upload's auto-mapper
+// guess) as a dropdown so the user picks a column by name instead of
+// guessing a blind zero-based index. Falls back to a plain number input
+// when no header row is available.
+function ColumnPicker({
+  headers,
+  value,
+  onChange,
+  allowNone,
+}: {
+  headers?: string[];
+  value: number;
+  onChange: (index: number) => void;
+  allowNone?: boolean;
+}) {
+  if (!headers || headers.length === 0) {
+    return (
+      <input
+        type="number"
+        min={allowNone ? -1 : 0}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100"
+      />
+    );
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(parseInt(e.target.value))}
+      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100"
+    >
+      {allowNone && <option value={-1}>-- None --</option>}
+      {headers.map((h, idx) => (
+        <option key={idx} value={idx}>
+          Col {idx}: {h}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const RETRYABLE_STATUSES: ImportJobStatus[] = ["FAILED", "PARTIALLY_COMPLETED"];
+const ROLLBACKABLE_STATUSES: ImportJobStatus[] = ["COMPLETED", "PARTIALLY_COMPLETED"];
 
 export const ImportsView: React.FC = () => {
   const { activeSubTab } = useUIStore();
@@ -35,6 +115,7 @@ export const ImportsView: React.FC = () => {
   const { data: reviewQueue = [] } = useReviewQueue();
   const { data: accounts = [] } = useAccounts();
   const { data: creditCards = [] } = useCreditCards();
+  const { data: categories = [] } = useCategories();
 
   const combinedAccounts = React.useMemo(() => {
     const accountIds = new Set(accounts.map((a) => a.id));
@@ -61,12 +142,17 @@ export const ImportsView: React.FC = () => {
   const uploadMutation = useUploadImport();
   const commitMutation = useCommitImport();
   const columnMappingMutation = useConfirmColumnMapping();
+  const updateRowMutation = useUpdateImportRow();
+  const retryMutation = useRetryImport();
+  const rollbackMutation = useRollbackImport();
 
   const [activeStep, setActiveStep] = useState<"UPLOAD" | "MAPPING" | "PREVIEW" | "QUEUE">("UPLOAD");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [documentType, setDocumentType] = useState<string>("BANK_STATEMENT");
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [rowCategoryChoice, setRowCategoryChoice] = useState<Record<string, string>>({});
+  const [suggestedMapping, setSuggestedMapping] = useState<ColumnMappingData | null>(null);
 
   // Sync activeSubTab
   useEffect(() => {
@@ -101,9 +187,10 @@ export const ImportsView: React.FC = () => {
     transactionDate: 0,
     description: 1,
     amount: 2,
-    withdrawal: 3,
-    deposit: 4,
-    hasSeparateAmount: true,
+    withdrawal: 2,
+    deposit: 3,
+    balance: -1,
+    hasSeparateAmount: false,
   });
 
   useEffect(() => {
@@ -137,6 +224,19 @@ export const ImportsView: React.FC = () => {
     uploadMutation.mutate(formData, {
       onSuccess: (job: ImportJob) => {
         setCurrentJobId(job.id);
+        const guess = job.columnMapping;
+        setSuggestedMapping(guess);
+        if (guess) {
+          setMapping({
+            transactionDate: guess.fields.transactionDate,
+            description: guess.fields.description,
+            amount: guess.fields.amount ?? 2,
+            withdrawal: guess.fields.withdrawal ?? 2,
+            deposit: guess.fields.deposit ?? 3,
+            balance: guess.fields.balance ?? -1,
+            hasSeparateAmount: guess.fields.amount === undefined && guess.fields.withdrawal !== undefined,
+          });
+        }
         if (selectedFile.name.endsWith(".csv") || selectedFile.name.endsWith(".txt")) {
           setActiveStep("MAPPING");
         } else {
@@ -148,15 +248,20 @@ export const ImportsView: React.FC = () => {
 
   const handleConfirmMapping = () => {
     if (!currentJobId) return;
-    const dtoPayload: Record<string, string | number> = {
+    // ConfirmColumnMappingDto requires transactionDate + description; amount
+    // XOR withdrawal/deposit; balance is optional.
+    const dtoPayload: Record<string, number> = {
       transactionDate: Number(mapping.transactionDate) || 0,
-      description: Number(mapping.description) || 1,
+      description: Number(mapping.description) || 0,
     };
     if (mapping.hasSeparateAmount) {
-      dtoPayload.amount = Number(mapping.amount) || 2;
+      dtoPayload.withdrawal = Number(mapping.withdrawal) || 0;
+      dtoPayload.deposit = Number(mapping.deposit) || 0;
     } else {
-      dtoPayload.withdrawal = Number(mapping.withdrawal) || 2;
-      dtoPayload.deposit = Number(mapping.deposit) || 3;
+      dtoPayload.amount = Number(mapping.amount) || 0;
+    }
+    if (mapping.balance >= 0) {
+      dtoPayload.balance = mapping.balance;
     }
 
     columnMappingMutation.mutate(
@@ -169,8 +274,6 @@ export const ImportsView: React.FC = () => {
     );
   };
 
-  // Row action helper
-
   const handleCommit = () => {
     if (!currentJobId) return;
     commitMutation.mutate(currentJobId, {
@@ -179,6 +282,19 @@ export const ImportsView: React.FC = () => {
         setSelectedFile(null);
         setCurrentJobId(null);
       },
+    });
+  };
+
+  const handleResolveRow = (rowId: string, action: "accept" | "reject") => {
+    if (!currentJobId) return;
+    const categoryId = rowCategoryChoice[rowId];
+    updateRowMutation.mutate({
+      jobId: currentJobId,
+      rowId,
+      data:
+        action === "reject"
+          ? { reject: true }
+          : { confirmNotDuplicate: true, ...(categoryId ? { categoryId } : {}) },
     });
   };
 
@@ -278,7 +394,8 @@ export const ImportsView: React.FC = () => {
               <select
                 value={selectedAccountId}
                 onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
+                disabled={documentType === "CAS_STATEMENT" || documentType === "MUTUAL_FUND_STATEMENT"}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none disabled:opacity-40"
               >
                 <option value="">-- Auto-detect / Portfolio Target --</option>
                 {combinedAccounts.map((acc: Account) => (
@@ -287,6 +404,11 @@ export const ImportsView: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {(documentType === "CAS_STATEMENT" || documentType === "MUTUAL_FUND_STATEMENT") && (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  CAS/mutual-fund statements target a portfolio directly — no account needed.
+                </p>
+              )}
             </div>
 
             <div>
@@ -356,23 +478,91 @@ export const ImportsView: React.FC = () => {
             <p className="text-xs text-slate-400">Map statement headers to standardized transaction properties.</p>
           </div>
 
+          {suggestedMapping ? (
+            <div
+              className={`max-w-xl px-4 py-2.5 rounded-xl text-xs border ${
+                suggestedMapping.confidence >= 0.8
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+              }`}
+            >
+              Auto-detected mapping at {(suggestedMapping.confidence * 100).toFixed(0)}% confidence — review
+              before confirming.
+            </div>
+          ) : (
+            <div className="max-w-xl px-4 py-2.5 rounded-xl text-xs border bg-slate-800/40 border-slate-700 text-slate-400">
+              No header row detected — pick columns by zero-based index instead.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Date Column Index</label>
-              <input
-                type="number"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Date Column</label>
+              <ColumnPicker
+                headers={suggestedMapping?.headers}
                 value={mapping.transactionDate}
-                onChange={(e) => setMapping({ ...mapping, transactionDate: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100"
+                onChange={(v) => setMapping({ ...mapping, transactionDate: v })}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Description Column Index</label>
-              <input
-                type="number"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Description Column</label>
+              <ColumnPicker
+                headers={suggestedMapping?.headers}
                 value={mapping.description}
-                onChange={(e) => setMapping({ ...mapping, description: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100"
+                onChange={(v) => setMapping({ ...mapping, description: v })}
+              />
+            </div>
+          </div>
+
+          <div className="max-w-xl">
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <input
+                type="checkbox"
+                checked={mapping.hasSeparateAmount}
+                onChange={(e) => setMapping({ ...mapping, hasSeparateAmount: e.target.checked })}
+                className="rounded border-slate-700 bg-slate-950"
+              />
+              Statement has separate Withdrawal / Deposit columns
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+            {mapping.hasSeparateAmount ? (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Withdrawal (Debit) Column</label>
+                  <ColumnPicker
+                    headers={suggestedMapping?.headers}
+                    value={mapping.withdrawal}
+                    onChange={(v) => setMapping({ ...mapping, withdrawal: v })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Deposit (Credit) Column</label>
+                  <ColumnPicker
+                    headers={suggestedMapping?.headers}
+                    value={mapping.deposit}
+                    onChange={(v) => setMapping({ ...mapping, deposit: v })}
+                  />
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Signed Amount Column</label>
+                <ColumnPicker
+                  headers={suggestedMapping?.headers}
+                  value={mapping.amount}
+                  onChange={(v) => setMapping({ ...mapping, amount: v })}
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Balance Column (Optional)</label>
+              <ColumnPicker
+                headers={suggestedMapping?.headers}
+                value={mapping.balance}
+                onChange={(v) => setMapping({ ...mapping, balance: v })}
+                allowNone
               />
             </div>
           </div>
@@ -429,24 +619,131 @@ export const ImportsView: React.FC = () => {
                     <th className="p-3">Amount</th>
                     <th className="p-3">Category</th>
                     <th className="p-3">Status</th>
+                    <th className="p-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {stagedRows.map((row) => {
-                    const r = row as StagedRowDisplay;
+                    const r = getRowDisplay(row);
+                    const needsReview = row.status === "NEEDS_REVIEW";
                     return (
                     <tr key={row.id} className="hover:bg-slate-800/30">
-                      <td className="p-3 text-xs text-slate-300 font-mono">{r.transactionDate || "—"}</td>
+                      <td className="p-3 text-xs text-slate-300 font-mono">{r.date || "—"}</td>
                       <td className="p-3 font-semibold text-slate-100">{r.description || "—"}</td>
-                      <td className="p-3 text-xs font-bold text-emerald-400">{r.direction || "INFLOW"}</td>
+                      <td className="p-3 text-xs font-bold text-emerald-400">{r.direction || "—"}</td>
                       <td className="p-3 font-bold text-slate-100">₹{r.amount || "0"}</td>
-                      <td className="p-3 text-xs text-slate-400">{r.categoryName || "General"}</td>
+                      <td className="p-3 text-xs text-slate-400">
+                        {needsReview ? (
+                          <select
+                            value={rowCategoryChoice[row.id] || ""}
+                            onChange={(e) =>
+                              setRowCategoryChoice((prev) => ({ ...prev, [row.id]: e.target.value }))
+                            }
+                            className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100"
+                          >
+                            <option value="">{r.categoryName}</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          r.categoryName
+                        )}
+                      </td>
                       <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                            needsReview
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              : row.status === "DUPLICATE"
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          }`}
+                        >
                           {row.status}
                         </span>
+                        {row.rejectionReason && (
+                          <p className="mt-1 text-[10px] text-slate-500">{row.rejectionReason}</p>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {(needsReview || row.status === "DUPLICATE") && row.status !== "COMMITTED" && (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleResolveRow(row.id, "accept")}
+                              disabled={updateRowMutation.isPending}
+                              title="Accept / confirm not a duplicate"
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 disabled:opacity-40"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleResolveRow(row.id, "reject")}
+                              disabled={updateRowMutation.isPending}
+                              title="Reject row"
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 disabled:opacity-40"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Review Queue: NEEDS_REVIEW rows across every import job. The
+          review-queue response doesn't carry the parent import job id per
+          row, so items are resolved from that job's own Staged Preview tab
+          (open it via Import Job History below) rather than inline here. */}
+      {activeStep === "QUEUE" && (
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+          <div className="border-b border-slate-800 pb-4">
+            <h3 className="text-lg font-bold text-slate-100">Manual Review Queue</h3>
+            <p className="text-xs text-slate-400">
+              Rows flagged low-confidence, ambiguous institution/account match, or ambiguous duplicate across all import jobs.
+              Open the job's Staged Preview below to resolve an item.
+            </p>
+          </div>
+          {reviewQueue.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-8">Nothing needs review right now.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="border-b border-slate-800 bg-slate-950 text-slate-400 font-semibold">
+                  <tr>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Description</th>
+                    <th className="p-3">Amount</th>
+                    <th className="p-3">Confidence</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {reviewQueue.map((row) => {
+                    const r = getRowDisplay(row);
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-800/40">
+                        <td className="p-3 font-mono">{r.date || "—"}</td>
+                        <td className="p-3 font-semibold text-slate-100">{r.description || "—"}</td>
+                        <td className="p-3 font-bold text-slate-100">₹{r.amount || "0"}</td>
+                        <td className="p-3">
+                          {row.confidenceScore ? `${(Number(row.confidenceScore) * 100).toFixed(0)}%` : "—"}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -467,23 +764,62 @@ export const ImportsView: React.FC = () => {
               <thead className="border-b border-slate-800 bg-slate-950 text-slate-400 font-semibold">
                 <tr>
                   <th className="p-3">Filename</th>
-                  <th className="p-3">Type</th>
+                  <th className="p-3">Source</th>
                   <th className="p-3">Rows</th>
                   <th className="p-3">Created At</th>
                   <th className="p-3">Status</th>
+                  <th className="p-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {importJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-slate-800/40">
                     <td className="p-3 font-bold text-slate-100">{job.fileName}</td>
-                    <td className="p-3 text-slate-400">{job.documentType}</td>
-                    <td className="p-3 font-semibold text-slate-200">{job.parsedRowCount || job.totalRows || 0}</td>
+                    <td className="p-3 text-slate-400">{job.sourceType}</td>
+                    <td className="p-3 font-semibold text-slate-200">
+                      {job.importedRows}/{job.totalRows}
+                    </td>
                     <td className="p-3 text-slate-400">{job.createdAt}</td>
                     <td className="p-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         {job.status}
                       </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {(job.status === "AWAITING_REVIEW" ||
+                          job.status === "PARTIALLY_COMPLETED") && (
+                          <button
+                            onClick={() => {
+                              setCurrentJobId(job.id);
+                              setActiveStep("PREVIEW");
+                            }}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold"
+                          >
+                            View
+                          </button>
+                        )}
+                        {RETRYABLE_STATUSES.includes(job.status) && (
+                          <button
+                            onClick={() => retryMutation.mutate(job.id)}
+                            disabled={retryMutation.isPending}
+                            title="Re-attempt commit for remaining rows"
+                            className="p-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 disabled:opacity-40"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {ROLLBACKABLE_STATUSES.includes(job.status) && (
+                          <button
+                            onClick={() => rollbackMutation.mutate(job.id)}
+                            disabled={rollbackMutation.isPending}
+                            title="Undo every transaction this job created"
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 disabled:opacity-40"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

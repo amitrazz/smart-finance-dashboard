@@ -355,16 +355,16 @@ export interface Merchant {
   defaultCategoryId?: string;
 }
 
+// Matches the ImportJobStatus enum in packages/finance/prisma/schema.prisma exactly.
 export type ImportJobStatus =
   | "UPLOADED"
-  | "VALIDATED"
-  | "PARSED"
-  | "EXTRACTED"
-  | "NORMALIZED"
-  | "MATCHED"
-  | "DUPLICATES_DETECTED"
-  | "MAPPED"
-  | "NEEDS_REVIEW"
+  | "VALIDATING"
+  | "PARSING"
+  | "OCR_PROCESSING"
+  | "AI_EXTRACTING"
+  | "NORMALIZING"
+  | "DETECTING_DUPLICATES"
+  | "AWAITING_REVIEW"
   | "COMMITTING"
   | "COMPLETED"
   | "PARTIALLY_COMPLETED"
@@ -380,45 +380,90 @@ export type ImportRowStatus =
   | "REJECTED"
   | "ERRORED";
 
-export interface ImportRowStaging {
-  id: string;
-  importJobId: string;
-  rawData?: Record<string, unknown>;
-  normalizedData?: {
-    date: string;
-    amount: string;
-    direction: TransactionDirection;
-    description: string;
-  };
-  status?: ImportRowStatus;
-  confidenceScore?: number;
-  duplicateOfId?: string;
-  targetCategoryId?: string;
+// Matches ImportRowResponseDto.normalizedData for non-trade rows (bank/CSV/Excel imports) —
+// backend field is `transactionDate`, not `date`.
+export interface NormalizedTransactionRowData {
+  transactionDate: string;
+  description: string;
+  amount: string;
+  direction: "INFLOW" | "OUTFLOW";
+  merchantId?: string;
+  merchantName?: string;
   categoryId?: string;
-  direction?: TransactionDirection;
-  confirmNotDuplicate?: boolean;
-  reject?: boolean;
-  targetMerchantId?: string;
-  committedEntityType?: string;
-  committedEntityId?: string;
+  loanScheduleId?: string;
+  loanId?: string;
+  balanceAfterTransaction?: string;
 }
 
+// Matches ImportRowResponseDto.normalizedData for CAS/broker PDF imports (Trade rows).
+export interface NormalizedTradeRowData {
+  securityId: string;
+  schemeName: string;
+  isin: string | null;
+  tradeType: string;
+  quantity: string;
+  price: string;
+  amount: string;
+  tradeDate: string;
+}
+
+// Matches GET /finance/imports/:id/preview and /finance/imports/review-queue
+// (ImportRowResponseDto) exactly.
+export interface ImportRowStaging {
+  id: string;
+  rowNumber: number;
+  rawData: string[];
+  normalizedData: NormalizedTransactionRowData | NormalizedTradeRowData | null;
+  status: ImportRowStatus;
+  confidenceScore: string | null;
+  duplicateOfTransactionId: string | null;
+  rejectionReason: string | null;
+}
+
+// Body for POST /finance/imports/:id/rows/:rowId (UpdateImportRowDto) — a
+// request payload, not part of the row's response shape above.
+export interface UpdateImportRowInput {
+  categoryId?: string;
+  direction?: "INFLOW" | "OUTFLOW";
+  confirmNotDuplicate?: boolean;
+  reject?: boolean;
+}
+
+export interface ColumnMappingFields {
+  transactionDate: number;
+  description: number;
+  amount?: number;
+  withdrawal?: number;
+  deposit?: number;
+  balance?: number;
+}
+
+// The auto column-mapper's own guess, returned on the job as soon as a
+// CSV/Excel upload is parsed — `headers` are the file's actual column names
+// (for rendering a picker), `fields` are the resolved/guessed indices, see
+// packages/finance/src/import/application/services/csv-column-mapper.ts.
+export interface ColumnMappingData {
+  headers: string[];
+  fields: ColumnMappingFields;
+  confidence: number;
+}
+
+// Matches GET/POST /finance/imports responses (ImportJobResponseDto) exactly.
 export interface ImportJob {
   id: string;
   fileName: string;
   sourceType: string;
-  documentType?: string;
-  parsedRowCount?: number;
   status: ImportJobStatus;
+  targetAccountId: string | null;
   totalRows: number;
-  processedRows: number;
   mappedRows: number;
   duplicateRows: number;
-  reviewRows: number;
   importedRows: number;
   failedRows: number;
-  errorLog?: string[];
+  columnMapping: ColumnMappingData | null;
+  errorLog: Array<{ rowNumber: number; message: string }> | null;
   createdAt: string;
+  completedAt: string | null;
 }
 
 export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";

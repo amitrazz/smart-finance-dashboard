@@ -5,19 +5,23 @@ import { ErrorState } from "../../../components/common/ErrorState";
 import { useUIStore } from "../../../store/useUIStore";
 import { UploadCloud, ArrowRight } from "lucide-react";
 
-const INVESTMENT_DOCUMENT_TYPES = new Set(["CAS_STATEMENT", "MUTUAL_FUND_STATEMENT"]);
-
 // This module does not reimplement the upload → column-mapping → preview →
 // commit pipeline — that already exists, real and working, at the app-level
 // Imports feature (#/imports), which already supports CAS_STATEMENT and
 // MUTUAL_FUND_STATEMENT document types. This view just surfaces the user's
 // investment-related import jobs and hands off to that pipeline.
+//
+// ImportJobResponseDto has no `documentType` (that's per-Document, not
+// per-ImportJob) — CAS/mutual-fund PDF imports are identified the same way
+// the backend itself distinguishes them: sourceType PDF with no
+// targetAccountId, since those statements target a portfolio, not an
+// account (see UploadImportDto.accountId doc comment).
 export const ImportView: React.FC = () => {
   const { data: jobs = [], isLoading, isError, refetch } = useImports();
   const { navigateToRoute } = useUIStore();
 
   const investmentJobs = useMemo(
-    () => jobs.filter((j) => INVESTMENT_DOCUMENT_TYPES.has(j.documentType || "")),
+    () => jobs.filter((j) => j.sourceType === "PDF" && !j.targetAccountId),
     [jobs]
   );
 
@@ -70,7 +74,7 @@ export const ImportView: React.FC = () => {
                 {investmentJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-slate-800/40">
                     <td className="p-3 font-bold text-slate-100">{job.fileName}</td>
-                    <td className="p-3 text-slate-400">{job.documentType}</td>
+                    <td className="p-3 text-slate-400">{job.sourceType}</td>
                     <td className="p-3 font-semibold text-slate-200">{job.importedRows}/{job.totalRows}</td>
                     <td className="p-3 text-slate-400">{job.createdAt}</td>
                     <td className="p-3">

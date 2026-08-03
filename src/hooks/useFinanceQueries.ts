@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, AccountStatementItem } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, AccountStatementItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -676,7 +676,7 @@ export function useConfirmColumnMapping() {
 export function useUpdateImportRow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ jobId, rowId, data }: { jobId: string; rowId: string; data: Partial<ImportRowStaging> }) =>
+    mutationFn: ({ jobId, rowId, data }: { jobId: string; rowId: string; data: UpdateImportRowInput }) =>
       api.updateImportRow(jobId, rowId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["imports"] });

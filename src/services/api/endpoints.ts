@@ -43,6 +43,7 @@ import {
   Holding,
   ImportJob,
   ImportRowStaging,
+  UpdateImportRowInput,
   IncomeTrendResponse,
   Insight,
   InvestmentReturnsPortfolio,
@@ -446,7 +447,7 @@ export const api = {
       body: JSON.stringify(mapping),
       timeoutMs: 300000,
     }),
-  updateImportRow: (jobId: string, rowId: string, data: Partial<ImportRowStaging>) =>
+  updateImportRow: (jobId: string, rowId: string, data: UpdateImportRowInput) =>
     fetchWithAuth<ImportRowStaging>(
       `/finance/imports/${encodeURIComponent(jobId)}/rows/${encodeURIComponent(rowId)}`,
       {
