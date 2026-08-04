@@ -41,6 +41,7 @@ import {
   HealthDimensionDetail,
   HealthRecommendation,
   Holding,
+  IgnoreReason,
   ImportJob,
   ImportRowStaging,
   UpdateImportRowInput,
@@ -71,11 +72,16 @@ import {
   PortfolioDetail,
   PortfolioSnapshot,
   RealizedGain,
+  ReconciliationRecord,
+  ReconciliationSummary,
   RecordCreditCardPaymentInput,
   RetirementForecastResponse,
+  RunAutoMatchResult,
   SearchResultItem,
   SipPlan,
   SmartActionItem,
+  StatementLine,
+  StatementLineCandidate,
   Trade,
   Transaction,
   Transfer,
@@ -420,6 +426,92 @@ export const api = {
     fetchWithAuth<ReverseTransferResult>(`/finance/transfers/${encodeURIComponent(id)}/reverse`, {
       method: 'POST',
     }),
+
+  // Statement Reconciliation
+  getStatementLines: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<StatementLine>>(
+      `/finance/statement-lines${buildQuery(params)}`,
+    ),
+  getUnmatchedStatementLines: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<StatementLine>>(
+      `/finance/statement-lines/unmatched${buildQuery(params)}`,
+    ),
+  getSuggestedStatementLines: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<StatementLine>>(
+      `/finance/statement-lines/suggestions${buildQuery(params)}`,
+    ),
+  getStatementLine: (id: string) =>
+    fetchWithAuth<StatementLine>(`/finance/statement-lines/${encodeURIComponent(id)}`),
+  getStatementLineCandidates: (id: string) =>
+    fetchWithAuth<StatementLineCandidate[]>(
+      `/finance/statement-lines/${encodeURIComponent(id)}/candidates`,
+    ),
+  matchStatementLine: (id: string, transactionId: string, version: number) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/statement-lines/${encodeURIComponent(id)}/match${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ transactionId }),
+      },
+    ),
+  unmatchStatementLine: (id: string, version: number) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/statement-lines/${encodeURIComponent(id)}/unmatch${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
+  ignoreStatementLine: (id: string, reason: IgnoreReason, version: number) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/statement-lines/${encodeURIComponent(id)}/ignore${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      },
+    ),
+  createMissingTransactionFromStatementLine: (
+    id: string,
+    data: { categoryId?: string; notes?: string },
+    version: number,
+  ) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/statement-lines/${encodeURIComponent(id)}/create-transaction${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+
+  runReconciliationAutoMatch: (params?: { accountId?: string; importJobId?: string }) =>
+    fetchWithAuth<RunAutoMatchResult>(`/finance/reconciliation/auto-match${buildQuery(params)}`, {
+      method: 'POST',
+    }),
+  completeReconciliation: (params?: { accountId?: string; dateFrom?: string; dateTo?: string }) =>
+    fetchWithAuth<ReconciliationSummary>(`/finance/reconciliation/complete${buildQuery(params)}`, {
+      method: 'POST',
+    }),
+  getReconciliations: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<ReconciliationRecord>>(
+      `/finance/reconciliation${buildQuery(params)}`,
+    ),
+  getReconciliationSummary: (params?: { accountId?: string; dateFrom?: string; dateTo?: string }) =>
+    fetchWithAuth<ReconciliationSummary>(`/finance/reconciliation/summary${buildQuery(params)}`),
+  getReconciliationRecord: (id: string) =>
+    fetchWithAuth<ReconciliationRecord>(`/finance/reconciliation/${encodeURIComponent(id)}`),
+  confirmReconciliation: (id: string, version: number) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/reconciliation/${encodeURIComponent(id)}/confirm${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
+  rejectReconciliation: (id: string, version: number) =>
+    fetchWithAuth<StatementLine>(
+      `/finance/reconciliation/${encodeURIComponent(id)}/reject${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
 
   // Categories
   getCategories: () =>

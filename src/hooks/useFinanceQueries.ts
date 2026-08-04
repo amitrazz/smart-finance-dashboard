@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, ReconciliationItem, AccountStatementItem } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -96,8 +96,15 @@ export const QUERY_KEYS = {
   fixedDeposits: ["fixedDeposits"],
   investmentCash: ["investmentCash"],
   transfers: (params?: Record<string, unknown>) => ["transfers", params],
-  reconciliation: (params?: Record<string, unknown>) => ["reconciliation", params],
   accountStatements: (params?: Record<string, unknown>) => ["accountStatements", params],
+  statementLines: (params?: Record<string, unknown>) => ["statementLines", params],
+  statementLine: (id: string) => ["statementLines", id],
+  statementLineCandidates: (id: string) => ["statementLines", id, "candidates"],
+  unmatchedStatementLines: (params?: Record<string, unknown>) => ["statementLines", "unmatched", params],
+  suggestedStatementLines: (params?: Record<string, unknown>) => ["statementLines", "suggestions", params],
+  reconciliations: (params?: Record<string, unknown>) => ["reconciliations", params],
+  reconciliation: (id: string) => ["reconciliations", id],
+  reconciliationSummary: (params?: Record<string, unknown>) => ["reconciliationSummary", params],
 };
 
 // Settings
@@ -418,23 +425,228 @@ export function useReverseTransfer() {
   });
 }
 
-// Reconciliation Query & Mutations
-// There is no backend endpoint for matching imported statement lines against ledger
-// transactions — resolves to an error state instead of fabricating match results.
-export function useReconciliation(params?: { status?: string }) {
+// Statement Reconciliation — Queries & Mutations
+// Mirrors packages/finance/src/reconciliation on the backend: every imported
+// bank-statement row lands as a StatementLine (UNMATCHED/SUGGESTED/MATCHED/
+// DUPLICATE/IGNORED); ReconciliationRecord rows track the match decisions
+// (SUGGESTED/CONFIRMED/REJECTED/SUPERSEDED) behind SUGGESTED lines.
+const invalidateAfterReconciliation = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  affectsLedger = false,
+) => {
+  queryClient.invalidateQueries({ queryKey: ["statementLines"] });
+  queryClient.invalidateQueries({ queryKey: ["reconciliations"] });
+  queryClient.invalidateQueries({ queryKey: ["reconciliationSummary"] });
+  if (affectsLedger) {
+    queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+    queryClient.invalidateQueries({ queryKey: ["cashFlow"] });
+  }
+};
+
+export function useStatementLines(params?: {
+  accountId?: string;
+  importJobId?: string;
+  status?: string;
+  reviewRequired?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  cursor?: string;
+  limit?: number;
+}) {
   return useQuery({
-    queryKey: QUERY_KEYS.reconciliation(params),
-    queryFn: (): Promise<ReconciliationItem[]> =>
-      Promise.reject(new Error("Statement reconciliation is not available yet — no backend endpoint exists.")),
+    queryKey: QUERY_KEYS.statementLines(params),
+    queryFn: () => api.getStatementLines(params),
     enabled: isAuth(),
-    retry: false,
+    select: (res) => unwrapList<StatementLine>(res),
   });
 }
 
-export function useBulkReconcile() {
-  return useMutation<never, Error, { ids: string[]; action: "MATCH" | "DISMISS" }>({
-    mutationFn: async () => {
-      throw new Error("Statement reconciliation is not available yet — no backend endpoint exists.");
+export function useStatementLinesInfinite(params?: {
+  accountId?: string;
+  importJobId?: string;
+  status?: string;
+  reviewRequired?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.statementLines(params), "infinite"],
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const page = await api.getStatementLines({ ...params, cursor: pageParam });
+      return { ...page, data: unwrapList<StatementLine>(page) };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
+  });
+}
+
+export function useUnmatchedStatementLines(params?: { accountId?: string; importJobId?: string; limit?: number }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.unmatchedStatementLines(params),
+    queryFn: () => api.getUnmatchedStatementLines(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<StatementLine>(res),
+  });
+}
+
+export function useSuggestedStatementLines(params?: { accountId?: string; importJobId?: string; limit?: number }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.suggestedStatementLines(params),
+    queryFn: () => api.getSuggestedStatementLines(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<StatementLine>(res),
+  });
+}
+
+export function useStatementLine(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.statementLine(id),
+    queryFn: () => api.getStatementLine(id),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+export function useStatementLineCandidates(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.statementLineCandidates(id),
+    queryFn: () => api.getStatementLineCandidates(id),
+    enabled: isAuth() && Boolean(id),
+    select: (res) => unwrapList<StatementLineCandidate>(res),
+  });
+}
+
+export function useMatchStatementLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, transactionId, version }: { id: string; transactionId: string; version: number }) =>
+      api.matchStatementLine(id, transactionId, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast("Statement line matched", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useUnmatchStatementLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) => api.unmatchStatementLine(id, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast("Match undone", "info");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useIgnoreStatementLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason, version }: { id: string; reason: IgnoreReason; version: number }) =>
+      api.ignoreStatementLine(id, reason, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast("Statement line ignored", "info");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useCreateMissingTransactionFromStatementLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+      version,
+    }: {
+      id: string;
+      data: { categoryId?: string; notes?: string };
+      version: number;
+    }) => api.createMissingTransactionFromStatementLine(id, data, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient, true);
+      useUIStore.getState().showToast("Transaction created and reconciled", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useRunReconciliationAutoMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params?: { accountId?: string; importJobId?: string }) =>
+      api.runReconciliationAutoMatch(params),
+    onSuccess: (res) => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast(
+        `Auto-match complete — ${res.autoMatched} matched, ${res.suggested} suggested`,
+        "success",
+      );
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useCompleteReconciliation() {
+  return useMutation({
+    mutationFn: (params?: { accountId?: string; dateFrom?: string; dateTo?: string }) =>
+      api.completeReconciliation(params),
+    onSuccess: () => {
+      useUIStore.getState().showToast("Reconciliation marked complete", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useReconciliations(params?: {
+  statementLineId?: string;
+  transactionId?: string;
+  status?: string;
+  cursor?: string;
+  limit?: number;
+}) {
+  return useQuery({
+    queryKey: QUERY_KEYS.reconciliations(params),
+    queryFn: () => api.getReconciliations(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<ReconciliationRecord>(res),
+  });
+}
+
+export function useReconciliationSummary(params?: { accountId?: string; dateFrom?: string; dateTo?: string }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.reconciliationSummary(params),
+    queryFn: () => api.getReconciliationSummary(params),
+    enabled: isAuth(),
+  });
+}
+
+export function useConfirmReconciliation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) => api.confirmReconciliation(id, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast("Match confirmed", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useRejectReconciliation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) => api.rejectReconciliation(id, version),
+    onSuccess: () => {
+      invalidateAfterReconciliation(queryClient);
+      useUIStore.getState().showToast("Suggestion rejected", "info");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });

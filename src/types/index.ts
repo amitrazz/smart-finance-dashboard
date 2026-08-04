@@ -1796,26 +1796,100 @@ export interface InvestmentCashPosition {
   currency: string;
 }
 
-export type ReconciliationStatus = "MATCHED" | "PENDING" | "EXCEPTION" | "MANUAL_REVIEW" | "UNMATCHED";
+// Statement Reconciliation — mirrors the backend's StatementLineResponseDto /
+// ReconciliationResponseDto exactly (packages/finance/src/reconciliation on
+// the backend-platform repo). Every imported bank-statement row becomes a
+// StatementLine; the matching engine (or a manual match/confirm) links it to
+// a ledger Transaction via a Reconciliation decision record.
 
-export interface ReconciliationItem {
+export type StatementLineStatus = "UNMATCHED" | "SUGGESTED" | "MATCHED" | "DUPLICATE" | "IGNORED";
+
+export type ReconciliationDecisionStatus = "SUGGESTED" | "CONFIRMED" | "REJECTED" | "SUPERSEDED";
+
+export type ReconciliationMatchedBy = "SYSTEM_AUTO" | "USER";
+
+export type IgnoreReason =
+  | "DUPLICATE_IMPORT"
+  | "BANK_INFORMATIONAL"
+  | "ALREADY_RECONCILED"
+  | "BANK_CHARGES"
+  | "INTEREST_ADJUSTMENT"
+  | "OTHER";
+
+export interface StatementLine {
   id: string;
+  importJobId: string;
+  importRowId: string;
   accountId: string;
-  accountName: string;
-  statementDate: string;
-  importedTransaction: {
-    id: string;
-    date: string;
-    description: string;
-    amount: Money;
-    fitId?: string;
-  };
-  matchedTransaction?: Transaction;
-  status: ReconciliationStatus;
-  confidenceScore?: number; // 0 - 100% match score
-  discrepancyNote?: string;
-  reconciledAt?: string;
-  reconciledBy?: string;
+  transactionDate: string;
+  description: string;
+  amount: Money;
+  direction: "INFLOW" | "OUTFLOW" | "TRANSFER" | "TRANSFER_OUT" | "TRANSFER_IN";
+  referenceNumber: string | null;
+  externalReference: string | null;
+  merchantId: string | null;
+  status: StatementLineStatus;
+  matchedTransactionId: string | null;
+  duplicateOfTransactionId: string | null;
+  confidenceScore: number | null;
+  isDuplicate: boolean;
+  reviewRequired: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  reconciledAt: string | null;
+  ignoredAt: string | null;
+}
+
+/** Component scores (0-100) behind a Reconciliation row's confidenceScore — null for import-linked (no scoring ran) rows. */
+export interface ReconciliationScoreBreakdown {
+  amount: number;
+  date: number;
+  merchant: number;
+  reference: number;
+  account: number;
+}
+
+/** One in-window candidate Transaction for a statement line, ranked by weighted confidence score. Read-only. */
+export interface StatementLineCandidate {
+  transactionId: string;
+  score: number;
+  breakdown: ReconciliationScoreBreakdown;
+}
+
+export interface ReconciliationRecord {
+  id: string;
+  statementLineId: string;
+  transactionId: string;
+  status: ReconciliationDecisionStatus;
+  confidenceScore: number;
+  matchedBy: ReconciliationMatchedBy;
+  reason: string;
+  scoreBreakdown: ReconciliationScoreBreakdown | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReconciliationSummary {
+  importedLines: number;
+  matched: number;
+  suggested: number;
+  needsReview: number;
+  ignored: number;
+  duplicates: number;
+  unmatched: number;
+  /** matched / importedLines * 100, rounded to 2 decimal places. 100 when there are no lines at all. */
+  reconciliationPercent: number;
+  /** Signed sum of still-UNMATCHED statement-line amounts (INFLOW positive, OUTFLOW negative), as a decimal string. */
+  totalDifference: string;
+}
+
+export interface RunAutoMatchResult {
+  accountsScanned: number;
+  processed: number;
+  autoMatched: number;
+  suggested: number;
 }
 
 export type StatementType = "BANK" | "CREDIT_CARD" | "WALLET" | "INVESTMENT" | "IMPORTED";
