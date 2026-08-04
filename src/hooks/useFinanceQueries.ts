@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, AccountTransfer, ReconciliationItem, AccountStatementItem } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, ReconciliationItem, AccountStatementItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -364,26 +364,55 @@ export function useInvestmentCash() {
   });
 }
 
-// Account Transfers Query & Mutation
-// There is no backend endpoint for account-to-account transfers yet (no
-// `/finance/transfers` route exists in services/api/endpoints.ts). These hooks
-// intentionally resolve to an error state instead of fabricating transfer
-// history or pretending a transfer succeeded — consumers must render the
-// resulting isError state rather than treat empty/success as real data.
-export function useAccountTransfers(params?: { status?: string }) {
+// Transfer Center (`/finance/transfers`) — atomic account-to-account
+// transfers. The backend only returns account ids, not names; components
+// join fromAccountName/toAccountName against useAccounts() themselves.
+export function useTransfers(params?: { status?: string; type?: string; accountId?: string; dateFrom?: string; dateTo?: string; search?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.transfers(params),
-    queryFn: (): Promise<AccountTransfer[]> =>
-      Promise.reject(new Error("Account transfers are not available yet — no backend endpoint exists.")),
+    queryFn: () => api.getTransfers(params),
     enabled: isAuth(),
-    retry: false,
+    select: (res) => unwrapList<Transfer>(res),
   });
 }
 
+export function useTransfer(id: string) {
+  return useQuery({
+    queryKey: ["transfers", id],
+    queryFn: () => api.getTransfer(id),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+const invalidateAfterTransfer = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ["transfers"] });
+  queryClient.invalidateQueries({ queryKey: ["accounts"] });
+  queryClient.invalidateQueries({ queryKey: ["transactions"] });
+  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+  queryClient.invalidateQueries({ queryKey: ["cashFlow"] });
+  queryClient.invalidateQueries({ queryKey: ["cashPosition"] });
+};
+
 export function useCreateTransfer() {
-  return useMutation<{ success: boolean; transfer: Partial<AccountTransfer> }, Error, Partial<AccountTransfer>>({
-    mutationFn: async () => {
-      throw new Error("Fund transfers are not available yet — no backend endpoint exists.");
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateTransferInput) => api.createTransfer(data),
+    onSuccess: () => {
+      invalidateAfterTransfer(queryClient);
+      useUIStore.getState().showToast("Transfer completed successfully", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useReverseTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.reverseTransfer(id),
+    onSuccess: () => {
+      invalidateAfterTransfer(queryClient);
+      useUIStore.getState().showToast("Transfer reversed", "info");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });

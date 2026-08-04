@@ -78,6 +78,9 @@ import {
   SmartActionItem,
   Trade,
   Transaction,
+  Transfer,
+  CreateTransferInput,
+  ReverseTransferResult,
   UpdateCreditCardInput,
   UpdateGoalInput,
   UpdateLoanInput,
@@ -401,6 +404,21 @@ export const api = {
     fetchWithAuth<{ updatedCount: number }>('/finance/transactions/bulk-categorize', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  // Transfers (Transfer Center)
+  getTransfers: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchWithAuth<PaginatedResponse<Transfer>>(`/finance/transfers${buildQuery(params)}`),
+  createTransfer: (data: CreateTransferInput) =>
+    fetchWithAuth<Transfer>('/finance/transfers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getTransfer: (id: string) =>
+    fetchWithAuth<Transfer>(`/finance/transfers/${encodeURIComponent(id)}`),
+  reverseTransfer: (id: string) =>
+    fetchWithAuth<ReverseTransferResult>(`/finance/transfers/${encodeURIComponent(id)}/reverse`, {
+      method: 'POST',
     }),
 
   // Categories

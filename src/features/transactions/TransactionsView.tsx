@@ -10,7 +10,15 @@ const DIRECTION_TO_CATEGORY_KIND: Record<TransactionDirection, Category["kind"]>
   OUTFLOW: "EXPENSE",
   INFLOW: "INCOME",
   TRANSFER: "TRANSFER",
+  // System-generated Transfer Center legs — not selectable in the manual-add
+  // form below, but this map must stay exhaustive over TransactionDirection.
+  TRANSFER_OUT: "TRANSFER",
+  TRANSFER_IN: "TRANSFER",
 };
+
+const isCreditDirection = (d: TransactionDirection) => d === "INFLOW" || d === "TRANSFER_IN";
+const isTransferDirection = (d: TransactionDirection) =>
+  d === "TRANSFER" || d === "TRANSFER_OUT" || d === "TRANSFER_IN";
 
 export const TransactionsView: React.FC = () => {
   const { isAddTransactionOpen, setAddTransactionOpen, activeSubTab } = useUIStore();
@@ -50,7 +58,14 @@ export const TransactionsView: React.FC = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useTransactionsInfinite(filterDirection !== "ALL" ? { direction: filterDirection } : undefined);
+  } = useTransactionsInfinite(
+    // The backend's `direction` filter matches exactly one enum value —
+    // fine for INFLOW/OUTFLOW, but "TRANSFER" alone would miss the
+    // TRANSFER_OUT/TRANSFER_IN legs Transfer Center produces (see
+    // isTransferDirection below). So the TRANSFER pill fetches unfiltered
+    // and matches client-side instead of narrowing server-side.
+    filterDirection === "INFLOW" || filterDirection === "OUTFLOW" ? { direction: filterDirection } : undefined
+  );
   const { data: accounts = [] } = useAccounts();
   const { data: categories = [] } = useCategories();
   const createTxnMutation = useCreateTransaction();
@@ -82,14 +97,28 @@ export const TransactionsView: React.FC = () => {
     }
   }, [accounts, accountId, directionCategories, categoryId]);
 
-  // Flatten all loaded pages into a single list
-  const allTxns = useMemo<Transaction[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
+  // Flatten all loaded pages into a single list. The backend only returns
+  // accountId (see RawTransaction in useFinanceQueries.ts) — accountName is
+  // joined here against the already-loaded accounts list.
+  const accountNameById = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
+  const allTxns = useMemo<Transaction[]>(
+    () =>
+      (data?.pages.flatMap((p) => p.data) ?? []).map((t) => ({
+        ...t,
+        accountName: (t.accountId && accountNameById.get(t.accountId)) || t.accountName,
+      })),
+    [data, accountNameById]
+  );
   const totalCount = data?.pages[0]?.totalCount ?? data?.pages[0]?.total;
 
   // Memoize filtered transactions to avoid recomputing on every render
   const filteredTxns = useMemo(() => {
     return allTxns.filter((t: Transaction) => {
-      // Direction is now filtered server-side (see useTransactionsInfinite call above).
+      // INFLOW/OUTFLOW are filtered server-side (see useTransactionsInfinite
+      // call above); TRANSFER is matched here since it must catch the
+      // legacy TRANSFER tag plus the new TRANSFER_OUT/TRANSFER_IN legs.
+      if (filterDirection === "TRANSFER" && !isTransferDirection(t.direction)) return false;
+
       let matchesSubFilter = true;
       if (activeSubTab === "recurring") {
         matchesSubFilter = t.description.toLowerCase().includes("subscription");
@@ -103,7 +132,7 @@ export const TransactionsView: React.FC = () => {
 
       return matchesSubFilter && matchesSearch;
     });
-  }, [allTxns, activeSubTab, searchQuery]);
+  }, [allTxns, activeSubTab, searchQuery, filterDirection]);
 
   // Virtualize the (potentially large) loaded row set
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -346,17 +375,17 @@ export const TransactionsView: React.FC = () => {
                           <div className="flex items-center gap-3">
                             <div
                               className={`p-2.5 rounded-xl ${
-                                txn.direction === "INFLOW"
+                                isCreditDirection(txn.direction)
                                   ? "bg-emerald-500/10 text-emerald-400"
-                                  : txn.direction === "TRANSFER"
+                                  : isTransferDirection(txn.direction)
                                   ? "bg-indigo-500/10 text-indigo-400"
                                   : "bg-slate-800 text-slate-300"
                               }`}
                             >
-                              {txn.direction === "INFLOW" ? (
-                                <ArrowDownLeft className="w-4 h-4" />
-                              ) : txn.direction === "TRANSFER" ? (
+                              {isTransferDirection(txn.direction) ? (
                                 <RefreshCcw className="w-4 h-4" />
+                              ) : isCreditDirection(txn.direction) ? (
+                                <ArrowDownLeft className="w-4 h-4" />
                               ) : (
                                 <ArrowUpRight className="w-4 h-4" />
                               )}
@@ -376,8 +405,8 @@ export const TransactionsView: React.FC = () => {
                         <td className="p-4 text-xs font-medium text-slate-400">{txn.accountName || "Bank Account"}</td>
                         <td className="p-4 text-xs text-slate-400">{formatDate(txn.date)}</td>
                         <td className="p-4 text-right font-bold text-sm">
-                          <span className={txn.direction === "INFLOW" ? "text-emerald-400" : "text-slate-100"}>
-                            {txn.direction === "INFLOW" ? "+" : "-"}{formatCurrency(txn.amount)}
+                          <span className={isCreditDirection(txn.direction) ? "text-emerald-400" : "text-slate-100"}>
+                            {isCreditDirection(txn.direction) ? "+" : "-"}{formatCurrency(txn.amount)}
                           </span>
                         </td>
                       </tr>
@@ -439,8 +468,8 @@ export const TransactionsView: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Amount</p>
-                <p className={`text-3xl font-extrabold mt-1 ${selectedTxnDrawer.direction === "INFLOW" ? "text-emerald-400" : "text-slate-100"}`}>
-                  {selectedTxnDrawer.direction === "INFLOW" ? "+" : "-"}{formatCurrency(selectedTxnDrawer.amount)}
+                <p className={`text-3xl font-extrabold mt-1 ${isCreditDirection(selectedTxnDrawer.direction) ? "text-emerald-400" : "text-slate-100"}`}>
+                  {isCreditDirection(selectedTxnDrawer.direction) ? "+" : "-"}{formatCurrency(selectedTxnDrawer.amount)}
                 </p>
               </div>
 

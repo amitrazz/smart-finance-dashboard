@@ -13,7 +13,7 @@ import { PlanningGlobalToolbar } from "./components/PlanningGlobalToolbar";
 import { PlanningQuickActions } from "./components/PlanningQuickActions";
 import { AddContributionModal } from "./components/AddContributionModal";
 import { AdjustBudgetModal } from "./components/AdjustBudgetModal";
-import { TransferMoneyModal } from "./components/TransferMoneyModal";
+import { NewTransferModal as TransferMoneyModal } from "../accounts/components/NewTransferModal";
 
 import { OverviewSection } from "./views/OverviewSection";
 import { GoalsSection } from "./views/GoalsSection";

@@ -285,7 +285,11 @@ export interface RecordCreditCardPaymentInput {
 }
 
 
-export type TransactionDirection = "INFLOW" | "OUTFLOW" | "TRANSFER";
+// TRANSFER is a legacy single-leg tag kept for backward compatibility with
+// manually-tagged rows via POST /finance/transactions. Transfer Center
+// (POST /finance/transfers) produces the two-leg TRANSFER_OUT/TRANSFER_IN
+// pair instead — both excluded from income/expense analytics same as TRANSFER.
+export type TransactionDirection = "INFLOW" | "OUTFLOW" | "TRANSFER" | "TRANSFER_OUT" | "TRANSFER_IN";
 
 // Matches TransactionResponseDto (GET /finance/transactions, /:id). The
 // backend nests category/merchant as `{id, name}` objects and never returns
@@ -333,6 +337,62 @@ export interface CreateTransactionInput {
 export interface UpdateTransactionInput {
   categoryId?: string;
   notes?: string;
+}
+
+// Transfer Center (`/finance/transfers`). This codebase's transfer execution
+// is synchronous/atomic (no queue) — a Transfer only ever becomes durable as
+// COMPLETED or REVERSED; PENDING/PROCESSING/FAILED are reserved server-side
+// for a future async path and are not actually produced today.
+export type TransferStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "REVERSED";
+export type TransferType =
+  | "INTERNAL"
+  | "BANK"
+  | "CASH"
+  | "INVESTMENT"
+  | "CREDIT_CARD_PAYMENT"
+  | "LOAN_PAYMENT";
+
+// Matches TransferResponseDto (GET/POST /finance/transfers, /:id). The
+// backend only returns account ids, not names — fromAccountName/
+// toAccountName are joined client-side against the accounts list, same
+// pattern as Transaction.accountName.
+export interface Transfer {
+  id: string;
+  fromAccountId: string;
+  toAccountId: string;
+  fromAccountName?: string;
+  toAccountName?: string;
+  amount: Money;
+  status: TransferStatus;
+  type: TransferType;
+  description: string | null;
+  notes: string | null;
+  reference: string | null;
+  executedAt: string;
+  reversalOfTransferId: string | null;
+  reversedByTransferId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Matches CreateTransferDto (POST /finance/transfers).
+export interface CreateTransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: string;
+  currencyCode?: CurrencyCode;
+  type?: TransferType;
+  transferDate?: string;
+  description?: string;
+  notes?: string;
+  reference?: string;
+  idempotencyKey?: string;
+}
+
+// Matches ReverseTransferHandler's response (POST /finance/transfers/:id/reverse).
+export interface ReverseTransferResult {
+  original: Transfer;
+  reversal: Transfer;
 }
 
 // Matches CategoryResponseDto (GET/POST /finance/categories). The backend
@@ -1734,26 +1794,6 @@ export interface InvestmentCashPosition {
   withdrawable: Money;
   recentTradesCount: number;
   currency: string;
-}
-
-export type TransferStatus = "COMPLETED" | "SCHEDULED" | "RECURRING" | "FAILED" | "IN_PROGRESS";
-
-export interface AccountTransfer {
-  id: string;
-  fromAccountId: string;
-  fromAccountName: string;
-  toAccountId: string;
-  toAccountName: string;
-  amount: Money;
-  fee?: Money;
-  exchangeRate?: number;
-  transferDate: string;
-  scheduledDate?: string;
-  status: TransferStatus;
-  recurringFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY";
-  note?: string;
-  referenceId?: string;
-  createdAt: string;
 }
 
 export type ReconciliationStatus = "MATCHED" | "PENDING" | "EXCEPTION" | "MANUAL_REVIEW" | "UNMATCHED";

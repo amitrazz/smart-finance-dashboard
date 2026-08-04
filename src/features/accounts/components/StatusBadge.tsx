@@ -17,6 +17,7 @@ export type StatusVariant =
   | "READY"
   | "PROCESSING"
   | "SYNCED"
+  | "REVERSED"
   | "WARNING";
 
 interface StatusBadgeProps {
@@ -56,6 +57,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = "md", c
     case "INACTIVE":
     case "CLOSED":
       style = "bg-slate-800/80 text-slate-400 border-slate-700/40";
+      break;
+    case "REVERSED":
+      style = "bg-indigo-500/10 text-indigo-400 border-indigo-500/30";
       break;
   }
 

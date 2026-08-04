@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 
 import { motion, Variants } from "framer-motion";
-import { useAccounts, useCashPosition, useAccountTransfers } from "../../../hooks/useFinanceQueries";
+import { useAccounts, useCashPosition, useTransfers } from "../../../hooks/useFinanceQueries";
 import { useCreditCards } from "../../credit-cards/hooks/useCreditCardQueries";
 import { formatCurrency } from "../../../utils/formatters";
 import { BalanceCard } from "../components/BalanceCard";
@@ -35,7 +35,7 @@ const cardVariants: Variants = {
 export const AccountsOverviewView: React.FC<AccountsOverviewViewProps> = ({ onNavigate, onSelectAccount }) => {
   const { data: accounts = [], isLoading: accountsLoading } = useAccounts();
   const { data: cashPosition } = useCashPosition();
-  const { data: transfers = [] } = useAccountTransfers();
+  const { data: transfers = [] } = useTransfers();
   const { data: creditCards = [] } = useCreditCards();
 
   const totalCash = parseFloat(cashPosition?.totalCash?.amount || "0");
@@ -45,7 +45,17 @@ export const AccountsOverviewView: React.FC<AccountsOverviewViewProps> = ({ onNa
   const utilPct = limitTotal > 0 ? Math.round((creditTotal / limitTotal) * 100) : 0;
 
   const topAccounts = [...accounts].sort((a, b) => parseFloat(b.currentBalance?.amount || "0") - parseFloat(a.currentBalance?.amount || "0")).slice(0, 3);
-  const recentTransfers = transfers.slice(0, 3);
+
+  const accountNameById = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
+  const recentTransfers = useMemo(
+    () =>
+      transfers.slice(0, 3).map((t) => ({
+        ...t,
+        fromAccountName: accountNameById.get(t.fromAccountId) || t.fromAccountId,
+        toAccountName: accountNameById.get(t.toAccountId) || t.toAccountId,
+      })),
+    [transfers, accountNameById]
+  );
 
   const kpiCards = [
     { title: "Total Cash", amount: formatCurrency(totalCash, "INR").replace(/[₹$€£]/g, ""), currency: "₹", subtitle: "All liquid assets", icon: <DollarSign className="w-5 h-5" />, gradient: "from-emerald-500/20 to-teal-500/20" },

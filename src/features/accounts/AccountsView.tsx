@@ -23,6 +23,7 @@ import {
 import { AccountsGlobalToolbar } from "./components/AccountsGlobalToolbar";
 import { QuickActions } from "./components/QuickActions";
 import { AddAccountModal } from "./components/AddAccountModal";
+import { NewTransferModal } from "./components/NewTransferModal";
 
 // ─── Lazy Sub-Views ──────────────────────────────────────────────────────────
 
@@ -110,6 +111,14 @@ export const AccountsView: React.FC = () => {
   /** The currently open Account in the detail workspace */
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
+  const [isTransferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferSourceAccountId, setTransferSourceAccountId] = useState<string | undefined>(undefined);
+
+  const openTransferModal = useCallback((sourceAccountId?: string) => {
+    setTransferSourceAccountId(sourceAccountId);
+    setTransferModalOpen(true);
+  }, []);
+
   /**
    * The active route — resolved from:
    * 1. If an account is selected → "details"
@@ -186,7 +195,7 @@ export const AccountsView: React.FC = () => {
       case "reconciliation":
         return <ReconciliationView />;
       case "transfers":
-        return <TransfersView onNewTransfer={() => {}} />;
+        return <TransfersView onNewTransfer={() => openTransferModal()} />;
       // All statements sub-routes render the same StatementsSubView for now
       case "statements-overview":
       case "statements-bank":
@@ -226,7 +235,7 @@ export const AccountsView: React.FC = () => {
           </p>
         </div>
         <QuickActions
-          onTransfer={() => navigate("transfers")}
+          onTransfer={() => openTransferModal()}
           onAddAccount={() => useUIStore.getState().setAddAccountOpen(true)}
           onImport={() => navigate("statements-imports")}
           onReconcile={() => navigate("reconciliation")}
@@ -260,6 +269,11 @@ export const AccountsView: React.FC = () => {
       </AnimatePresence>
 
       <AddAccountModal isOpen={isAddAccountOpen} onClose={() => setAddAccountOpen(false)} />
+      <NewTransferModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setTransferModalOpen(false)}
+        defaultFromAccountId={transferSourceAccountId}
+      />
     </div>
   );
 };
