@@ -103,9 +103,9 @@ export const LoanDashboard: React.FC<LoanDashboardProps> = ({
     ? dashboard.averageInterestRate
     : (activeLoans.length > 0 ? activeLoans.reduce((acc, l) => acc + (l.interestRate || 0), 0) / activeLoans.length : 0);
 
-  const rawHighestEmi = parseMoney(dashboard?.highestInstallment);
+  const rawHighestEmi = parseMoney(dashboard?.highestInstallment?.installmentAmount);
   const loansMaxEmi = Math.max(...loans.map((l) => parseMoney(getLoanEmi(l))), 0);
-  const highestEmi = rawHighestEmi > 0 ? dashboard!.highestInstallment! : { amount: String(loansMaxEmi), currency: loans[0]?.currency || "INR" };
+  const highestEmi = rawHighestEmi > 0 ? dashboard!.highestInstallment!.installmentAmount : { amount: String(loansMaxEmi), currency: loans[0]?.currency || "INR" };
 
   // Chart 1: Debt Distribution by Category (from dashboard.loansByType or computed from active loans)
   const loansByType = Array.isArray(dashboard?.loansByType) && dashboard.loansByType.length > 0
@@ -136,12 +136,12 @@ export const LoanDashboard: React.FC<LoanDashboardProps> = ({
   const upcomingInstallments = Array.isArray(dashboard?.upcomingInstallments) && dashboard.upcomingInstallments.length > 0
     ? dashboard.upcomingInstallments
     : activeLoans.map((l, idx) => ({
-        id: l.id || `up_${idx}`,
+        scheduleId: l.id || `up_${idx}`,
         loanId: l.id,
         loanName: l.name,
         installmentNo: 1,
         dueDate: l.nextDueDate || new Date().toISOString().split("T")[0],
-        amount: typeof getLoanEmi(l) === "object" ? (getLoanEmi(l) as Money) : { amount: String(parseMoney(getLoanEmi(l))), currency: l.currency || "INR" },
+        installmentAmount: typeof getLoanEmi(l) === "object" ? (getLoanEmi(l) as Money) : { amount: String(parseMoney(getLoanEmi(l))), currency: l.currency || "INR" },
         status: "UPCOMING",
       }));
 
@@ -361,14 +361,14 @@ export const LoanDashboard: React.FC<LoanDashboardProps> = ({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {upcomingInstallments.slice(0, 5).map((item) => (
+              {upcomingInstallments.slice(0, 5).map((item, idx) => (
                 <div
-                  key={item.id}
+                  key={item.scheduleId}
                   className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-indigo-500/40 flex items-center justify-between gap-4 transition-all"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0 font-bold text-xs">
-                      #{item.installmentNo}
+                      #{item.installmentNo ?? idx + 1}
                     </div>
                     <div className="min-w-0">
                       <h4 className="text-xs font-bold text-slate-100 truncate">{item.loanName}</h4>
@@ -379,7 +379,7 @@ export const LoanDashboard: React.FC<LoanDashboardProps> = ({
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
                       <span className="text-xs font-extrabold text-emerald-400 block">
-                        {formatCurrency(item.amount)}
+                        {formatCurrency(item.installmentAmount)}
                       </span>
                       <span
                         className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase border ${

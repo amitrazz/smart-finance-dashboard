@@ -858,31 +858,27 @@ export interface Loan {
   updatedAt?: string;
 }
 
+export interface LoanInstallmentSummary {
+  scheduleId: string;
+  loanId: string;
+  loanName: string;
+  dueDate: string;
+  installmentAmount: Money | string;
+  status: string;
+}
+
 export interface LoanDashboardData {
   totalOutstanding: Money;
   totalMonthlyEmi: Money;
   averageInterestRate: number;
-  highestInstallment: Money;
-  nextDue?: {
-    loanId: string;
-    loanName: string;
-    dueDate: string;
-    amount: Money;
-  } | null;
+  highestInstallment: LoanInstallmentSummary;
+  nextDue?: LoanInstallmentSummary | null;
   debtRatio?: number;
   activeCount: number;
   closedCount: number;
   loansByType: Array<{ type: string; count: number; totalOutstanding: Money }>;
   loansByStatus: Array<{ status: string; count: number; totalOutstanding: Money }>;
-  upcomingInstallments: Array<{
-    id: string;
-    loanId: string;
-    loanName: string;
-    installmentNo: number;
-    dueDate: string;
-    amount: Money;
-    status: string;
-  }>;
+  upcomingInstallments: Array<LoanInstallmentSummary & { installmentNo?: number }>;
   recentlyPaid: Array<{
     id: string;
     loanId: string;
