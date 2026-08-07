@@ -40,7 +40,7 @@ interface SmartActionCardProps {
   onOpenDetails: (action: SmartActionItem) => void;
 }
 
-export const getActionIcon = (iconName?: string | null, category?: string) => {
+const getActionIcon = (iconName?: string | null, category?: string) => {
   switch (iconName) {
     case "shield":
       return <ShieldAlert className="w-5 h-5 text-indigo-400" />;

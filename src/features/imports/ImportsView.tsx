@@ -33,6 +33,7 @@ import {
   MerchantReviewCluster,
   ResolveReviewClusterInput,
 } from "../../types";
+import { PaginatedResponse } from "../../services/api/endpoints";
 import {
   UploadCloud,
   CheckCircle2,
@@ -754,7 +755,7 @@ export const ImportsView: React.FC = () => {
 
   const stagedRows = useMemo<ImportRowStaging[]>(() => {
     if (!previewData) return [];
-    return previewData.pages.flatMap((p: any) => {
+    return previewData.pages.flatMap((p: PaginatedResponse<ImportRowStaging> | ImportRowStaging[]) => {
       if (Array.isArray(p)) return p;
       if (p && Array.isArray(p.data)) return p.data;
       return [];
@@ -763,11 +764,14 @@ export const ImportsView: React.FC = () => {
 
   const totalStagedCount = useMemo(() => {
     if (!previewData?.pages[0]) return 0;
-    const firstPage = previewData.pages[0] as any;
-    if (typeof firstPage.totalCount === "number") return firstPage.totalCount;
-    if (typeof firstPage.total === "number") return firstPage.total;
-    if (Array.isArray(firstPage)) return firstPage.length;
-    if (Array.isArray(firstPage.data)) return firstPage.data.length;
+    const firstPage = previewData.pages[0] as PaginatedResponse<ImportRowStaging> | ImportRowStaging[];
+    if (!Array.isArray(firstPage)) {
+      if (typeof firstPage.totalCount === "number") return firstPage.totalCount;
+      if (typeof firstPage.total === "number") return firstPage.total;
+      if (Array.isArray(firstPage.data)) return firstPage.data.length;
+    } else {
+      return firstPage.length;
+    }
     return 0;
   }, [previewData]);
 

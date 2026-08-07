@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { FinancialCalendarEvent } from "../../types";
-import { CalendarEventCard, getCategoryStyles } from "../CalendarEventCard";
+import { CalendarEventCard } from "../CalendarEventCard";
+import { getCategoryStyles } from "../CalendarHelpers";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 interface MonthCalendarViewProps {

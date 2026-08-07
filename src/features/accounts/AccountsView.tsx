@@ -18,8 +18,8 @@ import { Account } from "../../types";
 import {
   AccountsNavigation,
   type ActiveRoute,
-  ROUTE_TO_SECTION,
 } from "./components/AccountsNavigation";
+import { ROUTE_TO_SECTION } from "./components/AccountsNavigation.constants";
 import { AccountsGlobalToolbar } from "./components/AccountsGlobalToolbar";
 import { QuickActions } from "./components/QuickActions";
 import { AddAccountModal } from "./components/AddAccountModal";

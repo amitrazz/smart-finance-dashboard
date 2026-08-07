@@ -175,6 +175,7 @@ export function useCardTransactions(
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapCardTransaction(raw: any, categoryMap?: Map<string, string>): Transaction {
   const categoryId = raw.category?.id || raw.categoryId || undefined;
   let categoryName = raw.category?.name || raw.categoryName || undefined;
@@ -237,6 +238,7 @@ export function useCardTransactionsInfinite(
     queryKey: [...CREDIT_CARD_QUERY_KEYS.transactions(cardId, params), "infinite"],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
       const res = await api.getCardTransactions(cardId, { ...params, cursor: pageParam });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let dataList: any[] = [];
       let nextCursor: string | null | undefined = undefined;
       let hasMore = false;

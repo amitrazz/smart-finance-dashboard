@@ -8,7 +8,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useUIStore } from "../../store/useUIStore";
 import { useGoals, useBudgets } from "../../hooks/useFinanceQueries";
 
-import { PlanningNavigation, PlanningSection, getPrimaryTab } from "./components/PlanningNavigation";
+import { PlanningNavigation, PlanningSection } from "./components/PlanningNavigation";
+import { getPrimaryTab } from "./components/PlanningNavigation.constants";
 import { PlanningGlobalToolbar } from "./components/PlanningGlobalToolbar";
 import { PlanningQuickActions } from "./components/PlanningQuickActions";
 import { AddContributionModal } from "./components/AddContributionModal";

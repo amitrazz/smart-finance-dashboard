@@ -31,15 +31,17 @@ export const LoansView: React.FC = () => {
       if (["all-loans", "debt-accounts"].includes(activeSubTab)) {
         setActiveTab("list");
       } else if (["payment-history", "schedule"].includes(activeSubTab)) {
-        if (loans.length > 0 && !selectedLoanId) {
-          setSelectedLoanId(loans[0].id);
+        if (loans.length > 0) {
+          if (!selectedLoanId) {
+            setSelectedLoanId(loans[0].id);
+          }
           setActiveTab("details");
         } else {
           setActiveTab("list");
         }
       }
     }
-  }, [activeSubTab, loans]);
+  }, [activeSubTab, loans, selectedLoanId]);
 
   // Modals state
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);

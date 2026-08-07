@@ -26,7 +26,7 @@ interface InvestmentsSubNavProps {
 // corporate actions, dividend/income tracking, and advanced performance
 // metrics (Sharpe/Alpha/Beta/CAGR/benchmark) have no backend support and
 // were removed rather than kept as dead tabs.
-export const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
+const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
   {
     id: "dashboard",
     label: "Dashboard",
@@ -108,7 +108,7 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrad
             onClick={() => setIsMobileDrawerOpen(true)}
             className="md:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold"
           >
-            <Menu className="w-4 h-4 text-indigo-400" />
+            <Menu className="w-4 h-4 text-emerald-400" />
             <span>Navigation Menu</span>
           </button>
 

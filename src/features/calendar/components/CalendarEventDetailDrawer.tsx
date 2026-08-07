@@ -7,7 +7,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { FinancialCalendarEvent } from "../types";
-import { getCategoryStyles, getSmartCountdown } from "./CalendarEventCard";
+import { getCategoryStyles, getSmartCountdown } from "./CalendarHelpers";
 import { formatCurrency } from "../../../utils/formatters";
 import { useUIStore } from "../../../store/useUIStore";
 

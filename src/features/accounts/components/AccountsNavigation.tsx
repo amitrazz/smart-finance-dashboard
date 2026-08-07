@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Home,
 } from "lucide-react";
+import { ROUTE_TO_SECTION } from "./AccountsNavigation.constants";
 
 // ─── Route Definitions ────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ export interface PrimaryTab {
   secondaryTabs?: SecondaryTab[];
 }
 
-export const PRIMARY_TABS: PrimaryTab[] = [
+const PRIMARY_TABS: PrimaryTab[] = [
   {
     id: "overview",
     label: "Overview",
@@ -107,31 +108,11 @@ export const PRIMARY_TABS: PrimaryTab[] = [
 
 // ─── Route Helpers ──────────────────────────────────────────────────────────
 
-export const ROUTE_TO_SECTION: Record<ActiveRoute, PrimarySection> = {
-  overview: "overview",
-  bank: "accounts",
-  wallets: "accounts",
-  "cash-accounts": "accounts",
-  "credit-cards": "accounts",
-  "fixed-deposits": "accounts",
-  "investments-cash": "accounts",
-  "cash-position": "cash",
-  transfers: "operations",
-  reconciliation: "operations",
-  institutions: "operations",
-  "statements-overview": "statements",
-  "statements-bank": "statements",
-  "statements-card": "statements",
-  "statements-imports": "statements",
-  "statements-history": "statements",
-  details: "accounts",
-};
-
-export function getActivePrimaryTab(route: ActiveRoute): PrimarySection {
+function getActivePrimaryTab(route: ActiveRoute): PrimarySection {
   return ROUTE_TO_SECTION[route] ?? "overview";
 }
 
-export function getPrimaryTab(id: PrimarySection): PrimaryTab {
+function getPrimaryTab(id: PrimarySection): PrimaryTab {
   return PRIMARY_TABS.find((t) => t.id === id) ?? PRIMARY_TABS[0];
 }
 

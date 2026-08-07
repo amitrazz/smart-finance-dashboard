@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
-import { CalendarEventCard, getSmartCountdown } from "../CalendarEventCard";
+import { CalendarEventCard } from "../CalendarEventCard";
+import { getSmartCountdown } from "../CalendarHelpers";
 import { UpcomingTimelineView } from "../CalendarViews/UpcomingTimelineView";
 import { FinancialCalendarEvent } from "../../types";
 

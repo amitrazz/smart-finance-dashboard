@@ -17,7 +17,7 @@ export const InvestmentsBreadcrumb: React.FC<InvestmentsBreadcrumbProps> = ({ ca
           onClick={() => setActiveSubTab("dashboard")}
           className="flex items-center gap-1 hover:text-slate-200 transition-colors"
         >
-          <Home className="w-3.5 h-3.5 text-indigo-400" />
+          <Home className="w-3.5 h-3.5 text-emerald-400" />
           <span>Investments</span>
         </button>
 
@@ -28,7 +28,7 @@ export const InvestmentsBreadcrumb: React.FC<InvestmentsBreadcrumbProps> = ({ ca
         {subTabLabel && subTabLabel !== categoryLabel && (
           <>
             <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-            <span className="text-indigo-400 font-bold">{subTabLabel}</span>
+            <span className="text-emerald-400 font-bold">{subTabLabel}</span>
           </>
         )}
       </div>

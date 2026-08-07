@@ -13,7 +13,7 @@ import { InsightsAnalyticsToolbar } from "./InsightsAnalyticsToolbar";
 import { InsightsMobileNavDrawer, InsightsSectionConfig } from "./InsightsMobileNavDrawer";
 import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
-export const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
+const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
   {
     id: "overview",
     label: "Overview",
