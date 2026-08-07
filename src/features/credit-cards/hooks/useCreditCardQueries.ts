@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../../../services/api/endpoints";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useUIStore } from "../../../store/useUIStore";
@@ -14,6 +14,7 @@ import {
   UpdateCreditCardInput,
   RecordCreditCardPaymentInput,
   Transaction,
+  Money,
 } from "../../../types";
 
 const isAuth = () => useAuthStore.getState().isAuthenticated;
@@ -160,7 +161,7 @@ export function useRecordCardPayment() {
 
 export function useCardTransactions(
   cardId: string,
-  params?: { limit?: number; category?: string; merchant?: string; search?: string }
+  params?: { limit?: number; category?: string; merchant?: string; search?: string; cursor?: string }
 ) {
   return useQuery({
     queryKey: CREDIT_CARD_QUERY_KEYS.transactions(cardId, params),
@@ -170,6 +171,95 @@ export function useCardTransactions(
       if (res && Array.isArray(res.data)) return res.data;
       return [] as Transaction[];
     },
+    enabled: isAuth() && Boolean(cardId),
+  });
+}
+
+export function mapCardTransaction(raw: any, categoryMap?: Map<string, string>): Transaction {
+  const categoryId = raw.category?.id || raw.categoryId || undefined;
+  let categoryName = raw.category?.name || raw.categoryName || undefined;
+  if (!categoryName && categoryId && categoryMap) {
+    categoryName = categoryMap.get(categoryId);
+  }
+
+  const merchantId = raw.merchant?.id || raw.merchantId || undefined;
+  let merchantName = raw.merchant?.name || raw.merchantName || undefined;
+
+  if (!merchantName && raw.description) {
+    const desc = String(raw.description);
+    if (desc.startsWith("UPI-")) {
+      const parts = desc.split("-");
+      if (parts.length >= 3) {
+        const party = parts.slice(2).join("-").replace(/\s+IN$/, "").trim();
+        if (party) merchantName = party;
+      }
+    }
+  }
+
+  let amountObj: Money;
+  if (typeof raw.amount === "string" || typeof raw.amount === "number") {
+    amountObj = { amount: String(raw.amount), currency: "INR" };
+  } else if (raw.amount && typeof raw.amount === "object") {
+    amountObj = { amount: String(raw.amount.amount || "0"), currency: raw.amount.currency || "INR" };
+  } else {
+    amountObj = { amount: "0", currency: "INR" };
+  }
+
+  const dateStr = raw.transactionDate || raw.date || new Date().toISOString();
+
+  return {
+    id: raw.id,
+    accountId: raw.accountId || null,
+    creditCardId: raw.creditCardId || null,
+    emiId: raw.emiId || null,
+    counterAccountId: raw.counterAccountId || null,
+    categoryId,
+    categoryName,
+    merchantId,
+    merchantName,
+    amount: amountObj,
+    direction: raw.direction || "OUTFLOW",
+    description: raw.description || "",
+    date: dateStr,
+    notes: raw.notes || null,
+    source: raw.source || "CARD",
+    isPending: Boolean(raw.isPending),
+    importRowId: raw.importRowId || null,
+    version: raw.version || 1,
+  };
+}
+
+export function useCardTransactionsInfinite(
+  cardId: string,
+  params?: { limit?: number; category?: string; merchant?: string; search?: string; cursor?: string }
+) {
+  return useInfiniteQuery({
+    queryKey: [...CREDIT_CARD_QUERY_KEYS.transactions(cardId, params), "infinite"],
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const res = await api.getCardTransactions(cardId, { ...params, cursor: pageParam });
+      let dataList: any[] = [];
+      let nextCursor: string | null | undefined = undefined;
+      let hasMore = false;
+      let totalCount: number | undefined = undefined;
+
+      if (Array.isArray(res)) {
+        dataList = res;
+      } else if (res && typeof res === "object") {
+        dataList = Array.isArray(res.data) ? res.data : [];
+        nextCursor = res.nextCursor;
+        hasMore = Boolean(res.hasMore);
+        totalCount = res.totalCount ?? res.total;
+      }
+
+      return {
+        data: dataList,
+        nextCursor,
+        hasMore,
+        totalCount,
+      };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
     enabled: isAuth() && Boolean(cardId),
   });
 }

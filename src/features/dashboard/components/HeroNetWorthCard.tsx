@@ -130,7 +130,7 @@ export const HeroNetWorthCard: React.FC<HeroNetWorthCardProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab("transactions")}
+          onClick={() => setActiveTab("transactions", "transfers")}
           type="button"
           className="px-5 py-2.5 rounded-2xl bg-slate-950/80 hover:bg-slate-900 text-slate-200 hover:text-white font-semibold text-xs border border-slate-800 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >

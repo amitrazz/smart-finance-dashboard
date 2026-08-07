@@ -75,6 +75,7 @@ export const CommandPaletteModal: React.FC = () => {
           />
           <button
             onClick={() => setSearchOpen(false)}
+            aria-label="Close search"
             className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -122,7 +123,16 @@ export const CommandPaletteModal: React.FC = () => {
                   {results.map((res) => (
                     <button
                       key={res.id}
-                      onClick={() => navigateTo(res.link.replace("/", ""))}
+                      onClick={() => {
+                        // res.link can carry a sub-path (e.g. "/planning/goals/123"),
+                        // not just a bare tab name like the Quick Navigation entries
+                        // below — stripping only the leading slash and passing the
+                        // whole remainder as `rawTab` silently produced an invalid
+                        // NavTab (e.g. "planning/goals/123") and broke navigation.
+                        const clean = res.link.replace(/^\/+/, "");
+                        const [tabPart, ...rest] = clean.split("/");
+                        navigateTo(tabPart, rest.length > 0 ? rest.join("/") : undefined);
+                      }}
                       className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/80 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">

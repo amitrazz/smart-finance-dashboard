@@ -16,6 +16,7 @@ import { EditLoanModal } from "./components/EditLoanModal";
 import { RecordPaymentModal } from "./components/RecordPaymentModal";
 import { ChangeInterestRateModal } from "./components/ChangeInterestRateModal";
 import { Loan } from "../../types";
+import { NAV_TAB_L2 } from "../../styles/navTabTokens";
 
 export const LoansView: React.FC = () => {
   const { activeSubTab } = useUIStore();
@@ -123,7 +124,7 @@ export const LoansView: React.FC = () => {
             onClick={() => setActiveTab("dashboard")}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "dashboard"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                ? `${NAV_TAB_L2}`
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -135,7 +136,7 @@ export const LoansView: React.FC = () => {
             onClick={() => setActiveTab("list")}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "list"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                ? `${NAV_TAB_L2}`
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -148,7 +149,7 @@ export const LoansView: React.FC = () => {
               onClick={() => setActiveTab("details")}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
                 activeTab === "details"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  ? `${NAV_TAB_L2}`
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >

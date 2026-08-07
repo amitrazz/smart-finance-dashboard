@@ -210,6 +210,7 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
             type="button"
             className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
             title="Mark Complete"
+            aria-label="Mark Complete"
           >
             <CheckCircle2 className="w-4 h-4" />
           </button>
@@ -219,6 +220,7 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
             type="button"
             className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer"
             title="Snooze Action"
+            aria-label="Snooze Action"
           >
             <Clock className="w-4 h-4" />
           </button>
@@ -229,6 +231,7 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
               type="button"
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
               title="Dismiss Action"
+              aria-label="Dismiss Action"
             >
               <X className="w-4 h-4" />
             </button>
@@ -247,6 +250,7 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
                   <span>Snooze Action</span>
                   <button
                     onClick={() => setShowSnoozeMenu(false)}
+                    aria-label="Close snooze menu"
                     className="text-slate-500 hover:text-slate-300"
                   >
                     <X className="w-3.5 h-3.5" />

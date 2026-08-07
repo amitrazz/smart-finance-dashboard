@@ -1,6 +1,7 @@
 import React from "react";
 import { X, ChevronRight } from "lucide-react";
 import { useUIStore } from "../../../store/useUIStore";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 export interface NavCategoryConfig {
   id: string;
@@ -40,6 +41,7 @@ export const InvestmentsMobileNavDrawer: React.FC<InvestmentsMobileNavDrawerProp
           <h3 className="text-sm font-bold text-slate-100">Investments Navigation</h3>
           <button
             onClick={onClose}
+            aria-label="Close navigation menu"
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
@@ -57,11 +59,11 @@ export const InvestmentsMobileNavDrawer: React.FC<InvestmentsMobileNavDrawerProp
                 <div
                   onClick={() => handleSubTabSelect(cat.defaultSubTab)}
                   className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-colors ${
-                    isCatActive ? "bg-indigo-600/10 text-indigo-300 font-bold border border-indigo-500/20" : "bg-slate-950/60 text-slate-300 hover:bg-slate-800/40"
+                    isCatActive ? `${NAV_TAB_L2}` : "bg-slate-950/60 text-slate-300 hover:bg-slate-800/40"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-indigo-400" />
+                    <Icon className={`w-4 h-4 ${isCatActive ? "text-nav-tab-l2-fg" : "text-slate-500"}`} />
                     <span className="text-xs">{cat.label}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-500" />

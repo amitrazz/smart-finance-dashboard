@@ -4,6 +4,7 @@ import { LotTable } from "../components/LotTable";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { Holding, InvestmentAssetClass } from "../../../types";
 import { Search, Filter } from "lucide-react";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface HoldingsViewProps {
   onSelectAsset?: (holding: Holding) => void;
@@ -64,7 +65,7 @@ export const HoldingsView: React.FC<HoldingsViewProps> = ({ onSelectAsset }) => 
               onClick={() => setSelectedAssetClass(ac)}
               className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${
                 selectedAssetClass === ac
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  ? `${NAV_TAB_L2}`
                   : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
               }`}
             >

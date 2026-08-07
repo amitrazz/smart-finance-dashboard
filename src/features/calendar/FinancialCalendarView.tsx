@@ -22,6 +22,7 @@ import { WeekAgendaView } from "./components/CalendarViews/WeekAgendaView";
 import { DayScheduleView } from "./components/CalendarViews/DayScheduleView";
 import { CalendarEventDetailDrawer } from "./components/CalendarEventDetailDrawer";
 import { NotificationsTabFeed } from "./components/NotificationsTabFeed";
+import { NAV_TAB_L2 } from "../../styles/navTabTokens";
 
 const FILTER_PILLS: { key: CalendarFilterCategory; label: string }[] = [
   { key: "ALL", label: "All Events" },
@@ -112,6 +113,7 @@ export const FinancialCalendarView: React.FC = () => {
             type="button"
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-all cursor-pointer"
             title="Refresh Timeline"
+            aria-label="Refresh timeline"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -126,7 +128,7 @@ export const FinancialCalendarView: React.FC = () => {
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeSubTab === "CALENDAR"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800"
             }`}
           >
@@ -139,7 +141,7 @@ export const FinancialCalendarView: React.FC = () => {
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeSubTab === "SMART_ACTIONS"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800"
             }`}
           >
@@ -152,7 +154,7 @@ export const FinancialCalendarView: React.FC = () => {
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeSubTab === "SYSTEM_ALERTS"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800"
             }`}
           >
@@ -165,7 +167,7 @@ export const FinancialCalendarView: React.FC = () => {
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeSubTab === "ACTIVITY"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800"
             }`}
           >
@@ -181,7 +183,7 @@ export const FinancialCalendarView: React.FC = () => {
               onClick={() => setViewMode("UPCOMING")}
               type="button"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                viewMode === "UPCOMING" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
+                viewMode === "UPCOMING" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Upcoming
@@ -190,7 +192,7 @@ export const FinancialCalendarView: React.FC = () => {
               onClick={() => setViewMode("MONTH")}
               type="button"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                viewMode === "MONTH" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
+                viewMode === "MONTH" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Month
@@ -199,7 +201,7 @@ export const FinancialCalendarView: React.FC = () => {
               onClick={() => setViewMode("WEEK")}
               type="button"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                viewMode === "WEEK" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
+                viewMode === "WEEK" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Week
@@ -208,7 +210,7 @@ export const FinancialCalendarView: React.FC = () => {
               onClick={() => setViewMode("DAY")}
               type="button"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                viewMode === "DAY" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
+                viewMode === "DAY" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Day
@@ -232,7 +234,7 @@ export const FinancialCalendarView: React.FC = () => {
                 type="button"
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                   activeFilter === pill.key
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                    ? `${NAV_TAB_L2}`
                     : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800"
                 }`}
               >

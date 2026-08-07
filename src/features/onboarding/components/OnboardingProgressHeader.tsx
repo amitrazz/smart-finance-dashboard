@@ -78,6 +78,7 @@ export const OnboardingProgressHeader: React.FC<HeaderProps> = ({
               type="button"
               className="p-2 text-xs font-semibold text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-1.5"
               title="Reset Onboarding"
+              aria-label="Reset onboarding progress"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Reset</span>

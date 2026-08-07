@@ -23,6 +23,7 @@ import { SmartActionCard } from "./components/SmartActionCard";
 import { SmartActionDetailDrawer } from "./components/SmartActionDetailDrawer";
 import { SmartActionItem, ActionStatus } from "../../types";
 import { useUIStore, NavTab } from "../../store/useUIStore";
+import { NAV_TAB_L2 } from "../../styles/navTabTokens";
 
 export const SmartActionCenter: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState("TODAY");
@@ -111,7 +112,7 @@ export const SmartActionCenter: React.FC = () => {
               onClick={() => setActiveStatus("ACTIVE")}
               className={`px-3 py-1 rounded-lg transition-all ${
                 activeStatus === "ACTIVE"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  ? `${NAV_TAB_L2}`
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -156,8 +157,9 @@ export const SmartActionCenter: React.FC = () => {
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}
             type="button"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-all cursor-pointer"
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-all cursor-pointer disabled:opacity-50"
             title="Refresh Smart Actions"
+            aria-label="Refresh Smart Actions"
           >
             <RotateCcw className={`w-4 h-4 ${refreshMutation.isPending ? "animate-spin text-indigo-400" : ""}`} />
           </button>
@@ -175,7 +177,7 @@ export const SmartActionCenter: React.FC = () => {
               type="button"
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                 isSelected
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-400/40"
+                  ? `${NAV_TAB_L2}`
                   : "bg-slate-950/70 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700"
               }`}
             >

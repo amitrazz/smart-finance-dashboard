@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sliders, X, RefreshCw } from "lucide-react";
 import { useBudgets, useBudgetCategories, useUpdateCategoryAllocation } from "../../../hooks/useFinanceQueries";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface AdjustBudgetModalProps {
   isOpen: boolean;
@@ -11,6 +12,10 @@ interface AdjustBudgetModalProps {
 
 export const AdjustBudgetModal: React.FC<AdjustBudgetModalProps> = ({ isOpen, onClose, defaultBudgetId }) => {
   const { data: budgets = [] } = useBudgets();
+  const [budgetSearch, setBudgetSearch] = useState("");
+  const { data: budgetSearchResults = [], isFetching: isBudgetSearchFetching } = useBudgets(
+    budgetSearch ? { search: budgetSearch } : undefined
+  );
   const [budgetId, setBudgetId] = useState(defaultBudgetId ?? "");
   const { data: categories = [] } = useBudgetCategories(budgetId);
   const mutation = useUpdateCategoryAllocation();
@@ -67,17 +72,18 @@ export const AdjustBudgetModal: React.FC<AdjustBudgetModalProps> = ({ isOpen, on
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400">Budget</label>
-              <select
+              <AsyncSearchSelect
                 value={budgetId}
-                onChange={(e) => { setBudgetId(e.target.value); setCategoryId(""); }}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50"
-              >
-                <option value="" disabled>Select a budget</option>
-                {budgets.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+                valueLabel={budgets.find((b) => b.id === budgetId)?.name || "Select a budget"}
+                items={budgetSearchResults}
+                isFetching={isBudgetSearchFetching}
+                onSearch={setBudgetSearch}
+                onSelect={(b) => { setBudgetId(b.id); setCategoryId(""); }}
+                getOptionKey={(b) => b.id}
+                placeholder="Select a budget"
+                emptyMessage="No matching budgets"
+                renderOption={(b) => <span className="truncate">{b.name}</span>}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400">Category</label>

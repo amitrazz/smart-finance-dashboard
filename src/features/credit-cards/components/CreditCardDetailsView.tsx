@@ -25,6 +25,7 @@ import { CardDocumentsTab } from "./CardDocumentsTab";
 import { CardSettingsTab } from "./CardSettingsTab";
 import { CreditCard } from "../../../types";
 import { ConfirmModal } from "../../../components/common/ConfirmModal";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface CreditCardDetailsViewProps {
   cardId: string;
@@ -233,7 +234,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeTab === tab.id
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                ? `${NAV_TAB_L2}`
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -247,7 +248,7 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
       <div className="space-y-6">
         {activeTab === "overview" && <OverviewTab cardId={cardId} />}
         {activeTab === "statements" && <StatementsTab cardId={cardId} onPayCard={onPayCard} />}
-        {activeTab === "payments" && <PaymentsTab cardId={cardId} />}
+        {activeTab === "payments" && <PaymentsTab cardId={cardId} onRecordPayment={() => onPayCard(card)} />}
         {activeTab === "transactions" && <CardTransactionsTab cardId={cardId} />}
         {activeTab === "emis" && <CardEmisTab cardId={cardId} />}
         {activeTab === "rewards" && <CardRewardsTab cardId={cardId} />}

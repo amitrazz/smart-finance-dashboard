@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { useFinancialHealthHistory, HEALTH_DIMENSION_LABELS, getRatingLabel } from "../hooks/useFinancialHealth";
 import { DetailedFinancialHealthScore, HealthDimensionKey, HealthDimensionDetail } from "../../../types";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface DrawerProps {
   isOpen: boolean;
@@ -107,6 +108,7 @@ export const FinancialHealthDetailDrawer: React.FC<DrawerProps> = ({
             <button
               onClick={onClose}
               type="button"
+              aria-label="Close"
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -147,7 +149,7 @@ export const FinancialHealthDetailDrawer: React.FC<DrawerProps> = ({
                       type="button"
                       className={`px-2.5 py-1 text-[11px] font-bold uppercase rounded-lg transition-all ${
                         activePeriod === p
-                          ? "bg-indigo-600 text-white"
+                          ? `${NAV_TAB_L2}`
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -203,7 +205,7 @@ export const FinancialHealthDetailDrawer: React.FC<DrawerProps> = ({
                   onClick={() => setActiveDimension("ALL")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     activeDimension === "ALL"
-                      ? "bg-indigo-600 text-white"
+                      ? `${NAV_TAB_L2}`
                       : "bg-slate-950 text-slate-400 hover:bg-slate-800 border border-slate-800"
                   }`}
                 >
@@ -216,7 +218,7 @@ export const FinancialHealthDetailDrawer: React.FC<DrawerProps> = ({
                     onClick={() => setActiveDimension(comp.code)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                       activeDimension === comp.code
-                        ? "bg-indigo-600 text-white"
+                        ? `${NAV_TAB_L2}`
                         : "bg-slate-950 text-slate-400 hover:bg-slate-800 border border-slate-800"
                     }`}
                   >

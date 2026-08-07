@@ -332,6 +332,8 @@ export const CalendarEventCard: React.FC<CalendarEventCardProps> = ({
           <button
             type="button"
             className="p-1.5 rounded-xl text-slate-500 group-hover:text-slate-300 transition-colors"
+            aria-label="View event details"
+            tabIndex={-1}
           >
             <ChevronRight className="w-4 h-4" />
           </button>

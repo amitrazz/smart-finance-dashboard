@@ -50,6 +50,7 @@ export const InsightsAnalyticsToolbar: React.FC<InsightsAnalyticsToolbarProps> =
             onClick={onRefresh}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all"
             title="Refresh Analytics Data"
+            aria-label="Refresh analytics data"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>

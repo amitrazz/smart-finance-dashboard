@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -41,11 +41,14 @@ export const QUERY_KEYS = {
   accountHistory: (id: string, params?: Record<string, unknown>) => ["accounts", id, "history", params],
   transactions: (params?: Record<string, unknown>) => ["transactions", params],
   transaction: (id: string) => ["transactions", id],
-  categories: ["categories"],
+  categories: (params?: Record<string, unknown>) => ["categories", params],
   imports: (params?: Record<string, unknown>) => ["imports", params],
   reviewQueue: (params?: Record<string, unknown>) => ["reviewQueue", params],
   importJob: (id: string) => ["imports", id],
   importPreview: (id: string, params?: Record<string, unknown>) => ["imports", id, "preview", params],
+  merchants: (params?: Record<string, unknown>) => ["merchants", params],
+  reviewClusters: (params?: Record<string, unknown>) => ["reviewClusters", params],
+  reviewCluster: (id: string) => ["reviewClusters", id],
   documents: (params?: Record<string, unknown>) => ["documents", params],
   document: (id: string) => ["documents", id],
   holdings: (params?: Record<string, unknown>) => ["holdings", params],
@@ -822,10 +825,10 @@ export function useBulkCategorizeTransactions() {
 export const useBulkCategorize = useBulkCategorizeTransactions;
 
 // Categories
-export function useCategories() {
+export function useCategories(params?: { search?: string; limit?: number }) {
   return useQuery({
-    queryKey: QUERY_KEYS.categories,
-    queryFn: () => api.getCategories(),
+    queryKey: QUERY_KEYS.categories(params),
+    queryFn: () => api.getCategories(params),
     enabled: isAuth(),
     select: (res) => unwrapList<Category>(res),
   });
@@ -836,7 +839,7 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: (data: Partial<Category>) => api.createCategory(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.categories });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       useUIStore.getState().showToast("Category created", "success");
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
@@ -844,29 +847,150 @@ export function useCreateCategory() {
 }
 
 // Imports & Documents
+//
+// Polls while any job in the list hasn't reached a terminal status yet, so
+// Import Job History reflects PARSING/OCR_PROCESSING/etc. progressing to
+// AWAITING_REVIEW/COMPLETED/FAILED without the user needing to manually
+// refresh — this list previously only ever updated via mutation
+// invalidation, so a job's row froze on its upload-time status (e.g.
+// "PARSING") for as long as the user stayed on the page.
 export function useImportJobs(params?: { limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.imports(params),
     queryFn: () => api.getImportJobs(params),
     enabled: isAuth(),
     select: (res) => unwrapList<ImportJob>(res),
+    refetchInterval: (query) => {
+      const jobs = query.state.data ? unwrapList<ImportJob>(query.state.data) : [];
+      const hasActiveJob = jobs.some((j) => !TERMINAL_POST_UPLOAD_STATUSES.includes(j.status));
+      return hasActiveJob ? 4000 : false;
+    },
   });
 }
 
-export function useReviewQueue(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.reviewQueue(params),
-    queryFn: () => api.getReviewQueue(params),
+// Cursor-paginated ("Load More") rather than a single fixed-limit fetch —
+// the review queue can span many jobs' worth of NEEDS_REVIEW rows, and a
+// plain useQuery previously silently truncated to one page while a caller
+// used `.length` on that truncated array as if it were the true total.
+export function useReviewQueueInfinite(params?: { limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.reviewQueue(params), "infinite"],
+    queryFn: ({ pageParam }: { pageParam?: string }) => api.getReviewQueue({ ...params, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
     enabled: isAuth(),
-    select: (res) => unwrapList<ImportRowStaging>(res),
   });
 }
 
-export function useImportJob(id: string) {
+// Counterparty Intelligence — Unknown Counterparty Workflow. Distinct from
+// useReviewQueue above: that lists ImportRowStaging rows (per-job,
+// snapshotted at import time); these list MerchantReviewCluster groups
+// (cross-job, live — every raw narration variant of the same unresolved
+// counterparty grouped into one reviewable/resolvable unit).
+export function useMerchants(params?: { search?: string; merchantType?: string; limit?: number }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.merchants(params),
+    queryFn: () => api.getMerchants(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<Merchant>(res),
+  });
+}
+
+// Deliberately a distinct query-key prefix ("merchant", singular) from
+// useMerchants' ("merchants", plural + params) — TanStack Query's default
+// key hashing runs entries through JSON.stringify, which collapses
+// `undefined` array elements to `null`, so `["merchants", undefined]`
+// (useMerchants() with no filters) and `["merchants", null]` (this hook,
+// disabled) would otherwise hash identically and share one cache slot —
+// this disabled query would then silently render the *list* query's cached
+// response as if it were a single Merchant.
+export function useMerchant(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["merchant", id],
+    queryFn: () => api.getMerchant(id as string),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+// Cursor-paginated ("Load More") for the same reason as
+// useReviewQueueInfinite above — cursor is driven by pagination itself
+// (via pageParam), not passed in by the caller.
+export function useReviewClustersInfinite(params?: { status?: ReviewClusterStatus; limit?: number }) {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.reviewClusters(params), "infinite"],
+    queryFn: ({ pageParam }: { pageParam?: string }) => api.getReviewClusters({ ...params, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
+    enabled: isAuth(),
+  });
+}
+
+export function useReviewCluster(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.reviewCluster(id),
+    queryFn: () => api.getReviewCluster(id),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+// `silent` (caller-side only, not sent to the backend) lets bulk callers —
+// "Ignore Selected" / auto-resolve high-confidence matches — suppress the
+// per-call toast and show one summary toast instead.
+export function useResolveReviewCluster() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ResolveReviewClusterInput; silent?: boolean }) =>
+      api.resolveReviewCluster(id, data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["reviewClusters"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.reviewQueue() });
+      queryClient.invalidateQueries({ queryKey: ["imports"] });
+      if (!variables.silent) {
+        useUIStore
+          .getState()
+          .showToast(
+            variables.data.status === "IGNORED" ? "Cluster ignored" : "Counterparty resolved",
+            "success",
+          );
+      }
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+// Statuses a job can settle into after upload without an explicit user
+// action (commit/rollback). Anything else (UPLOADED, VALIDATING, PARSING,
+// OCR_PROCESSING, AI_EXTRACTING, NORMALIZING, DETECTING_DUPLICATES) is
+// in-flight processing that a poller should keep waiting through.
+export const TERMINAL_POST_UPLOAD_STATUSES: ImportJobStatus[] = [
+  "AWAITING_REVIEW",
+  "FAILED",
+  "COMPLETED",
+  "PARTIALLY_COMPLETED",
+  "ROLLED_BACK",
+];
+
+// `pollIntervalMs` (not a plain `poll: boolean`) so a caller can slow the
+// cadence down instead of only being able to turn polling fully off —
+// e.g. ImportsView drops to a slower interval once its own give-up timeout
+// fires, rather than stopping entirely and never learning the job later
+// failed/completed. `poll: true` still works as a 2.5s-cadence shorthand.
+export function useImportJob(
+  id: string,
+  options?: { poll?: boolean; pollIntervalMs?: number }
+) {
+  const intervalMs = options?.pollIntervalMs ?? (options?.poll ? 2500 : undefined);
   return useQuery({
     queryKey: QUERY_KEYS.importJob(id),
     queryFn: () => api.getImportJob(id),
     enabled: isAuth() && Boolean(id),
+    refetchInterval: intervalMs
+      ? (query) => {
+          const status = query.state.data?.status;
+          if (status && TERMINAL_POST_UPLOAD_STATUSES.includes(status)) return false;
+          return intervalMs;
+        }
+      : undefined,
   });
 }
 
@@ -893,9 +1017,17 @@ export function useUploadImportFile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (formData: FormData) => api.uploadImportFile(formData),
-    onSuccess: () => {
+    onSuccess: (job) => {
       queryClient.invalidateQueries({ queryKey: ["imports"] });
-      useUIStore.getState().showToast("Statement uploaded successfully", "success");
+      // The job is very often still PARSING/OCR_PROCESSING/etc. at this
+      // point (only fast CSVs resolve synchronously) — don't claim success
+      // before it's actually done, since that reads as contradictory next
+      // to the "Processing Statement" screen the UI moves to.
+      if (job.status === "AWAITING_REVIEW") {
+        useUIStore.getState().showToast("Statement uploaded and parsed successfully", "success");
+      } else if (job.status !== "FAILED") {
+        useUIStore.getState().showToast("Statement received — processing started", "info");
+      }
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });
@@ -914,15 +1046,21 @@ export function useConfirmColumnMapping() {
   });
 }
 
+// `silent` is a caller-side flag, not sent to the backend (mutationFn only
+// forwards jobId/rowId/data) — bulk callers (Review Queue's Accept/Reject
+// Selected) set it so N queued mutateAsync calls don't stack N identical
+// "Row updated" toasts; they show one summary toast themselves instead.
 export function useUpdateImportRow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ jobId, rowId, data }: { jobId: string; rowId: string; data: UpdateImportRowInput }) =>
+    mutationFn: ({ jobId, rowId, data }: { jobId: string; rowId: string; data: UpdateImportRowInput; silent?: boolean }) =>
       api.updateImportRow(jobId, rowId, data),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["imports"] });
       queryClient.invalidateQueries({ queryKey: ["reviewQueue"] });
-      useUIStore.getState().showToast("Row updated", "success");
+      if (!variables.silent) {
+        useUIStore.getState().showToast("Row updated", "success");
+      }
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });

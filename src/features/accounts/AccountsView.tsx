@@ -24,6 +24,7 @@ import { AccountsGlobalToolbar } from "./components/AccountsGlobalToolbar";
 import { QuickActions } from "./components/QuickActions";
 import { AddAccountModal } from "./components/AddAccountModal";
 import { NewTransferModal } from "./components/NewTransferModal";
+import { AddInstitutionModal } from "../institutions/components/AddInstitutionModal";
 
 // ─── Lazy Sub-Views ──────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export const AccountsView: React.FC = () => {
 
   const [isTransferModalOpen, setTransferModalOpen] = useState(false);
   const [transferSourceAccountId, setTransferSourceAccountId] = useState<string | undefined>(undefined);
+  const [isAddInstitutionOpen, setAddInstitutionOpen] = useState(false);
 
   const openTransferModal = useCallback((sourceAccountId?: string) => {
     setTransferSourceAccountId(sourceAccountId);
@@ -178,6 +180,7 @@ export const AccountsView: React.FC = () => {
           <BankAccountsView
             onSelectAccount={handleSelectAccount}
             onTransfer={() => navigate("transfers")}
+            onStatement={() => navigate("statements-overview")}
           />
         );
       case "wallets":
@@ -191,7 +194,7 @@ export const AccountsView: React.FC = () => {
       case "investments-cash":
         return <InvestmentCashView />;
       case "institutions":
-        return <InstitutionsSubView />;
+        return <InstitutionsSubView onAddInstitution={() => setAddInstitutionOpen(true)} />;
       case "reconciliation":
         return <ReconciliationView />;
       case "transfers":
@@ -237,7 +240,10 @@ export const AccountsView: React.FC = () => {
         <QuickActions
           onTransfer={() => openTransferModal()}
           onAddAccount={() => useUIStore.getState().setAddAccountOpen(true)}
-          onImport={() => navigate("statements-imports")}
+          onImport={() => {
+            useUIStore.getState().setImportModalOpen(true);
+            useUIStore.getState().setActiveTab("imports");
+          }}
           onReconcile={() => navigate("reconciliation")}
           onRefresh={() => refetch()}
         />
@@ -274,6 +280,7 @@ export const AccountsView: React.FC = () => {
         onClose={() => setTransferModalOpen(false)}
         defaultFromAccountId={transferSourceAccountId}
       />
+      <AddInstitutionModal isOpen={isAddInstitutionOpen} onClose={() => setAddInstitutionOpen(false)} />
     </div>
   );
 };

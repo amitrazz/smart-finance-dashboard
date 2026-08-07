@@ -1,16 +1,23 @@
-import React from "react";
-import { X, FileText } from "lucide-react";
+import React, { useState } from "react";
+import { X, FileText, Check, Undo2 } from "lucide-react";
 import { CreditCardStatement } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { usePayCardStatement, useReverseCardStatementPayment } from "../../../hooks/useFinanceQueries";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 
 interface StatementDetailsModalProps {
+  cardId: string;
   statement: CreditCardStatement | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ statement, isOpen, onClose }) => {
-  if (!isOpen || !statement) return null;
+export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ cardId, statement, isOpen, onClose }) => {
+  const payStatementMutation = usePayCardStatement();
+  const reverseStatementMutation = useReverseCardStatementPayment();
+  const [paidAmount, setPaidAmount] = useState("");
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
+  const [isReversing, setIsReversing] = useState(false);
 
   const getVal = (val: unknown): number => {
     if (typeof val === "object" && val !== null) return parseFloat((val as { amount?: string }).amount || "0");
@@ -19,11 +26,43 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ st
     return 0;
   };
 
+  // Reset the payment form whenever a different statement is opened, and
+  // default the amount to the statement's outstanding balance.
+  React.useEffect(() => {
+    if (statement) {
+      setPaidAmount(getVal(statement.statementBalance || statement.closingBalance).toFixed(2));
+      setPaidDate(new Date().toISOString().split("T")[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statement?.id]);
+
+  if (!isOpen || !statement) return null;
+
   const statementBal = getVal(statement.statementBalance || statement.closingBalance);
   const openingBal = getVal(statement.openingBalance);
   const minDue = getVal(statement.minimumDue);
   const interest = getVal(statement.interest);
   const fees = getVal(statement.fees);
+  const canPay = statement.status !== "PAID";
+  const canReverse = statement.status === "PAID" || statement.status === "PARTIALLY_PAID";
+
+  const handlePay = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountVal = parseFloat(paidAmount || "0");
+    if (amountVal <= 0) return;
+    payStatementMutation.mutate({
+      cardId,
+      statementId: statement.id,
+      data: { paidAmount: String(amountVal), paidDate },
+    });
+  };
+
+  const handleConfirmReverse = () => {
+    reverseStatementMutation.mutate(
+      { cardId, statementId: statement.id },
+      { onSuccess: () => setIsReversing(false) }
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -40,6 +79,7 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ st
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -106,6 +146,72 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ st
               </span>
             </div>
           </div>
+
+          {/* Record / Reverse Payment for this specific statement */}
+          {canPay && (
+            <form onSubmit={handlePay} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Record Payment for This Statement</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="stmt-paid-amount" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Amount Paid
+                  </label>
+                  <input
+                    id="stmt-paid-amount"
+                    type="number"
+                    step="any"
+                    required
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="stmt-paid-date" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Paid Date
+                  </label>
+                  <input
+                    id="stmt-paid-date"
+                    type="date"
+                    required
+                    value={paidDate}
+                    onChange={(e) => setPaidDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={payStatementMutation.isPending || parseFloat(paidAmount || "0") <= 0}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {payStatementMutation.isPending ? (
+                  "Recording Payment..."
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" /> Record Payment
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {canReverse && (
+            <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/20 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-rose-300">Reverse Payment</p>
+                <p className="text-[11px] text-slate-400">Undo the payment recorded against this statement.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReversing(true)}
+                disabled={reverseStatementMutation.isPending}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Undo2 className="w-3.5 h-3.5" /> Reverse
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
@@ -117,6 +223,18 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ st
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isReversing}
+        title="Reverse Statement Payment?"
+        message="This will undo the payment recorded against this statement and restore its outstanding balance. This action cannot be undone."
+        confirmText="Reverse Payment"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={reverseStatementMutation.isPending}
+        onConfirm={handleConfirmReverse}
+        onClose={() => setIsReversing(false)}
+      />
     </div>
   );
 };

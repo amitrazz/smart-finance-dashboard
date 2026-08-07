@@ -57,6 +57,7 @@ export const PlanningGlobalToolbar: React.FC<PlanningGlobalToolbarProps> = ({ on
 
           <button
             onClick={onRefresh}
+            aria-label="Refresh Planning data"
             className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
             title="Refresh Planning data"
           >

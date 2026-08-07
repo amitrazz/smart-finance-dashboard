@@ -17,6 +17,7 @@ import {
   Building2,
 } from "lucide-react";
 import { formatCurrency, formatPercent } from "../../../utils/formatters";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import {
   useLoan,
   useLoanSchedule,
@@ -31,6 +32,7 @@ import {
   useAddLoanDocument,
 } from "../hooks/useLoanQueries";
 import { Loan } from "../../../types";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface LoanDetailsViewProps {
   loanId: string;
@@ -64,6 +66,9 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
   const [docCategory, setDocCategory] = useState("SANCTION_LETTER");
   const [docFileName, setDocFileName] = useState("");
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [reversePaymentTarget, setReversePaymentTarget] = useState<{ id: string } | null>(null);
+  const [deleteDocTarget, setDeleteDocTarget] = useState<{ id: string; fileName: string } | null>(null);
 
   const pauseMutation = usePauseLoan();
   const resumeMutation = useResumeLoan();
@@ -71,6 +76,7 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
   const reversePaymentMutation = useReverseLoanPayment();
   const deleteDocMutation = useDeleteLoanDocument();
   const addDocMutation = useAddLoanDocument();
+  const isStatusActionPending = pauseMutation.isPending || resumeMutation.isPending || closeMutation.isPending;
 
   if (isLoanLoading) {
     return (
@@ -122,6 +128,29 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
           setDocFileName("");
         },
       }
+    );
+  };
+
+  const handleConfirmClose = () => {
+    closeMutation.mutate(
+      { id: loan.id, version: loan.version },
+      { onSuccess: () => setIsCloseConfirmOpen(false) }
+    );
+  };
+
+  const handleConfirmReversePayment = () => {
+    if (!reversePaymentTarget) return;
+    reversePaymentMutation.mutate(
+      { loanId: loan.id, paymentId: reversePaymentTarget.id },
+      { onSuccess: () => setReversePaymentTarget(null) }
+    );
+  };
+
+  const handleConfirmDeleteDocument = () => {
+    if (!deleteDocTarget) return;
+    deleteDocMutation.mutate(
+      { loanId: loan.id, documentId: deleteDocTarget.id },
+      { onSuccess: () => setDeleteDocTarget(null) }
     );
   };
 
@@ -204,7 +233,8 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
             {loan.status === "ACTIVE" ? (
               <button
                 onClick={() => pauseMutation.mutate({ id: loan.id, version: loan.version })}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                disabled={isStatusActionPending}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <PauseCircle className="w-3.5 h-3.5" />
                 <span>Pause Repayments</span>
@@ -212,7 +242,8 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
             ) : loan.status === "PAUSED" ? (
               <button
                 onClick={() => resumeMutation.mutate({ id: loan.id, version: loan.version })}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                disabled={isStatusActionPending}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <PlayCircle className="w-3.5 h-3.5" />
                 <span>Resume Repayments</span>
@@ -221,8 +252,9 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
 
             {loan.status !== "CLOSED" && (
               <button
-                onClick={() => closeMutation.mutate({ id: loan.id, version: loan.version })}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setIsCloseConfirmOpen(true)}
+                disabled={isStatusActionPending}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Close Loan</span>
@@ -343,7 +375,7 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  ? `${NAV_TAB_L2}`
                   : "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
               }`}
             >
@@ -560,9 +592,11 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
                         <td className="py-3.5 px-4 text-center">
                           {pmt.status !== "REVERSED" && (
                             <button
-                              onClick={() => reversePaymentMutation.mutate({ loanId: loan.id, paymentId: pmt.id })}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
+                              onClick={() => setReversePaymentTarget({ id: pmt.id })}
+                              disabled={reversePaymentMutation.isPending}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title="Reverse Payment"
+                              aria-label="Reverse this payment"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </button>
@@ -663,9 +697,11 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
                   </div>
 
                   <button
-                    onClick={() => deleteDocMutation.mutate({ loanId: loan.id, documentId: doc.id })}
-                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 cursor-pointer"
+                    onClick={() => setDeleteDocTarget({ id: doc.id, fileName: doc.fileName })}
+                    disabled={deleteDocMutation.isPending}
+                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Delete document"
+                    aria-label="Delete document"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -701,6 +737,42 @@ export const LoanDetailsView: React.FC<LoanDetailsViewProps> = ({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isCloseConfirmOpen}
+        title="Close this loan?"
+        message={`This marks "${loan.name}" as closed. It will stop appearing in active EMI schedules and reminders. You can review it later from the closed loans filter.`}
+        confirmText="Close Loan"
+        cancelText="Keep Active"
+        variant="warning"
+        isLoading={closeMutation.isPending}
+        onConfirm={handleConfirmClose}
+        onClose={() => setIsCloseConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(reversePaymentTarget)}
+        title="Reverse this payment?"
+        message="This reverses the recorded payment and restores the corresponding installment/outstanding balance. This action cannot be undone from here."
+        confirmText="Reverse Payment"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={reversePaymentMutation.isPending}
+        onConfirm={handleConfirmReversePayment}
+        onClose={() => setReversePaymentTarget(null)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deleteDocTarget)}
+        title="Delete this document?"
+        message={`"${deleteDocTarget?.fileName ?? "This document"}" will be permanently removed from the loan's document vault.`}
+        confirmText="Delete Document"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteDocMutation.isPending}
+        onConfirm={handleConfirmDeleteDocument}
+        onClose={() => setDeleteDocTarget(null)}
+      />
     </div>
   );
 };

@@ -12,6 +12,7 @@ export default function Header({ darkMode, setDarkMode }: HeaderProps) {
       <h1 className="text-2xl font-bold">Smart Finance Dashboard</h1>
       <button
         onClick={() => setDarkMode(!darkMode)}
+        aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
         className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:scale-105 transition-transform"
       >
         {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}

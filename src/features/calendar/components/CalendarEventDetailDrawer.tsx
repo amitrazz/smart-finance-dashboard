@@ -97,6 +97,7 @@ export const CalendarEventDetailDrawer: React.FC<CalendarEventDetailDrawerProps>
               onClick={onClose}
               type="button"
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+              aria-label="Close event details"
             >
               <X className="w-5 h-5" />
             </button>

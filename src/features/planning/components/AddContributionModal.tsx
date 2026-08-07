@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PiggyBank, X, RefreshCw } from "lucide-react";
 import { useGoals, useRecordGoalContribution } from "../../../hooks/useFinanceQueries";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface AddContributionModalProps {
   isOpen: boolean;
@@ -11,6 +12,11 @@ interface AddContributionModalProps {
 
 export const AddContributionModal: React.FC<AddContributionModalProps> = ({ isOpen, onClose, defaultGoalId }) => {
   const { data: goals = [] } = useGoals({ status: "ACTIVE" });
+  const [goalSearch, setGoalSearch] = useState("");
+  const { data: goalSearchResults = [], isFetching: isGoalSearchFetching } = useGoals({
+    status: "ACTIVE",
+    ...(goalSearch ? { search: goalSearch } : {}),
+  });
   const mutation = useRecordGoalContribution();
 
   const [goalId, setGoalId] = useState(defaultGoalId ?? "");
@@ -71,17 +77,18 @@ export const AddContributionModal: React.FC<AddContributionModalProps> = ({ isOp
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400">Goal</label>
-              <select
+              <AsyncSearchSelect
                 value={goalId}
-                onChange={(e) => setGoalId(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50"
-              >
-                <option value="" disabled>Select a goal</option>
-                {goals.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
+                valueLabel={goals.find((g) => g.id === goalId)?.name || "Select a goal"}
+                items={goalSearchResults}
+                isFetching={isGoalSearchFetching}
+                onSearch={setGoalSearch}
+                onSelect={(g) => setGoalId(g.id)}
+                getOptionKey={(g) => g.id}
+                placeholder="Select a goal"
+                emptyMessage="No matching goals"
+                renderOption={(g) => <span className="truncate">{g.name}</span>}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400">Amount</label>

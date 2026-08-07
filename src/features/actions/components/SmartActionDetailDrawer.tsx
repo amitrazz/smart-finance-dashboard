@@ -64,6 +64,7 @@ export const SmartActionDetailDrawer: React.FC<DetailDrawerProps> = ({
             <button
               onClick={onClose}
               type="button"
+              aria-label="Close"
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />

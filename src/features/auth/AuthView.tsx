@@ -191,6 +191,7 @@ export const AuthView: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 transition-colors"
                     title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>

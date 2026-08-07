@@ -13,6 +13,7 @@ import {
   Zap,
   BarChart3,
 } from "lucide-react";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -62,6 +63,10 @@ const RiskBadge: React.FC<{ isBehindSchedule: boolean }> = ({ isBehindSchedule }
 // fabricating an "overall" figure.
 export const ForecastSubmenuView: React.FC = () => {
   const { data: goals = [], isLoading: isLoadingGoals, isError: isGoalsError, refetch: refetchGoals } = useGoals();
+  const [goalSearch, setGoalSearch] = useState("");
+  const { data: goalSearchResults = [], isFetching: isGoalSearchFetching } = useGoals(
+    goalSearch ? { search: goalSearch } : undefined
+  );
   const [selectedGoalId, setSelectedGoalId] = useState<string>("");
   const [subView, setSubView] = useState<ForecastSubView>("projection");
 
@@ -114,15 +119,20 @@ export const ForecastSubmenuView: React.FC = () => {
             Linear pace projections, scenario analysis, and schedule tracking for a single goal
           </p>
         </div>
-        <select
-          value={selectedGoalId}
-          onChange={(e) => setSelectedGoalId(e.target.value)}
-          className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs font-bold focus:outline-none focus:border-indigo-500"
-        >
-          {goals.map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </select>
+        <div className="w-48">
+          <AsyncSearchSelect
+            value={selectedGoalId}
+            valueLabel={goals.find((g) => g.id === selectedGoalId)?.name}
+            items={goalSearchResults}
+            isFetching={isGoalSearchFetching}
+            onSearch={setGoalSearch}
+            onSelect={(g) => setSelectedGoalId(g.id)}
+            getOptionKey={(g) => g.id}
+            placeholder="Select goal"
+            emptyMessage="No matching goals"
+            renderOption={(g) => <span className="truncate">{g.name}</span>}
+          />
+        </div>
       </div>
 
       {(isLoadingForecast || isLoadingProjection) ? (

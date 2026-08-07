@@ -1,6 +1,7 @@
 import React from "react";
 import { X, ChevronRight } from "lucide-react";
 import { useUIStore } from "../../../store/useUIStore";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 export interface InsightsSectionConfig {
   id: string;
@@ -41,6 +42,7 @@ export const InsightsMobileNavDrawer: React.FC<InsightsMobileNavDrawerProps> = (
           <button
             onClick={onClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            aria-label="Close navigation menu"
           >
             <X className="w-5 h-5" />
           </button>
@@ -58,12 +60,12 @@ export const InsightsMobileNavDrawer: React.FC<InsightsMobileNavDrawerProps> = (
                   onClick={() => handleSubTabSelect(sec.defaultSubTab)}
                   className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-colors ${
                     isSecActive
-                      ? "bg-indigo-600/10 text-indigo-300 font-bold border border-indigo-500/20"
+                      ? `${NAV_TAB_L2}`
                       : "bg-slate-950/60 text-slate-300 hover:bg-slate-800/40"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-indigo-400" />
+                    <Icon className={`w-4 h-4 ${isSecActive ? "text-nav-tab-l2-fg" : "text-slate-500"}`} />
                     <span className="text-xs">{sec.label}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-500" />

@@ -11,6 +11,7 @@ import {
 import { InsightsBreadcrumbs } from "./InsightsBreadcrumbs";
 import { InsightsAnalyticsToolbar } from "./InsightsAnalyticsToolbar";
 import { InsightsMobileNavDrawer, InsightsSectionConfig } from "./InsightsMobileNavDrawer";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 export const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
   {
@@ -122,11 +123,11 @@ export const InsightsSubNav: React.FC<InsightsSubNavProps> = ({
               onClick={() => setActiveSubTab(sec.defaultSubTab)}
               className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                  ? "bg-nav-tab-l1-bg text-nav-tab-l1-fg shadow-lg shadow-nav-tab-l1-shadow"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-indigo-400"}`} />
+              <Icon className={`w-4 h-4 ${isActive ? "text-nav-tab-l1-fg" : "text-slate-500"}`} />
               <span className="truncate">{sec.label}</span>
             </button>
           );
@@ -147,7 +148,7 @@ export const InsightsSubNav: React.FC<InsightsSubNavProps> = ({
                 onClick={() => setActiveSubTab(sub.id)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   isSubActive
-                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-md"
+                    ? `${NAV_TAB_L2}`
                     : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
                 }`}
               >

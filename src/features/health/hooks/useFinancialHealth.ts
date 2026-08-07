@@ -181,6 +181,9 @@ export function usePayCardStatement() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       useUIStore.getState().showToast("Credit card statement payment recorded!", "success");
     },
+    onError: (err) => {
+      useUIStore.getState().showToast(getErrorMessage(err), "error");
+    },
   });
 }
 
@@ -194,6 +197,9 @@ export function useReverseCardStatementPayment() {
       queryClient.invalidateQueries({ queryKey: ["healthScore"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       useUIStore.getState().showToast("Statement payment reversed", "info");
+    },
+    onError: (err) => {
+      useUIStore.getState().showToast(getErrorMessage(err), "error");
     },
   });
 }

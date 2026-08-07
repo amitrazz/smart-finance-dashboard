@@ -13,12 +13,15 @@ import {
   Trash2,
   TrendingUp,
   Unlink,
+  Wallet,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAccounts } from '../../../hooks/useFinanceQueries';
 import { GoalContribution, GoalMilestone, Money } from '../../../types';
 import { formatCurrency } from '../../../utils/formatters';
+import { AsyncSearchSelect } from '../../../components/common/AsyncSearchSelect';
 import { EmptyState } from '../../../components/common/EmptyState';
+import { ConfirmModal } from '../../../components/common/ConfirmModal';
 import {
   useAddGoalMilestone,
   useDeleteGoal,
@@ -73,12 +76,27 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
 
   const [isLinkAssetModalOpen, setLinkAssetModalOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [accountPickerSearch, setAccountPickerSearch] = useState('');
+
+  // Generic destructive-confirmation state shared by goal/contribution/
+  // milestone/document deletes below.
+  const [pendingDelete, setPendingDelete] = useState<
+    | { type: 'goal'; label: string }
+    | { type: 'contribution'; id: string; version: number; label: string }
+    | { type: 'milestone'; id: string; version: number; label: string }
+    | { type: 'document'; id: string; label: string }
+    | null
+  >(null);
 
   const { data: goal, isLoading, isError, error } = useGoal(goalId);
   const { data: contributions = [] } = useGoalContributions(goalId);
   const { data: milestones = [] } = useGoalMilestones(goalId);
   const { data: forecast } = useGoalForecast(goalId);
   const { data: accounts = [] } = useAccounts();
+  const { data: accountPickerResults = [], isFetching: isAccountPickerFetching } = useAccounts({
+    search: accountPickerSearch || undefined,
+    limit: 100,
+  });
   const {
     data: analytics,
     isLoading: analyticsLoading,
@@ -185,6 +203,39 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
     updateGoalMutation.mutate({ id: goal.id, data: { linkedAccountIds: nextIds }, version: goal.version });
   };
 
+  const handleConfirmPendingDelete = () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === 'goal') {
+      deleteGoalMutation.mutate({ id: goal.id }, { onSuccess: () => onBack() });
+    } else if (pendingDelete.type === 'contribution') {
+      deleteContribMutation.mutate(
+        { goalId: goal.id, contributionId: pendingDelete.id, version: pendingDelete.version },
+        { onSuccess: () => setPendingDelete(null) },
+      );
+    } else if (pendingDelete.type === 'milestone') {
+      deleteMilestoneMutation.mutate(
+        { goalId: goal.id, milestoneId: pendingDelete.id, version: pendingDelete.version },
+        { onSuccess: () => setPendingDelete(null) },
+      );
+    } else if (pendingDelete.type === 'document') {
+      deleteDocumentMutation.mutate(
+        { goalId, documentId: pendingDelete.id },
+        { onSuccess: () => setPendingDelete(null) },
+      );
+    }
+  };
+
+  const isPendingDeleteLoading =
+    pendingDelete?.type === 'goal'
+      ? deleteGoalMutation.isPending
+      : pendingDelete?.type === 'contribution'
+      ? deleteContribMutation.isPending
+      : pendingDelete?.type === 'milestone'
+      ? deleteMilestoneMutation.isPending
+      : pendingDelete?.type === 'document'
+      ? deleteDocumentMutation.isPending
+      : false;
+
   const currentCorpus = goal.currentCorpus ||
     goal.currentAmount || { amount: '0', currency: 'INR' };
   const remainingCorpus = goal.remainingCorpus || { amount: '0', currency: 'INR' };
@@ -208,12 +259,11 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
             <Plus className="w-4 h-4" /> Log Contribution
           </button>
           <button
-            onClick={() => {
-              if (confirm(`Are you sure you want to delete goal "${goal.name}"?`)) {
-                deleteGoalMutation.mutate({ id: goal.id }, { onSuccess: () => onBack() });
-              }
-            }}
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
+            onClick={() => setPendingDelete({ type: 'goal', label: goal.name })}
+            disabled={deleteGoalMutation.isPending}
+            aria-label="Delete Goal"
+            title="Delete Goal"
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -546,9 +596,17 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                       <td className="py-3 px-4 text-right">
                         <button
                           onClick={() =>
-                            deleteContribMutation.mutate({ goalId: goal.id, contributionId: c.id, version: c.version })
+                            setPendingDelete({
+                              type: 'contribution',
+                              id: c.id,
+                              version: c.version,
+                              label: `${formatCurrency(c.amount)} contribution logged on ${c.date}`,
+                            })
                           }
-                          className="p-1 rounded text-slate-400 hover:text-rose-400"
+                          disabled={deleteContribMutation.isPending}
+                          aria-label="Delete contribution"
+                          title="Delete contribution"
+                          className="p-1 rounded text-slate-400 hover:text-rose-400 disabled:opacity-50"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -588,9 +646,17 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                     <span className="font-bold text-sm text-slate-100">{m.name}</span>
                     <button
                       onClick={() =>
-                        deleteMilestoneMutation.mutate({ goalId: goal.id, milestoneId: m.id, version: m.version })
+                        setPendingDelete({
+                          type: 'milestone',
+                          id: m.id,
+                          version: m.version,
+                          label: m.name,
+                        })
                       }
-                      className="text-slate-400 hover:text-rose-400"
+                      disabled={deleteMilestoneMutation.isPending}
+                      aria-label={`Delete milestone ${m.name}`}
+                      title="Delete milestone"
+                      className="text-slate-400 hover:text-rose-400 disabled:opacity-50"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -725,8 +791,10 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                         )}
                         <button
                           onClick={() => handleUnlinkAccount(accountId)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
+                          disabled={updateGoalMutation.isPending}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
                           title="Unlink Account"
+                          aria-label="Unlink Account"
                         >
                           <Unlink className="w-4 h-4" />
                         </button>
@@ -870,10 +938,13 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                     </div>
                   </div>
                   <button
-                    onClick={() => deleteDocumentMutation.mutate({ goalId, documentId: doc.id })}
+                    onClick={() =>
+                      setPendingDelete({ type: 'document', id: doc.id, label: doc.fileName })
+                    }
                     disabled={deleteDocumentMutation.isPending}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
                     title="Delete Document"
+                    aria-label="Delete Document"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1020,19 +1091,30 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Select Account
                 </label>
-                <select
-                  required
+                <AsyncSearchSelect
                   value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none"
-                >
-                  <option value="">Select an account...</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
+                  valueLabel={
+                    selectedAccountId
+                      ? (() => {
+                          const acc = accountPickerResults.find((a) => a.id === selectedAccountId);
+                          return acc ? `${acc.name} (${formatCurrency(acc.currentBalance)})` : undefined;
+                        })()
+                      : 'Select an account...'
+                  }
+                  items={accountPickerResults}
+                  isFetching={isAccountPickerFetching}
+                  onSearch={setAccountPickerSearch}
+                  onSelect={(acc) => setSelectedAccountId(acc.id)}
+                  getOptionKey={(acc) => acc.id}
+                  icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                  placeholder="Select an account..."
+                  emptyMessage="No matching accounts"
+                  renderOption={(acc) => (
+                    <span className="truncate">
                       {acc.name} ({formatCurrency(acc.currentBalance)})
-                    </option>
-                  ))}
-                </select>
+                    </span>
+                  )}
+                />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
@@ -1054,6 +1136,30 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={pendingDelete !== null}
+        title={
+          pendingDelete?.type === 'goal'
+            ? 'Delete Goal?'
+            : pendingDelete?.type === 'contribution'
+            ? 'Delete Contribution?'
+            : pendingDelete?.type === 'milestone'
+            ? 'Delete Milestone?'
+            : 'Delete Document?'
+        }
+        message={
+          pendingDelete
+            ? `Are you sure you want to delete ${pendingDelete.type === 'goal' ? 'goal' : pendingDelete.type} "${pendingDelete.label}"? This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isPendingDeleteLoading}
+        onConfirm={handleConfirmPendingDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 };

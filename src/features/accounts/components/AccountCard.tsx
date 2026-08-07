@@ -94,6 +94,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           {onTransfer && (
             <button
               title="Transfer Money"
+              aria-label="Transfer Money"
               onClick={(e) => {
                 e.stopPropagation();
                 onTransfer(account);
@@ -107,6 +108,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           {onStatement && (
             <button
               title="View Statement"
+              aria-label="View Statement"
               onClick={(e) => {
                 e.stopPropagation();
                 onStatement(account);

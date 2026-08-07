@@ -41,6 +41,7 @@ export const SuggestionActions: React.FC<{ statementLineId: string }> = ({ state
         onClick={() => confirmMutation.mutate({ id: suggestion.id, version: suggestion.version })}
         disabled={isSubmitting}
         title="Confirm this suggested match"
+        aria-label="Confirm this suggested match"
         className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 disabled:opacity-40"
       >
         {confirmMutation.isPending ? (
@@ -53,6 +54,7 @@ export const SuggestionActions: React.FC<{ statementLineId: string }> = ({ state
         onClick={() => rejectMutation.mutate({ id: suggestion.id, version: suggestion.version })}
         disabled={isSubmitting}
         title="Reject this suggested match"
+        aria-label="Reject this suggested match"
         className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 disabled:opacity-40"
       >
         {rejectMutation.isPending ? (

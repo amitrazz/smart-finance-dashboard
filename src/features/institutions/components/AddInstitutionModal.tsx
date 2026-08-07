@@ -51,6 +51,7 @@ export const AddInstitutionModal: React.FC<AddInstitutionModalProps> = ({ isOpen
           </div>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, Copy, PlusCircle, RefreshCw, X } from "lucide-react";
+import { AsyncSearchSelect } from "../../../../components/common/AsyncSearchSelect";
 import {
   useCategories,
   useCreateMissingTransactionFromStatementLine,
@@ -127,7 +128,10 @@ export const ResolveStatementLineModal: React.FC<ResolveStatementLineModalProps>
   const { data: candidates = [], isLoading: candidatesLoading } = useStatementLineCandidates(
     statementLine?.id || "",
   );
-  const { data: categories = [] } = useCategories();
+  const [categorySearch, setCategorySearch] = useState("");
+  const { data: categories = [], isFetching: isCategoriesFetching } = useCategories({
+    search: categorySearch || undefined,
+  });
 
   const matchMutation = useMatchStatementLine();
   const createTxMutation = useCreateMissingTransactionFromStatementLine();
@@ -267,18 +271,19 @@ export const ResolveStatementLineModal: React.FC<ResolveStatementLineModalProps>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Category (optional)
                   </label>
-                  <select
+                  <AsyncSearchSelect
                     value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="">-- Uncategorized --</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    valueLabel={categories.find((c) => c.id === categoryId)?.name || "-- Uncategorized --"}
+                    items={categories}
+                    isFetching={isCategoriesFetching}
+                    onSearch={setCategorySearch}
+                    onSelect={(c) => setCategoryId(c.id)}
+                    onClear={() => setCategoryId("")}
+                    getOptionKey={(c) => c.id}
+                    placeholder="-- Uncategorized --"
+                    emptyMessage="No matching categories"
+                    renderOption={(c) => <span className="truncate">{c.name}</span>}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Notes (optional)</label>

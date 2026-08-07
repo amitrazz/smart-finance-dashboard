@@ -1,0 +1,139 @@
+/* ==========================================================================
+   Personal Finance OS (pFOS) — Semantic Design Tokens
+   Linear + Stripe + Apple Wallet + Notion Aesthetic
+   ========================================================================== */
+
+:root {
+  /* Surface & Backgrounds */
+  --surface-canvas: #020617;        /* slate-950 */
+  --surface-card: #0f172a;          /* slate-900 */
+  --surface-elevated: #1e293b;      /* slate-800 */
+  --surface-hover: #334155;         /* slate-700 */
+  --surface-glass: rgba(15, 23, 42, 0.75);
+
+  /* ------------------------------------------------------------------------
+     0. Navigation Tab Selection System
+     Level 1 — Primary tab bar active pill (solid, high contrast)
+     Level 2 — Subtab / view toggle / filter pill (translucent outline)
+     ---------------------------------------------------------------- */
+  /* Level 1: solid pill (used in Investments, Insights sub-navs) */
+  --nav-tab-l1-bg:     #34d399;          /* emerald-400 */
+  --nav-tab-l1-fg:     #0f172a;          /* slate-900  — dark text on bright bg */
+  --nav-tab-l1-shadow: rgba(16, 185, 129, 0.20);
+
+  /* Level 2: translucent pill (used for detail tabs, toggles, filter pills) */
+  --nav-tab-l2-bg:     rgba(16, 185, 129, 0.15);  /* emerald-500/15 */
+  --nav-tab-l2-fg:     #6ee7b7;                    /* emerald-300   */
+  --nav-tab-l2-border: rgba(16, 185, 129, 0.30);  /* emerald-500/30 */
+
+  /* Borders */
+  --border-subtle: rgba(51, 65, 85, 0.5);   /* slate-700/50 */
+  --border-default: #334155;                /* slate-700 */
+  --border-strong: #475569;                 /* slate-600 */
+
+  /* Text & Content */
+  --text-primary: #f8fafc;        /* slate-50 */
+  --text-secondary: #94a3b8;      /* slate-400 */
+  --text-muted: #64748b;          /* slate-500 */
+  --text-inverse: #0f172a;        /* slate-900 */
+
+  /* ------------------------------------------------------------------------
+     1. Action Color System (Intent-Based)
+     ------------------------------------------------------------------------ */
+  /* Primary — Main CTA (Save, Continue, Create, Import, Connect Bank, Pay, Confirm) */
+  --action-primary-bg: #2563eb;          /* blue-600 */
+  --action-primary-hover: #1d4ed8;       /* blue-700 */
+  --action-primary-active: #1e40af;      /* blue-800 */
+  --action-primary-fg: #ffffff;
+  --action-primary-ring: rgba(59, 130, 246, 0.5);
+
+  /* Success — Positive Completion (Approve, Mark Paid, Complete, Verified, Reconciled) */
+  --action-success-bg: #16a34a;          /* green-600 */
+  --action-success-hover: #15803d;       /* green-700 */
+  --action-success-active: #166534;      /* green-800 */
+  --action-success-fg: #ffffff;
+  --action-success-ring: rgba(34, 197, 94, 0.5);
+
+  /* Warning — Needs User Attention (Review, Needs Approval, Pending, Retry, Update) */
+  --action-warning-bg: #d97706;          /* amber-600 */
+  --action-warning-hover: #b45309;       /* amber-700 */
+  --action-warning-active: #92400e;      /* amber-800 */
+  --action-warning-fg: #ffffff;
+  --action-warning-ring: rgba(245, 158, 11, 0.5);
+
+  /* Danger — Irreversible / Destructive (Delete, Archive, Disconnect, Reset, Close) */
+  --action-danger-bg: #dc2626;           /* red-600 */
+  --action-danger-hover: #b91c1c;        /* red-700 */
+  --action-danger-active: #991b1b;       /* red-800 */
+  --action-danger-fg: #ffffff;
+  --action-danger-ring: rgba(239, 68, 68, 0.5);
+
+  /* Neutral — Secondary Actions (Cancel, Back, Close, Dismiss, Later, Preview, Duplicate) */
+  --action-neutral-bg: #334155;          /* slate-700 */
+  --action-neutral-hover: #475569;       /* slate-600 */
+  --action-neutral-active: #1e293b;      /* slate-800 */
+  --action-neutral-fg: #cbd5e1;          /* slate-300 */
+  --action-neutral-ring: rgba(148, 163, 184, 0.4);
+
+  /* Info — Read-Only / Informational (View Details, Learn More, Docs, Audit Trail) */
+  --action-info-bg: #0284c7;             /* sky-600 */
+  --action-info-hover: #0369a1;          /* sky-700 */
+  --action-info-active: #075985;         /* sky-800 */
+  --action-info-fg: #ffffff;
+  --action-info-ring: rgba(56, 189, 248, 0.5);
+
+  /* ------------------------------------------------------------------------
+     2. Financial Context Colors
+     ------------------------------------------------------------------------ */
+  --finance-income: #10b981;      /* emerald-500 */
+  --finance-income-bg: rgba(16, 185, 129, 0.12);
+  --finance-income-border: rgba(16, 185, 129, 0.3);
+
+  --finance-expense: #f43f5e;     /* rose-500 */
+  --finance-expense-bg: rgba(244, 63, 94, 0.12);
+  --finance-expense-border: rgba(244, 63, 94, 0.3);
+
+  --finance-transfer: #3b82f6;    /* blue-500 */
+  --finance-transfer-bg: rgba(59, 130, 246, 0.12);
+  --finance-transfer-border: rgba(59, 130, 246, 0.3);
+
+  --finance-investment: #a855f7;  /* purple-500 */
+  --finance-investment-bg: rgba(168, 85, 247, 0.12);
+  --finance-investment-border: rgba(168, 85, 247, 0.3);
+
+  --finance-loan: #f97316;        /* orange-500 */
+  --finance-loan-bg: rgba(249, 115, 22, 0.12);
+  --finance-loan-border: rgba(249, 115, 22, 0.3);
+
+  --finance-credit: #6366f1;      /* indigo-500 */
+  --finance-credit-bg: rgba(99, 102, 241, 0.12);
+  --finance-credit-border: rgba(99, 102, 241, 0.3);
+
+  --finance-goal: #14b8a6;        /* teal-500 */
+  --finance-goal-bg: rgba(20, 184, 166, 0.12);
+  --finance-goal-border: rgba(20, 184, 166, 0.3);
+
+  --finance-savings: #059669;     /* emerald-600 */
+  --finance-savings-bg: rgba(5, 150, 105, 0.12);
+  --finance-savings-border: rgba(5, 150, 105, 0.3);
+
+  --finance-cash: #eab308;        /* yellow-500 */
+  --finance-cash-bg: rgba(234, 179, 8, 0.12);
+  --finance-cash-border: rgba(234, 179, 8, 0.3);
+
+  --finance-unknown: #64748b;     /* slate-500 */
+  --finance-unknown-bg: rgba(100, 116, 139, 0.12);
+  --finance-unknown-border: rgba(100, 116, 139, 0.3);
+
+  /* ------------------------------------------------------------------------
+     3. Status Color System
+     ------------------------------------------------------------------------ */
+  --status-draft: #64748b;              /* slate-500 */
+  --status-processing: #3b82f6;         /* blue-500 */
+  --status-pending: #f59e0b;            /* amber-500 */
+  --status-completed: #22c55e;          /* green-500 */
+  --status-failed: #ef4444;             /* red-500 */
+  --status-partially-complete: #a855f7; /* purple-500 */
+  --status-cancelled: #64748b;          /* slate-500 */
+  --status-syncing: #06b6d4;            /* cyan-500 */
+}

@@ -7,6 +7,7 @@ import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { formatCurrency } from "../../../utils/formatters";
 import { PieChart, LayoutGrid, Wallet } from "lucide-react";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   STOCK: "#10b981",
@@ -83,7 +84,7 @@ export const AllocationView: React.FC = () => {
           <button
             onClick={() => setViewType("PIE")}
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-              viewType === "PIE" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200"
+              viewType === "PIE" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
             }`}
           >
             <PieChart className="w-3.5 h-3.5" /> Pie Chart
@@ -91,7 +92,7 @@ export const AllocationView: React.FC = () => {
           <button
             onClick={() => setViewType("TREEMAP")}
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-              viewType === "TREEMAP" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200"
+              viewType === "TREEMAP" ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" /> Treemap

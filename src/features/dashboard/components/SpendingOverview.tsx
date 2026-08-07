@@ -3,14 +3,29 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, AreaChart, Area, XAx
 import { PieChart as PieIcon, TrendingUp, AlertCircle } from "lucide-react";
 import { formatCurrency } from "../../../utils/formatters";
 import { useExpensesByCategory, useExpenseTrendAnalytics } from "../../../hooks/useFinanceQueries";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 const COLORS = ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#f97316"];
+
+// The expense-trend endpoint returns monthly buckets and only accepts a
+// `limit` (number of months) — there's no day-granularity window param, so
+// the 7d/30d/90d/1y selector below maps to "how many trailing months to
+// show" rather than an exact day count.
+const TIME_RANGE_TO_MONTHS: Record<"7d" | "30d" | "90d" | "1y", number> = {
+  "7d": 1,
+  "30d": 1,
+  "90d": 3,
+  "1y": 12,
+};
 
 export const SpendingOverview: React.FC = () => {
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d");
 
+  // Category breakdown has no date-range filtering on the backend (see
+  // Backend Dependency note) so it intentionally does not vary with
+  // timeRange; the trend chart does support `limit` and responds to it.
   const { data: categoryDataRaw = [] } = useExpensesByCategory();
-  const { data: trendDataRaw = [] } = useExpenseTrendAnalytics();
+  const { data: trendDataRaw = [] } = useExpenseTrendAnalytics({ limit: TIME_RANGE_TO_MONTHS[timeRange] });
 
   const categoryList = Array.isArray(categoryDataRaw) ? categoryDataRaw : [];
   const trendList = Array.isArray(trendDataRaw) ? trendDataRaw : [];
@@ -43,7 +58,7 @@ export const SpendingOverview: React.FC = () => {
               key={r}
               onClick={() => setTimeRange(r)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                timeRange === r ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200"
+                timeRange === r ? `${NAV_TAB_L2}` : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {r === "7d" ? "7 Days" : r === "30d" ? "30 Days" : r === "90d" ? "90 Days" : "1 Year"}

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Info, Trash2, X, RefreshCw } from "lucide-react";
+import { AlertTriangle, Info, Trash2, X, AlertCircle } from "lucide-react";
+import { Button } from "../ui/Button";
 
 export interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
   message: string;
+  impactDetails?: string;
   confirmText?: string;
   cancelText?: string;
   variant?: "danger" | "warning" | "info";
@@ -18,6 +20,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   title,
   message,
+  impactDetails,
   confirmText = "Confirm",
   cancelText = "Cancel",
   variant = "warning",
@@ -78,20 +81,20 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         return {
           icon: <Trash2 className="w-6 h-6 text-rose-400" />,
           iconBg: "bg-rose-500/10 border-rose-500/20",
-          buttonBg: "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20",
+          btnVariant: "danger" as const,
         };
       case "info":
         return {
-          icon: <Info className="w-6 h-6 text-indigo-400" />,
-          iconBg: "bg-indigo-500/10 border-indigo-500/20",
-          buttonBg: "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20",
+          icon: <Info className="w-6 h-6 text-sky-400" />,
+          iconBg: "bg-sky-500/10 border-sky-500/20",
+          btnVariant: "info" as const,
         };
       case "warning":
       default:
         return {
           icon: <AlertTriangle className="w-6 h-6 text-amber-400" />,
           iconBg: "bg-amber-500/10 border-amber-500/20",
-          buttonBg: "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20",
+          btnVariant: "warning" as const,
         };
     }
   };
@@ -111,8 +114,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
-          className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 relative overflow-hidden"
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden"
         >
           <button
             onClick={onClose}
@@ -128,7 +131,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               {style.icon}
             </div>
 
-            <div className="space-y-1.5 pt-1 pr-6">
+            <div className="space-y-1.5 pt-0.5 pr-6">
               <h3 id="confirm-modal-title" className="font-bold text-lg text-slate-100 leading-snug">
                 {title}
               </h3>
@@ -136,28 +139,43 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={onClose}
+          {(impactDetails || variant === "danger") && (
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300 space-y-1 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-slate-200">Impact Notice: </span>
+                {impactDetails || "This action cannot be undone and may affect associated reports and calculations."}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <Button
+              variant="neutral"
+              hierarchy="outline"
+              size="md"
               disabled={isLoading}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all disabled:opacity-50"
+              onClick={onClose}
             >
               {cancelText}
-            </button>
-            <button
+            </Button>
+
+            <Button
               ref={confirmButtonRef}
-              type="button"
+              variant={style.btnVariant}
+              hierarchy="filled"
+              size="md"
+              isLoading={isLoading}
+              loadingText="Processing..."
               onClick={onConfirm}
-              disabled={isLoading}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all disabled:opacity-50 ${style.buttonBg}`}
             >
-              {isLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
               {confirmText}
-            </button>
+            </Button>
           </div>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 };
+
+export default ConfirmModal;

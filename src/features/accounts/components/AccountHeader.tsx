@@ -45,7 +45,12 @@ export const AccountHeader: React.FC<AccountHeaderProps> = ({
       <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {onBack && (
-            <button onClick={onBack} className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition-colors">
+            <button
+              onClick={onBack}
+              aria-label="Back to accounts"
+              title="Back to accounts"
+              className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition-colors"
+            >
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}

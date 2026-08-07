@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useCreditCards } from "../../credit-cards/hooks/useCreditCardQueries";
 import { CreditCardWidget } from "../components/CreditCardWidget";
+import { useUIStore } from "../../../store/useUIStore";
 import { CreditCard } from "lucide-react";
 
 export const CreditCardsSubView: React.FC = () => {
@@ -48,7 +49,11 @@ export const CreditCardsSubView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {cards.map((card, i) => (
             <motion.div key={card.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-              <CreditCardWidget card={card} />
+              <CreditCardWidget
+                card={card}
+                onPay={() => useUIStore.getState().setActiveTab("credit-cards", "payments")}
+                onViewStatement={() => useUIStore.getState().setActiveTab("credit-cards", "statements")}
+              />
             </motion.div>
           ))}
         </div>

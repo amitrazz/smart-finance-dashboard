@@ -136,6 +136,7 @@ export const CardDocumentsTab: React.FC<CardDocumentsTabProps> = ({ cardId }) =>
                         onClick={() => setPreviewDoc(doc)}
                         className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
                         title="Preview Document"
+                        aria-label="Preview Document"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -143,6 +144,7 @@ export const CardDocumentsTab: React.FC<CardDocumentsTabProps> = ({ cardId }) =>
                         onClick={() => setDeletingDoc({ id: doc.id, name: doc.fileName })}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                         title="Delete Document"
+                        aria-label="Delete Document"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -161,7 +163,11 @@ export const CardDocumentsTab: React.FC<CardDocumentsTabProps> = ({ cardId }) =>
           <div className="relative w-full max-w-lg p-6 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-slate-100 text-sm">Preview: {previewDoc.fileName}</h3>
-              <button onClick={() => setPreviewDoc(null)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => setPreviewDoc(null)}
+                aria-label="Close preview"
+                className="text-slate-400 hover:text-white"
+              >
                 &times;
               </button>
             </div>

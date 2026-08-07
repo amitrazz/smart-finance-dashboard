@@ -57,6 +57,7 @@ export const ChangeInterestRateModal: React.FC<ChangeInterestRateModalProps> = (
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>

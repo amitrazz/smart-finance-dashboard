@@ -15,6 +15,7 @@ import {
 import { useBudget, useDeleteBudget, useBudgetCategories } from "../hooks/useBudgetQueries";
 import { formatCurrency } from "../../../utils/formatters";
 import { BudgetTransactionsTab } from "./BudgetTransactionsTab";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 
 interface BudgetDetailViewProps {
   budgetId: string;
@@ -28,6 +29,7 @@ export const BudgetDetailView: React.FC<BudgetDetailViewProps> = ({ budgetId, on
   const deleteMutation = useDeleteBudget();
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const { data: categoryLines = [] } = useBudgetCategories(budgetId);
+  const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -57,9 +59,11 @@ export const BudgetDetailView: React.FC<BudgetDetailViewProps> = ({ budgetId, on
   }
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete budget "${budget.name}"?`)) {
-      deleteMutation.mutate({ id: budget.id }, { onSuccess: () => onBack() });
-    }
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    deleteMutation.mutate({ id: budget.id }, { onSuccess: () => onBack() });
   };
 
   const tabs: Array<{ id: DetailTab; label: string; icon: React.ReactNode }> = [
@@ -79,6 +83,8 @@ export const BudgetDetailView: React.FC<BudgetDetailViewProps> = ({ budgetId, on
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
+            aria-label="Back to My Budgets"
+            title="Back to My Budgets"
             className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -97,7 +103,8 @@ export const BudgetDetailView: React.FC<BudgetDetailViewProps> = ({ budgetId, on
         <div className="flex items-center gap-2">
           <button
             onClick={handleDelete}
-            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            disabled={deleteMutation.isPending}
+            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <Trash2 className="w-4 h-4" /> Delete Plan
           </button>
@@ -253,6 +260,18 @@ export const BudgetDetailView: React.FC<BudgetDetailViewProps> = ({ budgetId, on
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="Delete Budget Plan?"
+        message={`Are you sure you want to delete budget "${budget.name}"? This action cannot be undone.`}
+        confirmText="Delete Plan"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteConfirmOpen(false)}
+      />
     </div>
   );
 };

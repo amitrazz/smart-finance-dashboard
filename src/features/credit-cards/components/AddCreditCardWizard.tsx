@@ -7,12 +7,14 @@ import {
   ChevronLeft,
   Info,
   ChevronDown,
+  Wallet,
 } from "lucide-react";
 import { useCreateCreditCard } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
 import { CardNetwork, CreditCardCategory, CreateCreditCardInput, FinancialInstitution } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface AddCreditCardWizardProps {
   isOpen: boolean;
@@ -21,7 +23,12 @@ interface AddCreditCardWizardProps {
 
 export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen, onClose }) => {
   const createCardMutation = useCreateCreditCard();
-  const { data: accounts = [] } = useAccounts();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
+  const paymentAccountOptions = accounts.filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN");
 
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -48,12 +55,15 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
 
   // Step 3: Payment Setup
   const [paymentAccountId, setPaymentAccountId] = useState("");
+  const selectedPaymentAccount = paymentAccountOptions.find((a) => a.id === paymentAccountId);
   const [autoPayEnabled, setAutoPayEnabled] = useState(false);
 
   // Step 4: Advanced
   const [annualFee, setAnnualFee] = useState("");
   const [joiningFee, setJoiningFee] = useState("");
   const [openedDate, setOpenedDate] = useState("");
+  const [rewardProgram, setRewardProgram] = useState("");
+  const [rewardRatePoints, setRewardRatePoints] = useState("");
   const [notes, setNotes] = useState("");
 
   if (!isOpen) return null;
@@ -86,6 +96,8 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
     setAnnualFee("");
     setJoiningFee("");
     setOpenedDate("");
+    setRewardProgram("");
+    setRewardRatePoints("");
     setNotes("");
   };
 
@@ -132,6 +144,8 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
       annualFee: annualFee || undefined,
       joiningFee: joiningFee || undefined,
       openedDate: openedDate || undefined,
+      rewardProgram: rewardProgram || undefined,
+      rewardRatePoints: rewardRatePoints || undefined,
       notes: notes || undefined,
     };
 
@@ -192,6 +206,7 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
           </div>
           <button
             onClick={handleClose}
+            aria-label="Close"
             className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -459,20 +474,28 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Default Payment Account (Bank Account)
                 </label>
-                <select
+                <AsyncSearchSelect
                   value={paymentAccountId}
-                  onChange={(e) => setPaymentAccountId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-                >
-                  <option value="">-- Select Linked Bank Account --</option>
-                  {accounts
-                    .filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN")
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.type}) - Bal: {formatCurrency(a.currentBalance)}
-                      </option>
-                    ))}
-                </select>
+                  valueLabel={
+                    selectedPaymentAccount
+                      ? `${selectedPaymentAccount.name} (${selectedPaymentAccount.type}) - Bal: ${formatCurrency(selectedPaymentAccount.currentBalance)}`
+                      : "-- Select Linked Bank Account --"
+                  }
+                  items={paymentAccountOptions}
+                  isFetching={isAccountsFetching}
+                  onSearch={setAccountSearch}
+                  onSelect={(a) => setPaymentAccountId(a.id)}
+                  onClear={() => setPaymentAccountId("")}
+                  getOptionKey={(a) => a.id}
+                  icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                  placeholder="-- Select Linked Bank Account --"
+                  emptyMessage="No matching accounts"
+                  renderOption={(a) => (
+                    <span className="truncate">
+                      {a.name} ({a.type}) - Bal: {formatCurrency(a.currentBalance)}
+                    </span>
+                  )}
+                />
                 <p className="text-[11px] text-slate-400 mt-1">
                   Used for single-click bill settlements and auto-debit payments.
                 </p>
@@ -543,6 +566,33 @@ export const AddCreditCardWizard: React.FC<AddCreditCardWizardProps> = ({ isOpen
                     onChange={(e) => setOpenedDate(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reward Program</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC SmartBuy"
+                      value={rewardProgram}
+                      onChange={(e) => setRewardProgram(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reward Rate (points / ₹ spent)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="e.g. 2"
+                      value={rewardRatePoints}
+                      onChange={(e) => setRewardRatePoints(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">Flat rate — points auto-earned per currency unit spent.</p>
+                  </div>
                 </div>
 
                 <div>

@@ -3,8 +3,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTransactionsInfinite, useCreateTransaction, useBulkCategorize, useAccounts, useCategories } from "../../hooks/useFinanceQueries";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { Category, Transaction, TransactionDirection } from "../../types";
-import { Search, Plus, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw, Tag, X, Check, AlertTriangle, RefreshCw } from "lucide-react";
+import { Search, Plus, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw, Tag, X, Check, AlertTriangle, RefreshCw, Wallet } from "lucide-react";
 import { useUIStore } from "../../store/useUIStore";
+import { AsyncSearchSelect } from "../../components/common/AsyncSearchSelect";
 
 const DIRECTION_TO_CATEGORY_KIND: Record<TransactionDirection, Category["kind"]> = {
   OUTFLOW: "EXPENSE",
@@ -19,6 +20,8 @@ const DIRECTION_TO_CATEGORY_KIND: Record<TransactionDirection, Category["kind"]>
 const isCreditDirection = (d: TransactionDirection) => d === "INFLOW" || d === "TRANSFER_IN";
 const isTransferDirection = (d: TransactionDirection) =>
   d === "TRANSFER" || d === "TRANSFER_OUT" || d === "TRANSFER_IN";
+
+import { Button } from "../../components/ui/Button";
 
 export const TransactionsView: React.FC = () => {
   const { isAddTransactionOpen, setAddTransactionOpen, activeSubTab } = useUIStore();
@@ -71,6 +74,24 @@ export const TransactionsView: React.FC = () => {
   const createTxnMutation = useCreateTransaction();
   const bulkCategorizeMutation = useBulkCategorize();
 
+  // Separate search-scoped fetches for the two Account/Category pickers below
+  // — kept apart from the base `accounts`/`categories` lists above, which
+  // stay unfiltered since they're also used for the account-name join and
+  // the categories count/panel elsewhere in this view.
+  const [modalAccountSearch, setModalAccountSearch] = useState("");
+  const { data: modalAccounts = [], isFetching: isModalAccountsFetching } = useAccounts({
+    search: modalAccountSearch || undefined,
+    limit: 100,
+  });
+  const [modalCategorySearch, setModalCategorySearch] = useState("");
+  const { data: modalCategoriesRaw = [], isFetching: isModalCategoriesFetching } = useCategories({
+    search: modalCategorySearch || undefined,
+  });
+  const [bulkCategorySearch, setBulkCategorySearch] = useState("");
+  const { data: bulkCategories = [], isFetching: isBulkCategoriesFetching } = useCategories({
+    search: bulkCategorySearch || undefined,
+  });
+
   // Form State — accountId synced from loaded accounts
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
@@ -83,6 +104,10 @@ export const TransactionsView: React.FC = () => {
   const directionCategories = useMemo(
     () => categories.filter((c) => (c.kind ?? c.type) === DIRECTION_TO_CATEGORY_KIND[direction]),
     [categories, direction]
+  );
+  const modalDirectionCategories = useMemo(
+    () => modalCategoriesRaw.filter((c) => (c.kind ?? c.type) === DIRECTION_TO_CATEGORY_KIND[direction]),
+    [modalCategoriesRaw, direction]
   );
 
   // Sync accountId when backend data loads, and keep categoryId valid for
@@ -207,36 +232,41 @@ export const TransactionsView: React.FC = () => {
           {selectedTxnIds.length > 0 && (
             <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-300 animate-in fade-in">
               <span>{selectedTxnIds.length} Selected</span>
-              <select
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) handleBulkCategorize(e.target.value);
-                  e.target.value = "";
-                }}
-                disabled={bulkCategorizeMutation.isPending}
-                className="px-2 py-0.5 rounded bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold text-xs focus:outline-none disabled:opacity-50"
-              >
-                <option value="" disabled>Categorize as...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div className="w-40">
+                <AsyncSearchSelect
+                  items={bulkCategories}
+                  isFetching={isBulkCategoriesFetching}
+                  disabled={bulkCategorizeMutation.isPending}
+                  onSearch={setBulkCategorySearch}
+                  onSelect={(c) => handleBulkCategorize(c.id)}
+                  getOptionKey={(c) => c.id}
+                  placeholder="Categorize as..."
+                  emptyMessage="No matching categories"
+                  renderOption={(c) => <span className="truncate">{c.name}</span>}
+                />
+              </div>
             </div>
           )}
 
-          <button
+          <Button
+            variant="neutral"
+            hierarchy="outline"
+            size="md"
+            leftIcon={<Tag className="w-4 h-4 text-purple-400" />}
             onClick={() => useUIStore.getState().showToast("Categories are managed in master settings", "info")}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-all border border-slate-700"
           >
-            <Tag className="w-4 h-4 text-purple-400" /> Categories ({categories.length})
-          </button>
+            Categories ({categories.length})
+          </Button>
 
-          <button
+          <Button
+            variant="primary"
+            hierarchy="filled"
+            size="md"
+            leftIcon={<Plus className="w-4 h-4" />}
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-emerald-500/20"
           >
-            <Plus className="w-4 h-4" /> Add Transaction
-          </button>
+            Add Transaction
+          </Button>
         </div>
       </div>
 
@@ -256,15 +286,15 @@ export const TransactionsView: React.FC = () => {
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
           <Filter className="w-4 h-4 text-slate-400 mr-1 hidden sm:inline" />
           {["ALL", "INFLOW", "OUTFLOW", "TRANSFER"].map((dir) => (
-            <button
+            <Button
               key={dir}
+              variant={filterDirection === dir ? "primary" : "neutral"}
+              hierarchy={filterDirection === dir ? "filled" : "outline"}
+              size="sm"
               onClick={() => setFilterDirection(dir)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                filterDirection === dir ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:text-slate-200"
-              }`}
             >
               {dir}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -460,7 +490,11 @@ export const TransactionsView: React.FC = () => {
           <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 space-y-6 overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h3 className="font-bold text-lg text-slate-100">Transaction Details</h3>
-              <button onClick={() => setSelectedTxnDrawer(null)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => setSelectedTxnDrawer(null)}
+                aria-label="Close"
+                className="text-slate-400 hover:text-white"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -502,24 +536,35 @@ export const TransactionsView: React.FC = () => {
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-lg text-slate-100">Log Manual Transaction</h3>
-              <button onClick={handleCloseModal} className="text-slate-400 hover:text-white">
+              <button onClick={handleCloseModal} aria-label="Close" className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Account</label>
-                <select
+                <AsyncSearchSelect
                   value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none"
-                >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
+                  valueLabel={
+                    (() => {
+                      const acc = modalAccounts.find((a) => a.id === accountId) || accounts.find((a) => a.id === accountId);
+                      return acc ? `${acc.name} (${acc.type})` : undefined;
+                    })()
+                  }
+                  items={modalAccounts}
+                  isFetching={isModalAccountsFetching}
+                  onSearch={setModalAccountSearch}
+                  onSelect={(acc) => setAccountId(acc.id)}
+                  getOptionKey={(acc) => acc.id}
+                  icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                  placeholder="Select account"
+                  emptyMessage="No matching accounts"
+                  renderOption={(acc) => (
+                    <span className="truncate">
                       {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
+                    </span>
+                  )}
+                />
               </div>
 
               <div>
@@ -563,28 +608,28 @@ export const TransactionsView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Category</label>
-                <select
+                <AsyncSearchSelect
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  disabled={directionCategories.length === 0}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-                >
-                  {directionCategories.length === 0 ? (
-                    <option value="">No categories available</option>
-                  ) : (
-                    directionCategories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))
-                  )}
-                </select>
+                  valueLabel={
+                    modalDirectionCategories.find((c) => c.id === categoryId)?.name ||
+                    directionCategories.find((c) => c.id === categoryId)?.name
+                  }
+                  items={modalDirectionCategories}
+                  isFetching={isModalCategoriesFetching}
+                  disabled={directionCategories.length === 0 && modalDirectionCategories.length === 0}
+                  onSearch={setModalCategorySearch}
+                  onSelect={(c) => setCategoryId(c.id)}
+                  getOptionKey={(c) => c.id}
+                  placeholder="No categories available"
+                  emptyMessage="No matching categories"
+                  renderOption={(c) => <span className="truncate">{c.name}</span>}
+                />
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700"
                 >
                   Cancel

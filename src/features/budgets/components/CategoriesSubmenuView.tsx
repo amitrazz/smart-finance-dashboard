@@ -112,6 +112,7 @@ export const CategoriesSubmenuView: React.FC = () => {
                   onClick={() => handleStartEdit(cat)}
                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
                   title="Edit Allocation"
+                  aria-label="Edit Allocation"
                 >
                   <Sliders className="w-4 h-4 text-emerald-400" />
                 </button>

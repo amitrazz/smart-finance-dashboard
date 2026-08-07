@@ -13,6 +13,7 @@ import { LoadingSkeleton } from "../../../../components/common/LoadingSkeleton";
 import { ErrorState } from "../../../../components/common/ErrorState";
 import { EmptyState } from "../../../../components/common/EmptyState";
 import { formatCurrency } from "../../../../utils/formatters";
+import { AsyncSearchSelect } from "../../../../components/common/AsyncSearchSelect";
 
 const TREND_LABELS: Record<string, string> = {
   ACCELERATING: "Accelerating",
@@ -30,6 +31,14 @@ export const TrendsTab: React.FC = () => {
   const { data: budgets = [] } = useBudgets();
   const [selectedGoalId, setSelectedGoalId] = useState("");
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
+  const [goalSearch, setGoalSearch] = useState("");
+  const { data: goalSearchResults = [], isFetching: isGoalSearchFetching } = useGoals(
+    goalSearch ? { search: goalSearch } : undefined
+  );
+  const [budgetSearch, setBudgetSearch] = useState("");
+  const { data: budgetSearchResults = [], isFetching: isBudgetSearchFetching } = useBudgets(
+    budgetSearch ? { search: budgetSearch } : undefined
+  );
 
   useEffect(() => {
     if (!selectedGoalId && goals.length > 0) {
@@ -82,13 +91,20 @@ export const TrendsTab: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-sm font-bold text-slate-100">Goal Corpus Growth</h3>
           {goals.length > 0 && (
-            <select
-              value={selectedGoalId}
-              onChange={(e) => setSelectedGoalId(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-[11px] font-bold focus:outline-none"
-            >
-              {goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            <div className="w-48">
+              <AsyncSearchSelect
+                value={selectedGoalId}
+                valueLabel={goals.find((g) => g.id === selectedGoalId)?.name}
+                items={goalSearchResults}
+                isFetching={isGoalSearchFetching}
+                onSearch={setGoalSearch}
+                onSelect={(g) => setSelectedGoalId(g.id)}
+                getOptionKey={(g) => g.id}
+                placeholder="Select goal"
+                emptyMessage="No matching goals"
+                renderOption={(g) => <span className="truncate">{g.name}</span>}
+              />
+            </div>
           )}
         </div>
         <AnalyticsChart
@@ -104,13 +120,20 @@ export const TrendsTab: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-sm font-bold text-slate-100">Budget Category Breakdown</h3>
           {budgets.length > 0 && (
-            <select
-              value={selectedBudgetId}
-              onChange={(e) => setSelectedBudgetId(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-[11px] font-bold focus:outline-none"
-            >
-              {budgets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <div className="w-48">
+              <AsyncSearchSelect
+                value={selectedBudgetId}
+                valueLabel={budgets.find((b) => b.id === selectedBudgetId)?.name}
+                items={budgetSearchResults}
+                isFetching={isBudgetSearchFetching}
+                onSearch={setBudgetSearch}
+                onSelect={(b) => setSelectedBudgetId(b.id)}
+                getOptionKey={(b) => b.id}
+                placeholder="Select budget"
+                emptyMessage="No matching budgets"
+                renderOption={(b) => <span className="truncate">{b.name}</span>}
+              />
+            </div>
           )}
         </div>
         {budgetAnalytics && (

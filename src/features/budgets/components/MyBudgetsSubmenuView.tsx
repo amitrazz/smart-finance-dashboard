@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useBudgets, useDeleteBudget } from "../hooks/useBudgetQueries";
 import { formatCurrency } from "../../../utils/formatters";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 
 interface MyBudgetsSubmenuViewProps {
   onOpenWizard: () => void;
@@ -28,6 +29,7 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<string>("ALL");
+  const [deletingBudget, setDeletingBudget] = useState<{ id: string; name: string } | null>(null);
 
   const filteredBudgets = useMemo(() => {
     return budgets.filter((b) => {
@@ -38,9 +40,15 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
   }, [budgets, searchTerm, periodFilter]);
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete budget plan "${name}"?`)) {
-      deleteBudgetMutation.mutate({ id });
-    }
+    setDeletingBudget({ id, name });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingBudget) return;
+    deleteBudgetMutation.mutate(
+      { id: deletingBudget.id },
+      { onSuccess: () => setDeletingBudget(null) }
+    );
   };
 
   if (isLoading) {
@@ -85,6 +93,8 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
           <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl">
             <button
               onClick={() => setViewMode("grid")}
+              aria-label="Grid view"
+              title="Grid view"
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "grid" ? "bg-slate-800 text-emerald-400" : "text-slate-400 hover:text-slate-200"
               }`}
@@ -93,6 +103,8 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
             </button>
             <button
               onClick={() => setViewMode("list")}
+              aria-label="List view"
+              title="List view"
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "list" ? "bg-slate-800 text-emerald-400" : "text-slate-400 hover:text-slate-200"
               }`}
@@ -218,6 +230,7 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
                       onClick={() => handleDelete(budget.id, budget.name)}
                       className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                       title="Delete Budget"
+                      aria-label="Delete Budget"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -265,6 +278,14 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
                     >
                       <Eye className="w-3.5 h-3.5 text-emerald-400" /> Detail
                     </button>
+                    <button
+                      onClick={() => handleDelete(b.id, b.name)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 inline-flex items-center"
+                      title="Delete Budget"
+                      aria-label="Delete Budget"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -272,6 +293,18 @@ export const MyBudgetsSubmenuView: React.FC<MyBudgetsSubmenuViewProps> = ({
           </table>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deletingBudget)}
+        title="Delete Budget Plan?"
+        message={`Are you sure you want to delete budget plan "${deletingBudget?.name}"? This action cannot be undone.`}
+        confirmText="Delete Budget"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteBudgetMutation.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletingBudget(null)}
+      />
     </div>
   );
 };

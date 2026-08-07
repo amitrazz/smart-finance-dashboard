@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Undo2,
+  Wallet,
 } from "lucide-react";
 import {
   useAccounts,
@@ -25,6 +26,7 @@ import { formatDate } from "../../../utils/formatters";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ResolveStatementLineModal } from "../components/reconciliation/ResolveStatementLineModal";
 import { SuggestionActions } from "../components/reconciliation/SuggestionActions";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 const STATUS_FILTERS: { id: StatementLineStatus | "ALL"; label: string }[] = [
   { id: "ALL", label: "All" },
@@ -103,6 +105,7 @@ const StatementLineRow: React.FC<{
             onClick={() => unmatchMutation.mutate({ id: line.id, version: line.version })}
             disabled={unmatchMutation.isPending}
             title="Undo this match"
+            aria-label="Undo this match"
             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 disabled:opacity-40"
           >
             {unmatchMutation.isPending ? (
@@ -123,7 +126,11 @@ const StatementLineRow: React.FC<{
 };
 
 export const ReconciliationView: React.FC = () => {
-  const { data: accounts = [] } = useAccounts();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
   const [accountId, setAccountId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatementLineStatus | "ALL">("ALL");
   const [resolvingLine, setResolvingLine] = useState<StatementLine | null>(null);
@@ -210,18 +217,22 @@ export const ReconciliationView: React.FC = () => {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
-          >
-            <option value="">All Accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-56">
+            <AsyncSearchSelect
+              value={accountId}
+              valueLabel={accountId ? accounts.find((a) => a.id === accountId)?.name : "All Accounts"}
+              items={accounts}
+              isFetching={isAccountsFetching}
+              onSearch={setAccountSearch}
+              onSelect={(a) => setAccountId(a.id)}
+              onClear={() => setAccountId("")}
+              getOptionKey={(a) => a.id}
+              icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+              placeholder="All Accounts"
+              emptyMessage="No matching accounts"
+              renderOption={(a) => <span className="truncate">{a.name}</span>}
+            />
+          </div>
 
           <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800">
             {STATUS_FILTERS.map((f) => (

@@ -16,6 +16,7 @@ import {
 import { formatCurrency, formatPercent } from "../../../utils/formatters";
 import { Loan, LoanStatus } from "../../../types";
 import { usePauseLoan, useResumeLoan, useCloseLoan } from "../hooks/useLoanQueries";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 
 interface LoanListTableProps {
   loans: Loan[];
@@ -65,11 +66,13 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [activeMenuLoanId, setActiveMenuLoanId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [closeLoanTarget, setCloseLoanTarget] = useState<Loan | null>(null);
   const pageSize = 10;
 
   const pauseMutation = usePauseLoan();
   const resumeMutation = useResumeLoan();
   const closeMutation = useCloseLoan();
+  const isRowActionPending = pauseMutation.isPending || resumeMutation.isPending || closeMutation.isPending;
 
   const parseMoneyNum = (m?: unknown): number => {
     if (!m) return 0;
@@ -131,9 +134,17 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
     setActiveMenuLoanId(null);
   };
 
-  const handleClose = (loan: Loan) => {
-    closeMutation.mutate({ id: loan.id, version: loan.version });
+  const handleRequestClose = (loan: Loan) => {
+    setCloseLoanTarget(loan);
     setActiveMenuLoanId(null);
+  };
+
+  const handleConfirmClose = () => {
+    if (!closeLoanTarget) return;
+    closeMutation.mutate(
+      { id: closeLoanTarget.id, version: closeLoanTarget.version },
+      { onSuccess: () => setCloseLoanTarget(null) }
+    );
   };
 
   return (
@@ -369,6 +380,7 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                             onClick={() => onOpenRecordPayment(loan.id)}
                             className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer"
                             title="Record EMI / Prepayment"
+                            aria-label="Record EMI / Prepayment"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
                           </button>
@@ -377,6 +389,7 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                             onClick={() => onSelectLoan(loan.id)}
                             className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer"
                             title="View Details"
+                            aria-label="View loan details"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -385,6 +398,7 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                             <button
                               onClick={() => setActiveMenuLoanId(activeMenuLoanId === loan.id ? null : loan.id)}
                               className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-all cursor-pointer"
+                              aria-label="More loan actions"
                             >
                               <MoreVertical className="w-3.5 h-3.5" />
                             </button>
@@ -394,7 +408,8 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                                 {loan.status === "ACTIVE" && (
                                   <button
                                     onClick={() => handlePause(loan)}
-                                    className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-amber-400 text-xs font-semibold flex items-center gap-2 cursor-pointer"
+                                    disabled={isRowActionPending}
+                                    className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-amber-400 text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   >
                                     <PauseCircle className="w-3.5 h-3.5" />
                                     <span>Pause Repayments</span>
@@ -404,7 +419,8 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                                 {loan.status === "PAUSED" && (
                                   <button
                                     onClick={() => handleResume(loan)}
-                                    className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-emerald-400 text-xs font-semibold flex items-center gap-2 cursor-pointer"
+                                    disabled={isRowActionPending}
+                                    className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-emerald-400 text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   >
                                     <PlayCircle className="w-3.5 h-3.5" />
                                     <span>Resume Repayments</span>
@@ -412,8 +428,9 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                                 )}
 
                                 <button
-                                  onClick={() => handleClose(loan)}
-                                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 cursor-pointer"
+                                  onClick={() => handleRequestClose(loan)}
+                                  disabled={isRowActionPending}
+                                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   <span>Mark Closed</span>
@@ -442,6 +459,7 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-slate-300 transition-all cursor-pointer"
+                  aria-label="Previous page"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -449,6 +467,7 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-slate-300 transition-all cursor-pointer"
+                  aria-label="Next page"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -457,6 +476,18 @@ export const LoanListTable: React.FC<LoanListTableProps> = ({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(closeLoanTarget)}
+        title="Close this loan?"
+        message={`This marks "${closeLoanTarget?.name ?? "this loan"}" as closed. It will stop appearing in active EMI schedules and reminders. You can review it later from the closed loans filter.`}
+        confirmText="Close Loan"
+        cancelText="Keep Active"
+        variant="warning"
+        isLoading={closeMutation.isPending}
+        onConfirm={handleConfirmClose}
+        onClose={() => setCloseLoanTarget(null)}
+      />
     </div>
   );
 };

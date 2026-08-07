@@ -66,7 +66,11 @@ export const InstitutionCard: React.FC<InstitutionCardProps> = ({
       <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
         <button
           onClick={() => onSync?.(institution)}
-          className="text-xs font-semibold text-slate-300 hover:text-emerald-400 flex items-center gap-1.5 transition-colors"
+          disabled={!onSync}
+          title={onSync ? "Sync Institution" : "Institution sync isn't available yet — no backend endpoint exists"}
+          className={`text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            onSync ? "text-slate-300 hover:text-emerald-400" : "text-slate-600 cursor-not-allowed opacity-50"
+          }`}
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Sync Institution</span>
@@ -76,6 +80,7 @@ export const InstitutionCard: React.FC<InstitutionCardProps> = ({
           onClick={() => onDelete?.(institution)}
           className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
           title="Disconnect Institution"
+          aria-label="Disconnect Institution"
         >
           <Trash2 className="w-4 h-4" />
         </button>

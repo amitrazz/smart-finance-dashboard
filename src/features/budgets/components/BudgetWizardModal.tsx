@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { X, Check, ArrowRight, ArrowLeft, RefreshCw } from "lucide-react";
 import { useCreateBudget } from "../hooks/useBudgetQueries";
 import { useCategories } from "../../../hooks/useFinanceQueries";
 import { Budget, BudgetPeriod } from "../../../types";
@@ -82,6 +82,7 @@ export const BudgetWizardModal: React.FC<BudgetWizardModalProps> = ({ isOpen, on
 
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -339,9 +340,14 @@ export const BudgetWizardModal: React.FC<BudgetWizardModalProps> = ({ isOpen, on
             <button
               onClick={handleSubmit}
               disabled={createMutation.isPending}
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition-all shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
             >
-              <Check className="w-4 h-4" /> <span>Save & Activate Plan</span>
+              {createMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              <span>Save & Activate Plan</span>
             </button>
           )}
         </div>

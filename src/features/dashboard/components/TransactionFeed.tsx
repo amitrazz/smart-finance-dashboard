@@ -4,6 +4,7 @@ import { formatCurrency } from "../../../utils/formatters";
 import { useTransactions } from "../../../hooks/useFinanceQueries";
 import { useUIStore } from "../../../store/useUIStore";
 import { Transaction } from "../../../types";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 export const TransactionFeed: React.FC = () => {
   const [search, setSearch] = useState("");
@@ -66,7 +67,7 @@ export const TransactionFeed: React.FC = () => {
             onClick={() => setFilterCategory(cat)}
             className={`px-3 py-1 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
               filterCategory === cat
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
             }`}
           >

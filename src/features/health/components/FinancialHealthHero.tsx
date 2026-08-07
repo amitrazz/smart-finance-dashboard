@@ -133,8 +133,9 @@ export const FinancialHealthHero: React.FC = () => {
               onClick={() => recalculateMutation.mutate()}
               disabled={recalculateMutation.isPending}
               type="button"
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-all cursor-pointer disabled:opacity-50"
               title="Recalculate Score"
+              aria-label="Recalculate Score"
             >
               <RotateCcw className={`w-4 h-4 ${recalculateMutation.isPending ? "animate-spin text-indigo-400" : ""}`} />
             </button>

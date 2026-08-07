@@ -1,5 +1,5 @@
 import React from "react";
-import { useSmartActions } from "../../../actions/hooks/useSmartActions";
+import { useSmartActions, useDismissAction } from "../../../actions/hooks/useSmartActions";
 import { RecommendationCard } from "../../../../components/planning/RecommendationCard";
 import { LoadingSkeleton } from "../../../../components/common/LoadingSkeleton";
 import { EmptyState } from "../../../../components/common/EmptyState";
@@ -8,6 +8,7 @@ import { ErrorState } from "../../../../components/common/ErrorState";
 export const RecommendationsTab: React.FC = () => {
   const { data: goalActions = [], isLoading: goalLoading, isError: goalErrored, refetch: refetchGoalActions } = useSmartActions({ category: "GOALS" });
   const { data: savingsActions = [], isLoading: savingsLoading, isError: savingsErrored, refetch: refetchSavingsActions } = useSmartActions({ category: "SAVINGS" });
+  const dismissAction = useDismissAction();
 
   const isLoading = goalLoading || savingsLoading;
   if (isLoading) return <LoadingSkeleton type="list" rows={4} />;
@@ -44,6 +45,11 @@ export const RecommendationsTab: React.FC = () => {
           title={action.title}
           text={action.recommendation ?? action.description}
           severity={action.priority === "CRITICAL" ? "CRITICAL" : action.priority === "HIGH" ? "WARNING" : "INFO"}
+          onDismiss={
+            action.dismissible
+              ? () => dismissAction.mutate({ id: action.id, version: action.version })
+              : undefined
+          }
         />
       ))}
     </div>

@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { PortfolioSnapshot } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 export type PortfolioChartTimeframe = "1M" | "6M" | "1Y" | "ALL";
 
@@ -81,7 +82,7 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({ data, timeframe,
               onClick={() => onTimeframeChange(tf)}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
                 timeframe === tf
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  ? `${NAV_TAB_L2}`
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >

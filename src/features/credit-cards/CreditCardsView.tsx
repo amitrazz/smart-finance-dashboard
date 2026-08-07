@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LayoutDashboard, CreditCard as CreditCardIcon, Plus } from "lucide-react";
 import { useUIStore } from "../../store/useUIStore";
+import { Button } from "../../components/ui/Button";
 import { CreditCardDashboard } from "./components/CreditCardDashboard";
 import { CreditCardList } from "./components/CreditCardList";
 import { CreditCardDetailsView } from "./components/CreditCardDetailsView";
@@ -8,6 +9,7 @@ import { AddCreditCardWizard } from "./components/AddCreditCardWizard";
 import { EditCreditCardModal } from "./components/EditCreditCardModal";
 import { RecordPaymentModal } from "./components/RecordPaymentModal";
 import { CreditCard } from "../../types";
+import { NAV_TAB_L2 } from "../../styles/navTabTokens";
 
 type ViewMode = "dashboard" | "list" | "detail";
 
@@ -66,7 +68,7 @@ export const CreditCardsView: React.FC = () => {
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                   viewMode === "dashboard"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    ? `${NAV_TAB_L2}`
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -80,7 +82,7 @@ export const CreditCardsView: React.FC = () => {
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                   viewMode === "list"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    ? `${NAV_TAB_L2}`
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -89,12 +91,15 @@ export const CreditCardsView: React.FC = () => {
               </button>
             </div>
 
-            <button
+            <Button
+              variant="primary"
+              hierarchy="filled"
+              size="md"
+              leftIcon={<Plus className="w-4 h-4" />}
               onClick={() => setAddWizardOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20"
             >
-              <Plus className="w-4 h-4" /> Add Credit Card
-            </button>
+              Add Credit Card
+            </Button>
           </div>
         </div>
       )}

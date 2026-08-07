@@ -5,6 +5,7 @@ import { useAccounts, useTransfers, useReverseTransfer } from "../../../hooks/us
 import { TransferCard } from "../components/TransferCard";
 import { Transfer, TransferStatus } from "../../../types";
 import { EmptyState } from "../../../components/common/EmptyState";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import { formatCurrency, formatDate } from "../../../utils/formatters";
 import { ArrowRightLeft, Clock, AlertCircle, Plus, X, Undo2 } from "lucide-react";
 
@@ -26,6 +27,7 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
   const reverseTransferMutation = useReverseTransfer();
   const [activeTab, setActiveTab] = useState<TransferStatus | "ALL">("ALL");
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
+  const [reversingTransfer, setReversingTransfer] = useState<Transfer | null>(null);
 
   const accountNameById = useMemo(
     () => new Map(accounts.map((a) => [a.id, a.name])),
@@ -46,8 +48,16 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
 
   const handleReverse = (id: string) => {
     reverseTransferMutation.mutate(id, {
-      onSuccess: () => setSelectedTransfer(null),
+      onSuccess: () => {
+        setSelectedTransfer(null);
+        setReversingTransfer(null);
+      },
     });
+  };
+
+  const handleConfirmReverse = () => {
+    if (!reversingTransfer) return;
+    handleReverse(reversingTransfer.id);
   };
 
   if (isLoading) {
@@ -122,7 +132,7 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
               <TransferCard
                 transfer={transfer}
                 onClick={() => setSelectedTransfer(transfer)}
-                onReverse={() => handleReverse(transfer.id)}
+                onReverse={() => setReversingTransfer(transfer)}
                 isReversing={reverseTransferMutation.isPending && reverseTransferMutation.variables === transfer.id}
               />
             </motion.div>
@@ -142,7 +152,11 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
           <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 space-y-6 overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h3 className="font-bold text-lg text-slate-100">Transfer Details</h3>
-              <button onClick={() => setSelectedTransfer(null)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => setSelectedTransfer(null)}
+                aria-label="Close transfer details"
+                className="text-slate-400 hover:text-white"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -200,7 +214,7 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
                 !selectedTransfer.reversedByTransferId &&
                 !selectedTransfer.reversalOfTransferId && (
                   <button
-                    onClick={() => handleReverse(selectedTransfer.id)}
+                    onClick={() => setReversingTransfer(selectedTransfer)}
                     disabled={reverseTransferMutation.isPending}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 font-semibold text-sm transition-all disabled:opacity-50"
                   >
@@ -212,6 +226,22 @@ export const TransfersView: React.FC<TransfersViewProps> = ({ onNewTransfer }) =
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(reversingTransfer)}
+        title="Reverse Transfer"
+        message={
+          reversingTransfer
+            ? `Reverse the transfer of ${formatCurrency(parseFloat(reversingTransfer.amount.amount), reversingTransfer.amount.currency)} from ${reversingTransfer.fromAccountName} to ${reversingTransfer.toAccountName}? This creates an offsetting transfer and cannot be undone.`
+            : ""
+        }
+        confirmText="Reverse Transfer"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={reverseTransferMutation.isPending}
+        onConfirm={handleConfirmReverse}
+        onClose={() => setReversingTransfer(null)}
+      />
     </div>
   );
 };

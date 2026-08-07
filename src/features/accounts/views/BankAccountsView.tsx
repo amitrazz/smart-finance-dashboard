@@ -9,9 +9,10 @@ import { Search, Landmark, SlidersHorizontal } from "lucide-react";
 interface BankAccountsViewProps {
   onSelectAccount: (account: Account) => void;
   onTransfer: () => void;
+  onStatement?: () => void;
 }
 
-export const BankAccountsView: React.FC<BankAccountsViewProps> = ({ onSelectAccount, onTransfer }) => {
+export const BankAccountsView: React.FC<BankAccountsViewProps> = ({ onSelectAccount, onTransfer, onStatement }) => {
   const { data: accounts = [], isLoading } = useAccounts();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"balance" | "name" | "lastSync">("balance");
@@ -95,7 +96,7 @@ export const BankAccountsView: React.FC<BankAccountsViewProps> = ({ onSelectAcco
                 account={account}
                 onViewDetails={onSelectAccount}
                 onTransfer={onTransfer}
-                onStatement={() => {}}
+                onStatement={onStatement}
               />
             </motion.div>
           ))}

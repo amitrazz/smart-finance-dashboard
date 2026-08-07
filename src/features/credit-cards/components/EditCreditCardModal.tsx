@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { X, Check, CreditCard as CreditCardIcon } from "lucide-react";
+import { X, Check, CreditCard as CreditCardIcon, Wallet } from "lucide-react";
 import { useUpdateCreditCard } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
 import { CreditCard, CardStatus, UpdateCreditCardInput, FinancialInstitution } from "../../../types";
 import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface EditCreditCardModalProps {
   card: CreditCard | null;
@@ -13,7 +14,12 @@ interface EditCreditCardModalProps {
 
 export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, isOpen, onClose }) => {
   const updateCardMutation = useUpdateCreditCard();
-  const { data: accounts = [] } = useAccounts();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
+  const paymentAccountOptions = accounts.filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN");
 
   const [nickname, setNickname] = useState("");
   const [issuer, setIssuer] = useState("");
@@ -21,8 +27,11 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
   const [lastFourDigits, setLastFourDigits] = useState("");
   const [interestRate, setInterestRate] = useState("42.0");
   const [paymentAccountId, setPaymentAccountId] = useState("");
+  const selectedPaymentAccount = paymentAccountOptions.find((a) => a.id === paymentAccountId);
   const [autoPayEnabled, setAutoPayEnabled] = useState(false);
   const [status, setStatus] = useState<CardStatus>("ACTIVE");
+  const [rewardProgram, setRewardProgram] = useState("");
+  const [rewardRatePoints, setRewardRatePoints] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -35,6 +44,9 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
       setPaymentAccountId(card.paymentAccountId || "");
       setAutoPayEnabled(Boolean(card.autoPayEnabled));
       setStatus((card.status as CardStatus) || "ACTIVE");
+      setRewardProgram(card.rewardProgram || "");
+      // Backend doesn't echo rewardRatePoints back in the read model (write-only), so this always starts blank.
+      setRewardRatePoints("");
       setNotes(card.notes || "");
     }
   }, [card]);
@@ -57,6 +69,8 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
       interestRate,
       paymentAccountId: paymentAccountId || undefined,
       autoPayEnabled,
+      rewardProgram: rewardProgram || undefined,
+      rewardRatePoints: rewardRatePoints || undefined,
       notes: notes || undefined,
     };
 
@@ -94,6 +108,7 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -169,22 +184,56 @@ export const EditCreditCardModal: React.FC<EditCreditCardModalProps> = ({ card, 
             Credit limit, billing cycle day, and payment due day are set when the card is added and are not editable here.
           </p>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reward Program</label>
+              <input
+                type="text"
+                placeholder="e.g. HDFC SmartBuy"
+                value={rewardProgram}
+                onChange={(e) => setRewardProgram(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Reward Rate (points / ₹ spent)</label>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 2"
+                value={rewardRatePoints}
+                onChange={(e) => setRewardRatePoints(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">Default Payment Account</label>
-            <select
+            <AsyncSearchSelect
               value={paymentAccountId}
-              onChange={(e) => setPaymentAccountId(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-            >
-              <option value="">-- None Linked --</option>
-              {accounts
-                .filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN")
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.type})
-                  </option>
-                ))}
-            </select>
+              valueLabel={
+                selectedPaymentAccount
+                  ? `${selectedPaymentAccount.name} (${selectedPaymentAccount.type})`
+                  : "-- None Linked --"
+              }
+              items={paymentAccountOptions}
+              isFetching={isAccountsFetching}
+              onSearch={setAccountSearch}
+              onSelect={(a) => setPaymentAccountId(a.id)}
+              onClear={() => setPaymentAccountId("")}
+              getOptionKey={(a) => a.id}
+              icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+              placeholder="-- None Linked --"
+              emptyMessage="No matching accounts"
+              renderOption={(a) => (
+                <span className="truncate">
+                  {a.name} ({a.type})
+                </span>
+              )}
+            />
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">

@@ -55,6 +55,8 @@ import {
   LoanPayment,
   LoanScheduleItem,
   Lot,
+  Merchant,
+  MerchantReviewCluster,
   Money,
   NetWorthSnapshot,
   OnboardingAccountInput,
@@ -75,7 +77,9 @@ import {
   ReconciliationRecord,
   ReconciliationSummary,
   RecordCreditCardPaymentInput,
+  ResolveReviewClusterInput,
   RetirementForecastResponse,
+  ReviewClusterStatus,
   RunAutoMatchResult,
   SearchResultItem,
   SipPlan,
@@ -514,8 +518,8 @@ export const api = {
     ),
 
   // Categories
-  getCategories: () =>
-    fetchWithAuth<PaginatedResponse<Category> | Category[]>('/finance/categories'),
+  getCategories: (params?: { search?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<Category> | Category[]>(`/finance/categories${buildQuery(params)}`),
   createCategory: (data: Partial<Category>) =>
     fetchWithAuth<Category>('/finance/categories', {
       method: 'POST',
@@ -527,7 +531,7 @@ export const api = {
     fetchWithAuth<PaginatedResponse<ImportJob>>(`/finance/imports${buildQuery(params)}`, {
       timeoutMs: 300000,
     }),
-  getReviewQueue: (params?: { limit?: number }) =>
+  getReviewQueue: (params?: { limit?: number; cursor?: string }) =>
     fetchWithAuth<PaginatedResponse<ImportRowStaging>>(
       `/finance/imports/review-queue${buildQuery(params)}`,
       {
@@ -584,6 +588,31 @@ export const api = {
       method: 'POST',
       timeoutMs: 300000,
     }),
+
+  // Merchant Intelligence — Counterparty review clusters (Unknown
+  // Counterparty Workflow: fuzzy-similar review-queue misses grouped for
+  // one-action resolution) and the merchant directory search backing the
+  // "resolve to existing merchant" picker.
+  getMerchants: (params?: { search?: string; merchantType?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<Merchant>>(`/finance/merchants${buildQuery(params)}`),
+  getMerchant: (id: string) =>
+    fetchWithAuth<Merchant>(`/finance/merchants/${encodeURIComponent(id)}`),
+  getReviewClusters: (params?: { status?: ReviewClusterStatus; cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<MerchantReviewCluster>>(
+      `/finance/merchant/review-clusters${buildQuery(params)}`,
+    ),
+  getReviewCluster: (id: string) =>
+    fetchWithAuth<MerchantReviewCluster>(
+      `/finance/merchant/review-clusters/${encodeURIComponent(id)}`,
+    ),
+  resolveReviewCluster: (id: string, data: ResolveReviewClusterInput) =>
+    fetchWithAuth<MerchantReviewCluster>(
+      `/finance/merchant/review-clusters/${encodeURIComponent(id)}/resolve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
 
   // Documents
   getDocuments: (params?: { limit?: number }) =>
@@ -864,7 +893,7 @@ export const api = {
     ),
   getCardTransactions: (
     cardId: string,
-    params?: { limit?: number; category?: string; merchant?: string; search?: string },
+    params?: { limit?: number; category?: string; merchant?: string; search?: string; cursor?: string },
   ) =>
     fetchWithAuth<PaginatedResponse<Transaction> | Transaction[]>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/transactions${buildQuery(params)}`,

@@ -243,6 +243,7 @@ export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
                           }}
                           className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                           title="View Statement Details"
+                          aria-label="View Statement Details"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -271,6 +272,7 @@ export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
 
       {/* Statement Details Modal */}
       <StatementDetailsModal
+        cardId={cardId}
         statement={selectedStatement}
         isOpen={isDetailsOpen}
         onClose={() => {

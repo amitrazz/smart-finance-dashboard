@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { InvestmentsBreadcrumb } from "./InvestmentsBreadcrumb";
 import { InvestmentsMobileNavDrawer, NavCategoryConfig } from "./InvestmentsMobileNavDrawer";
+import { Button } from "../../../components/ui/Button";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface InvestmentsSubNavProps {
   onOpenTrade: () => void;
@@ -111,22 +113,27 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrad
           </button>
 
           {onRefresh && (
-            <button
+            <Button
+              variant="neutral"
+              hierarchy="ghost"
+              size="icon"
               onClick={onRefresh}
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all"
               title="Refresh Investment Data"
+              aria-label="Refresh Investment Data"
             >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+              <RefreshCw className="w-4 h-4 text-slate-400" />
+            </Button>
           )}
 
-          <button
+          <Button
+            variant="primary"
+            hierarchy="filled"
+            size="md"
+            leftIcon={<Plus className="w-4 h-4" />}
             onClick={onOpenTrade}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all"
           >
-            <Plus className="w-4 h-4" />
             <span>Record Trade</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -141,11 +148,11 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrad
               onClick={() => setActiveSubTab(cat.defaultSubTab)}
               className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                  ? "bg-nav-tab-l1-bg text-nav-tab-l1-fg shadow-lg shadow-nav-tab-l1-shadow"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-indigo-400"}`} />
+              <Icon className={`w-4 h-4 ${isActive ? "text-nav-tab-l1-fg" : "text-slate-500"}`} />
               <span className="truncate">{cat.label}</span>
             </button>
           );
@@ -166,7 +173,7 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrad
                 onClick={() => setActiveSubTab(sub.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   isSubActive
-                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-md"
+                    ? `${NAV_TAB_L2}`
                     : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800"
                 }`}
               >

@@ -4,6 +4,7 @@ import { formatCurrency } from "../../../utils/formatters";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { BarChart3, TrendingUp, ShieldCheck, AlertTriangle, Target } from "lucide-react";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -67,6 +68,10 @@ const HealthGauge: React.FC<{ score: number; band: string }> = ({ score, band })
 // pick which goal to inspect instead of fabricating an "overall" figure.
 export const AnalyticsSubmenuView: React.FC = () => {
   const { data: goals = [], isLoading: isLoadingGoals, isError: isGoalsError, refetch: refetchGoals } = useGoals();
+  const [goalSearch, setGoalSearch] = useState("");
+  const { data: goalSearchResults = [], isFetching: isGoalSearchFetching } = useGoals(
+    goalSearch ? { search: goalSearch } : undefined
+  );
   const [selectedGoalId, setSelectedGoalId] = useState<string>("");
   const [subView, setSubView] = useState<AnalyticsSubView>("growth");
 
@@ -109,15 +114,20 @@ export const AnalyticsSubmenuView: React.FC = () => {
           </h2>
           <p className="text-xs text-slate-400 mt-1">Corpus, contribution, and health analytics for a single goal</p>
         </div>
-        <select
-          value={selectedGoalId}
-          onChange={(e) => setSelectedGoalId(e.target.value)}
-          className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs font-bold focus:outline-none focus:border-purple-500"
-        >
-          {goals.map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </select>
+        <div className="w-48">
+          <AsyncSearchSelect
+            value={selectedGoalId}
+            valueLabel={goals.find((g) => g.id === selectedGoalId)?.name}
+            items={goalSearchResults}
+            isFetching={isGoalSearchFetching}
+            onSearch={setGoalSearch}
+            onSelect={(g) => setSelectedGoalId(g.id)}
+            getOptionKey={(g) => g.id}
+            placeholder="Select goal"
+            emptyMessage="No matching goals"
+            renderOption={(g) => <span className="truncate">{g.name}</span>}
+          />
+        </div>
       </div>
 
       {isLoading ? (

@@ -460,6 +460,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                           <button
                             onClick={() => onPayCard(card)}
                             title="Record Payment"
+                            aria-label="Record Payment"
                             className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                           >
                             <DollarSign className="w-3.5 h-3.5" />
@@ -467,6 +468,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                           <button
                             onClick={() => onSelectCard(card.id)}
                             title="View Details"
+                            aria-label="View Details"
                             className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -474,6 +476,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                           <button
                             onClick={() => onEditCard(card)}
                             title="Card Settings & Edit"
+                            aria-label="Card Settings & Edit"
                             className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -481,6 +484,7 @@ export const CreditCardList: React.FC<CreditCardListProps> = ({
                           <button
                             onClick={() => setDeletingCard({ id: card.id, name: card.nickname || "Credit Card", version: card.version || 1 })}
                             title="Delete Credit Card"
+                            aria-label="Delete Credit Card"
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

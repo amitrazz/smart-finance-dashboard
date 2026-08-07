@@ -11,6 +11,7 @@ import { TrendingUp, AlertTriangle, RefreshCw, Layers, Wallet, Zap, Activity } f
 import { useBudgetAnalytics, useBudgets } from "../hooks/useBudgetQueries";
 import { formatCurrency } from "../../../utils/formatters";
 import { EmptyState } from "../../../components/common/EmptyState";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 const TREND_LABELS: Record<string, string> = {
   ACCELERATING: "Accelerating",
@@ -22,6 +23,10 @@ const TREND_LABELS: Record<string, string> = {
 export const AnalyticsSubmenuView: React.FC = () => {
   const { data: budgets = [], isLoading: isLoadingBudgets, isError: isBudgetsError, refetch: refetchBudgets } = useBudgets();
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>("");
+  const [budgetSearch, setBudgetSearch] = useState("");
+  const { data: budgetSearchResults = [], isFetching: isBudgetSearchFetching } = useBudgets(
+    budgetSearch ? { search: budgetSearch } : undefined
+  );
 
   useEffect(() => {
     if (!selectedBudgetId && budgets.length > 0) {
@@ -67,15 +72,20 @@ export const AnalyticsSubmenuView: React.FC = () => {
   }
 
   const BudgetSelector = (
-    <select
-      value={selectedBudgetId}
-      onChange={(e) => setSelectedBudgetId(e.target.value)}
-      className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs font-bold focus:outline-none focus:border-indigo-500"
-    >
-      {budgets.map((b) => (
-        <option key={b.id} value={b.id}>{b.name}</option>
-      ))}
-    </select>
+    <div className="w-52">
+      <AsyncSearchSelect
+        value={selectedBudgetId}
+        valueLabel={budgets.find((b) => b.id === selectedBudgetId)?.name}
+        items={budgetSearchResults}
+        isFetching={isBudgetSearchFetching}
+        onSearch={setBudgetSearch}
+        onSelect={(b) => setSelectedBudgetId(b.id)}
+        getOptionKey={(b) => b.id}
+        placeholder="Select budget"
+        emptyMessage="No matching budgets"
+        renderOption={(b) => <span className="truncate">{b.name}</span>}
+      />
+    </div>
   );
 
   if (isLoading) {

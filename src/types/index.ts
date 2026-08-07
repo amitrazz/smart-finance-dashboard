@@ -411,8 +411,61 @@ export interface Category {
 export interface Merchant {
   id: string;
   name: string;
+  displayName?: string;
+  merchantType?: string | null;
   logoUrl?: string;
   defaultCategoryId?: string;
+}
+
+// Counterparty Intelligence — merchant-intelligence's Unknown Counterparty
+// Workflow. Mirrors packages/finance/src/merchant-intelligence's
+// FuzzyScoreBreakdown/ReviewClusterResponseDto exactly.
+export interface FuzzyScoreBreakdown {
+  levenshtein: number;
+  jaroWinkler: number;
+  phonetic: number;
+  historical: number | null;
+  final: number;
+}
+
+export type ReviewClusterStatus = "PENDING" | "RESOLVED" | "IGNORED";
+
+export interface ReviewClusterMember {
+  id: string;
+  rawDescription: string;
+  normalizedDescription: string;
+  occurrenceCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export interface MerchantReviewCluster {
+  id: string;
+  representativeName: string;
+  memberCount: number;
+  status: ReviewClusterStatus;
+  suggestedMerchantId: string | null;
+  suggestedConfidence: number | null;
+  suggestionBreakdown: FuzzyScoreBreakdown | null;
+  aiSuggestedMerchantId: string | null;
+  aiSuggestedName: string | null;
+  aiSuggestedCategoryId: string | null;
+  aiConfidence: number | null;
+  aiReason: string | null;
+  resolvedMerchantId: string | null;
+  resolvedAt: string | null;
+  members?: ReviewClusterMember[];
+}
+
+export interface ResolveReviewClusterInput {
+  status: "RESOLVED" | "IGNORED";
+  merchantId?: string;
+  newMerchantName?: string;
+  merchantType?: string;
+  categoryId?: string;
+  subcategoryId?: string;
+  backfillTransactions?: boolean;
+  reason?: string;
 }
 
 // Matches the ImportJobStatus enum in packages/finance/prisma/schema.prisma exactly.
@@ -471,6 +524,7 @@ export interface NormalizedTradeRowData {
 // (ImportRowResponseDto) exactly.
 export interface ImportRowStaging {
   id: string;
+  importJobId: string;
   rowNumber: number;
   rawData: string[];
   normalizedData: NormalizedTransactionRowData | NormalizedTradeRowData | null;

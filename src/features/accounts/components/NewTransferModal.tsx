@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRightLeft, X, Check } from "lucide-react";
+import { ArrowRightLeft, Wallet, X, Check } from "lucide-react";
 import { useAccounts, useCreateTransfer } from "../../../hooks/useFinanceQueries";
 import { Account, CreateTransferInput, TransferType } from "../../../types";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 // AccountResponseDto has no top-level `currency` field — it only appears
 // nested under currentBalance.currency (see account.mapper.ts on the
@@ -27,7 +28,16 @@ const TRANSFER_TYPES: { value: TransferType; label: string }[] = [
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onClose, defaultFromAccountId }) => {
-  const { data: accounts = [] } = useAccounts();
+  const [fromSearch, setFromSearch] = useState("");
+  const [toSearch, setToSearch] = useState("");
+  const { data: fromAccounts = [], isFetching: isFromFetching } = useAccounts({
+    search: fromSearch || undefined,
+    limit: 100,
+  });
+  const { data: toAccounts = [], isFetching: isToFetching } = useAccounts({
+    search: toSearch || undefined,
+    limit: 100,
+  });
   const createTransferMutation = useCreateTransfer();
 
   const [fromAccountId, setFromAccountId] = useState("");
@@ -40,22 +50,22 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onCl
   const [reference, setReference] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
-  const activeAccounts = accounts.filter((a) => a.status === "ACTIVE");
+  const activeFromAccounts = fromAccounts.filter((a) => a.status === "ACTIVE");
+  const activeToAccounts = toAccounts.filter((a) => a.status === "ACTIVE" && a.id !== fromAccountId);
 
-  // Seed from/to accounts once accounts have loaded, honoring defaultFromAccountId if given.
+  // Seed from/to accounts once the (unfiltered) initial fetch has loaded, honoring defaultFromAccountId if given.
   useEffect(() => {
-    if (!isOpen || activeAccounts.length === 0) return;
-    setFromAccountId((prev) => prev || defaultFromAccountId || activeAccounts[0].id);
-  }, [isOpen, activeAccounts, defaultFromAccountId]);
+    if (!isOpen || activeFromAccounts.length === 0) return;
+    setFromAccountId((prev) => prev || defaultFromAccountId || activeFromAccounts[0].id);
+  }, [isOpen, activeFromAccounts, defaultFromAccountId]);
 
   useEffect(() => {
-    if (!isOpen || activeAccounts.length === 0) return;
+    if (!isOpen || activeToAccounts.length === 0) return;
     setToAccountId((prev) => {
       if (prev && prev !== fromAccountId) return prev;
-      const firstOther = activeAccounts.find((a) => a.id !== fromAccountId);
-      return firstOther?.id || "";
+      return activeToAccounts[0]?.id || "";
     });
-  }, [isOpen, activeAccounts, fromAccountId]);
+  }, [isOpen, activeToAccounts, fromAccountId]);
 
   if (!isOpen) return null;
 
@@ -76,8 +86,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onCl
     onClose();
   };
 
-  const fromAccount = activeAccounts.find((a) => a.id === fromAccountId);
-  const toAccountOptions = activeAccounts.filter((a) => a.id !== fromAccountId);
+  const fromAccount = [...fromAccounts, ...toAccounts].find((a) => a.id === fromAccountId);
+  const toAccount = [...fromAccounts, ...toAccounts].find((a) => a.id === toAccountId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +130,7 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onCl
           <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
             <ArrowRightLeft className="w-5 h-5 text-emerald-400" /> New Transfer
           </h3>
-          <button onClick={handleClose} className="text-slate-400 hover:text-white">
+          <button onClick={handleClose} aria-label="Close dialog" className="text-slate-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -129,36 +139,44 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onCl
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">From Account</label>
-              <select
+              <AsyncSearchSelect
                 value={fromAccountId}
-                onChange={(e) => setFromAccountId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none"
-              >
-                {activeAccounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
+                valueLabel={fromAccount ? `${fromAccount.name} (${accountCurrency(fromAccount)})` : undefined}
+                items={activeFromAccounts}
+                isFetching={isFromFetching}
+                onSearch={setFromSearch}
+                onSelect={(acc) => setFromAccountId(acc.id)}
+                getOptionKey={(acc) => acc.id}
+                icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                placeholder="Search accounts…"
+                emptyMessage="No matching accounts"
+                renderOption={(acc) => (
+                  <span className="truncate">
                     {acc.name} ({accountCurrency(acc)})
-                  </option>
-                ))}
-              </select>
+                  </span>
+                )}
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">To Account</label>
-              <select
+              <AsyncSearchSelect
                 value={toAccountId}
-                onChange={(e) => setToAccountId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none"
-              >
-                {toAccountOptions.length === 0 ? (
-                  <option value="">No other accounts available</option>
-                ) : (
-                  toAccountOptions.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({accountCurrency(acc)})
-                    </option>
-                  ))
+                valueLabel={toAccount ? `${toAccount.name} (${accountCurrency(toAccount)})` : undefined}
+                items={activeToAccounts}
+                isFetching={isToFetching}
+                onSearch={setToSearch}
+                onSelect={(acc) => setToAccountId(acc.id)}
+                getOptionKey={(acc) => acc.id}
+                icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                placeholder="Search accounts…"
+                emptyMessage="No other accounts available"
+                renderOption={(acc) => (
+                  <span className="truncate">
+                    {acc.name} ({accountCurrency(acc)})
+                  </span>
                 )}
-              </select>
+              />
             </div>
           </div>
 
@@ -258,7 +276,7 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onCl
             </button>
             <button
               type="submit"
-              disabled={createTransferMutation.isPending || activeAccounts.length < 2}
+              disabled={createTransferMutation.isPending || activeFromAccounts.length < 2}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm disabled:opacity-50"
             >
               <Check className="w-4 h-4" /> {createTransferMutation.isPending ? "Transferring..." : "Send Transfer"}

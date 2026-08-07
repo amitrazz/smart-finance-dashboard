@@ -145,6 +145,7 @@ export const CreateLoanWizardModal: React.FC<CreateLoanWizardModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-all cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>

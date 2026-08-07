@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { useGoals, useDeleteGoal } from "../hooks/useGoalQueries";
 import { formatCurrency } from "../../../utils/formatters";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
+import { Button } from "../../../components/ui/Button";
+import { ActionOverflowMenu } from "../../../components/ui/ActionOverflowMenu";
 import {
   Search,
   ArrowUpDown,
-  Trash2,
-  Eye,
   Plus,
   Target,
   AlertTriangle,
@@ -32,9 +33,15 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [deletingGoal, setDeletingGoal] = useState<{ id: string; name: string } | null>(null);
 
   const { data: goals = [], isLoading, isError, error, refetch } = useGoals();
   const deleteGoalMutation = useDeleteGoal();
+
+  const handleConfirmDelete = () => {
+    if (!deletingGoal) return;
+    deleteGoalMutation.mutate({ id: deletingGoal.id }, { onSuccess: () => setDeletingGoal(null) });
+  };
 
   const filteredGoals = useMemo(() => {
     return goals.filter((g) => {
@@ -130,12 +137,15 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
           </p>
         </div>
 
-        <button
+        <Button
+          variant="primary"
+          hierarchy="filled"
+          size="md"
+          leftIcon={<Plus className="w-4 h-4" />}
           onClick={onOpenCreateWizard}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-emerald-500/20"
         >
-          <Plus className="w-4 h-4" /> Create Goal
-        </button>
+          Create Goal
+        </Button>
       </div>
 
       {/* Filter & Search Bar */}
@@ -329,26 +339,22 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => onSelectGoal(g.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete "${g.name}"?`)) {
-                              deleteGoalMutation.mutate({ id: g.id });
-                            }
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
-                          title="Delete Goal"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <ActionOverflowMenu
+                        ariaLabel={`Actions for ${g.name}`}
+                        items={[
+                          {
+                            id: "view",
+                            label: "View Details",
+                            onClick: () => onSelectGoal(g.id),
+                          },
+                          {
+                            id: "delete",
+                            label: "Delete Goal",
+                            variant: "danger",
+                            onClick: () => setDeletingGoal({ id: g.id, name: g.name }),
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -365,6 +371,7 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
               <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -375,6 +382,7 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -383,6 +391,17 @@ export const GoalListView: React.FC<GoalListViewProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deletingGoal !== null}
+        title="Delete Goal"
+        message={`Are you sure you want to delete "${deletingGoal?.name}"? This cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleteGoalMutation.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletingGoal(null)}
+      />
     </div>
   );
 };

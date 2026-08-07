@@ -1,6 +1,7 @@
 import React from "react";
 import { TimeHorizon } from "../types/insightsTypes";
 import { Calendar, Download } from "lucide-react";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface AnalyticsHeaderProps {
   title: string;
@@ -34,7 +35,7 @@ export const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
                 onClick={() => onHorizonChange(h)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                   horizon === h
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    ? `${NAV_TAB_L2}`
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >

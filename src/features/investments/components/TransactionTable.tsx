@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Trade, InvestmentTradeType } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import { Filter, Search } from "lucide-react";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface TransactionTableProps {
   transactions: Trade[];
@@ -68,7 +69,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({ transactions
               onClick={() => setTypeFilter(tf)}
               className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${
                 typeFilter === tf
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  ? `${NAV_TAB_L2}`
                   : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
               }`}
             >

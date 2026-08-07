@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Calendar, ArrowRight, ShieldCheck, CheckCircle2, Clock, Zap } from "lucide-react";
+import { Calendar, ArrowRight, ShieldCheck, CheckCircle2, Clock, Zap, Loader2 } from "lucide-react";
 import { useUpcomingEvents, useMarkEventAction } from "../../calendar/hooks/useFinancialCalendar";
 import { formatCurrency } from "../../../utils/formatters";
 import { useUIStore } from "../../../store/useUIStore";
@@ -90,15 +90,22 @@ export const UpcomingEventsTimeline: React.FC = () => {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => handleAction(evt.id, "PAY")}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                    disabled={markActionMutation.isPending}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {markActionMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
                     <span>Pay</span>
                   </button>
 
                   <button
                     onClick={() => handleAction(evt.id, "SNOOZE")}
-                    className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-all cursor-pointer shrink-0"
+                    disabled={markActionMutation.isPending}
+                    aria-label="Snooze"
+                    className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-all cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Snooze"
                   >
                     <Clock className="w-3.5 h-3.5" />

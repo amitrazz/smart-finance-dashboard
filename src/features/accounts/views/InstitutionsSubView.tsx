@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { motion } from "framer-motion";
 import { useInstitutions, useAccounts, useDeleteInstitution } from "../../../hooks/useFinanceQueries";
 import { InstitutionCard } from "../components/InstitutionCard";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import { Building2, Plus } from "lucide-react";
 import { FinancialInstitution } from "../../../types";
 
@@ -14,9 +15,18 @@ export const InstitutionsSubView: React.FC<InstitutionsSubViewProps> = ({ onAddI
   const { data: institutions = [], isLoading } = useInstitutions();
   const { data: accounts = [] } = useAccounts();
   const deleteInstitution = useDeleteInstitution();
+  const [pendingDelete, setPendingDelete] = useState<FinancialInstitution | null>(null);
 
   const getAccountCount = (instId: string): number =>
     accounts.filter((a) => a.institutionId === instId || a.institution?.id === instId).length;
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    deleteInstitution.mutate(
+      { id: pendingDelete.id },
+      { onSuccess: () => setPendingDelete(null) },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -53,12 +63,7 @@ export const InstitutionsSubView: React.FC<InstitutionsSubViewProps> = ({ onAddI
               <InstitutionCard
                 institution={inst}
                 accountCount={getAccountCount(inst.id)}
-                onSync={() => {}}
-                onDelete={(inst) => {
-                  if (window.confirm(`Disconnect ${inst.name}?`)) {
-                    deleteInstitution.mutate({ id: inst.id });
-                  }
-                }}
+                onDelete={(inst) => setPendingDelete(inst)}
               />
             </motion.div>
           ))}
@@ -74,6 +79,22 @@ export const InstitutionsSubView: React.FC<InstitutionsSubViewProps> = ({ onAddI
           </button>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDelete)}
+        title="Disconnect Institution"
+        message={
+          pendingDelete
+            ? `Disconnect ${pendingDelete.name}? Accounts linked to this institution will remain, but automatic syncing will stop.`
+            : ""
+        }
+        confirmText="Disconnect"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteInstitution.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 };

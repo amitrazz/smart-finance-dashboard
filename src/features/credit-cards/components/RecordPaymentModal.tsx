@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Check, DollarSign } from "lucide-react";
+import { X, Check, DollarSign, Wallet } from "lucide-react";
 import { useRecordCardPayment } from "../hooks/useCreditCardQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
 import { CreditCard, RecordCreditCardPaymentInput } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface RecordPaymentModalProps {
   card: CreditCard | null;
@@ -15,12 +16,18 @@ type PaymentOption = "FULL" | "MINIMUM" | "PARTIAL" | "CUSTOM";
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, isOpen, onClose }) => {
   const recordPaymentMutation = useRecordCardPayment();
-  const { data: accounts = [] } = useAccounts();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
+  const paymentAccountOptions = accounts.filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN");
 
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("FULL");
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentAccountId, setPaymentAccountId] = useState("");
+  const selectedPaymentAccount = paymentAccountOptions.find((a) => a.id === paymentAccountId);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -131,6 +138,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 text-slate-400 hover:text-slate-200 rounded-xl hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -200,20 +208,28 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Debit From Account</label>
-              <select
+              <AsyncSearchSelect
                 value={paymentAccountId}
-                onChange={(e) => setPaymentAccountId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
-              >
-                <option value="">-- Select Source Bank Account --</option>
-                {accounts
-                  .filter((a) => a.type !== "CREDIT_CARD" && a.type !== "LOAN")
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({formatCurrency(a.currentBalance)})
-                    </option>
-                  ))}
-              </select>
+                valueLabel={
+                  selectedPaymentAccount
+                    ? `${selectedPaymentAccount.name} (${formatCurrency(selectedPaymentAccount.currentBalance)})`
+                    : "-- Select Source Bank Account --"
+                }
+                items={paymentAccountOptions}
+                isFetching={isAccountsFetching}
+                onSearch={setAccountSearch}
+                onSelect={(a) => setPaymentAccountId(a.id)}
+                onClear={() => setPaymentAccountId("")}
+                getOptionKey={(a) => a.id}
+                icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                placeholder="-- Select Source Bank Account --"
+                emptyMessage="No matching accounts"
+                renderOption={(a) => (
+                  <span className="truncate">
+                    {a.name} ({formatCurrency(a.currentBalance)})
+                  </span>
+                )}
+              />
             </div>
 
             <div>

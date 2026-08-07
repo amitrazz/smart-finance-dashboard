@@ -120,7 +120,7 @@ export const GoalCreationWizardModal: React.FC<GoalCreationWizardModalProps> = (
             </div>
             <p className="text-xs text-slate-400">Step {currentStep} of 6</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
+          <button onClick={onClose} aria-label="Close" className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -413,7 +413,11 @@ export const GoalCreationWizardModal: React.FC<GoalCreationWizardModalProps> = (
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-emerald-400">₹{m.targetAmount}</span>
-                      <button onClick={() => handleRemoveMilestone(i)} className="text-slate-400 hover:text-rose-400">
+                      <button
+                        onClick={() => handleRemoveMilestone(i)}
+                        aria-label={`Remove milestone ${m.name}`}
+                        className="text-slate-400 hover:text-rose-400"
+                      >
                         <X className="w-4 h-4" />
                       </button>
                     </div>

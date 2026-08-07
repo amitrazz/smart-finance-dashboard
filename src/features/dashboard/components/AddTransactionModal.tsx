@@ -3,11 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, PlusCircle, ArrowUpRight, ArrowDownLeft, Wallet, Tag, Calendar, CheckCircle2 } from "lucide-react";
 import { useCreateTransaction, useAccounts, useCategories } from "../../../hooks/useFinanceQueries";
 import { useUIStore } from "../../../store/useUIStore";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 export const AddTransactionModal: React.FC = () => {
   const { isAddTransactionOpen, setAddTransactionOpen, showToast } = useUIStore();
-  const { data: accounts = [] } = useAccounts();
-  const { data: categories = [] } = useCategories();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
+  const [categorySearch, setCategorySearch] = useState("");
+  const { data: categories = [], isFetching: isCategoriesFetching } = useCategories({
+    search: categorySearch || undefined,
+  });
   const createTxnMutation = useCreateTransaction();
 
   const [description, setDescription] = useState("");
@@ -98,6 +106,7 @@ export const AddTransactionModal: React.FC = () => {
 
             <button
               onClick={() => setAddTransactionOpen(false)}
+              aria-label="Close"
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -165,35 +174,45 @@ export const AddTransactionModal: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
                   <Wallet className="w-3.5 h-3.5 text-indigo-400" /> Account
                 </label>
-                <select
+                <AsyncSearchSelect
                   value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
+                  valueLabel={(() => {
+                    const acc = accounts.find((a) => a.id === accountId);
+                    return acc
+                      ? `${acc.name} (${acc.currentBalance?.currency || "INR"} ${parseFloat(acc.currentBalance?.amount || "0").toLocaleString("en-IN")})`
+                      : undefined;
+                  })()}
+                  items={accounts}
+                  isFetching={isAccountsFetching}
+                  onSearch={setAccountSearch}
+                  onSelect={(acc) => setAccountId(acc.id)}
+                  getOptionKey={(acc) => acc.id}
+                  placeholder="Select account"
+                  emptyMessage="No matching accounts"
+                  renderOption={(acc) => (
+                    <span className="truncate">
                       {acc.name} ({acc.currentBalance?.currency || "INR"} {parseFloat(acc.currentBalance?.amount || "0").toLocaleString("en-IN")})
-                    </option>
-                  ))}
-                </select>
+                    </span>
+                  )}
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
                   <Tag className="w-3.5 h-3.5 text-emerald-400" /> Category
                 </label>
-                <select
+                <AsyncSearchSelect
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Category...</option>
-                  {directionCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  valueLabel={directionCategories.find((c) => c.id === categoryId)?.name || "Select Category..."}
+                  items={directionCategories}
+                  isFetching={isCategoriesFetching}
+                  onSearch={setCategorySearch}
+                  onSelect={(cat) => setCategoryId(cat.id)}
+                  getOptionKey={(cat) => cat.id}
+                  placeholder="Select Category..."
+                  emptyMessage="No matching categories"
+                  renderOption={(cat) => <span className="truncate">{cat.name}</span>}
+                />
               </div>
             </div>
 

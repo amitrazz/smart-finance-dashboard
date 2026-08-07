@@ -8,12 +8,17 @@ import { ErrorState } from "../../../../components/common/ErrorState";
 import { EmptyState } from "../../../../components/common/EmptyState";
 import { formatCurrency, formatPercent } from "../../../../utils/formatters";
 import { toCsv } from "../../utils/reportExport";
+import { AsyncSearchSelect } from "../../../../components/common/AsyncSearchSelect";
 
 export const SavingsReport: React.FC = () => {
   const { data: dashboard, isLoading, isError, refetch } = useGoalDashboard();
   const { data: cashFlow = [] } = useCashFlowAnalytics({ limit: 1 });
   const { data: goals = [] } = useGoals();
   const [selectedGoalId, setSelectedGoalId] = useState("");
+  const [goalSearch, setGoalSearch] = useState("");
+  const { data: goalSearchResults = [], isFetching: isGoalSearchFetching } = useGoals(
+    goalSearch ? { search: goalSearch } : undefined
+  );
 
   useEffect(() => {
     if (!selectedGoalId && goals.length > 0) {
@@ -69,13 +74,20 @@ export const SavingsReport: React.FC = () => {
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-800">
           <span className="text-[11px] text-slate-400 font-bold uppercase">Monthly Contribution Trend</span>
           {goals.length > 0 && (
-            <select
-              value={selectedGoalId}
-              onChange={(e) => setSelectedGoalId(e.target.value)}
-              className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-[11px] font-bold focus:outline-none"
-            >
-              {goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            <div className="w-44">
+              <AsyncSearchSelect
+                value={selectedGoalId}
+                valueLabel={goals.find((g) => g.id === selectedGoalId)?.name}
+                items={goalSearchResults}
+                isFetching={isGoalSearchFetching}
+                onSearch={setGoalSearch}
+                onSelect={(g) => setSelectedGoalId(g.id)}
+                getOptionKey={(g) => g.id}
+                placeholder="Select goal"
+                emptyMessage="No matching goals"
+                renderOption={(g) => <span className="truncate">{g.name}</span>}
+              />
+            </div>
           )}
         </div>
         <table className="w-full text-left text-xs">

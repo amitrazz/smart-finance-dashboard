@@ -7,6 +7,7 @@ import { EmptyState } from "../../../components/common/EmptyState";
 import { AccountStatementItem } from "../../../types";
 import { FileText, Upload } from "lucide-react";
 import type { ActiveRoute } from "../components/AccountsNavigation";
+import { useUIStore } from "../../../store/useUIStore";
 
 /** Map the route-level tab to a statement type filter */
 const ROUTE_TO_TYPE: Partial<Record<ActiveRoute, string>> = {
@@ -46,7 +47,12 @@ export const StatementsSubView: React.FC<StatementsSubViewProps> = ({
       <EmptyState
         icon={<FileText className="w-10 h-10 text-slate-600 mx-auto" aria-hidden="true" />}
         title="Statement Center Not Available"
-        message="There is no backend endpoint that generates or aggregates account statements yet."
+        message="There is no backend endpoint that generates or aggregates account statements yet. You can still import a bank or card statement file directly."
+        actionLabel="Import Statement"
+        onAction={() => {
+          useUIStore.getState().setImportModalOpen(true);
+          useUIStore.getState().setActiveTab("imports");
+        }}
       />
     );
   }
@@ -65,9 +71,11 @@ export const StatementsSubView: React.FC<StatementsSubViewProps> = ({
           </p>
         </div>
         <button
-          disabled
-          title="Statement import isn't available yet — no backend endpoint exists"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/50 text-slate-600 font-semibold text-sm cursor-not-allowed opacity-60"
+          onClick={() => {
+            useUIStore.getState().setImportModalOpen(true);
+            useUIStore.getState().setActiveTab("imports");
+          }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-colors shadow-lg shadow-emerald-500/20"
         >
           <Upload className="w-4 h-4" />
           <span>Import Statement</span>

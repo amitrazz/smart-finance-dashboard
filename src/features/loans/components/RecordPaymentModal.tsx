@@ -9,6 +9,7 @@ import {
 import { formatCurrency } from "../../../utils/formatters";
 import { usePayInstallment, useRecordExtraPayment, useLoanSchedule } from "../hooks/useLoanQueries";
 import { Loan } from "../../../types";
+import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 
 interface RecordPaymentModalProps {
   loans: Loan[];
@@ -205,6 +206,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -217,7 +219,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             onClick={() => setPaymentType("EMI")}
             className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               paymentType === "EMI"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                ? `${NAV_TAB_L2}`
                 : "bg-slate-900 text-slate-400 hover:text-slate-200"
             }`}
           >

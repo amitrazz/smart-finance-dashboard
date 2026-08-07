@@ -64,6 +64,7 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({
             onClick={handlePrevMonth}
             type="button"
             className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-all cursor-pointer"
+            aria-label="Previous month"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -82,6 +83,7 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({
             onClick={handleNextMonth}
             type="button"
             className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-all cursor-pointer"
+            aria-label="Next month"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

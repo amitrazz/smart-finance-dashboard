@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { X, CheckCircle2, Edit3 } from "lucide-react";
+import { X, CheckCircle2, Edit3, Wallet } from "lucide-react";
 import { useUpdateLoan } from "../hooks/useLoanQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
 import { Loan, LoanStatus, UpdateLoanInput, FinancialInstitution } from "../../../types";
 import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
+import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 
 interface EditLoanModalProps {
   loan: Loan | null;
@@ -25,7 +26,11 @@ export const EditLoanModal: React.FC<EditLoanModalProps> = ({ loan, isOpen, onCl
   });
 
   const updateLoanMutation = useUpdateLoan();
-  const { data: accounts = [] } = useAccounts();
+  const [accountSearch, setAccountSearch] = useState("");
+  const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
+    search: accountSearch || undefined,
+    limit: 100,
+  });
 
   const handleInstitutionChange = (id: string | undefined, institution?: FinancialInstitution) => {
     setFormData((prev) => ({
@@ -100,6 +105,7 @@ export const EditLoanModal: React.FC<EditLoanModalProps> = ({ loan, isOpen, onCl
           <button
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -169,18 +175,31 @@ export const EditLoanModal: React.FC<EditLoanModalProps> = ({ loan, isOpen, onCl
 
             <div>
               <label className="text-slate-400 font-semibold block mb-1.5">Linked Payment Account</label>
-              <select
+              <AsyncSearchSelect
                 value={formData.accountId}
-                onChange={(e) => setFormData((prev) => ({ ...prev, accountId: e.target.value }))}
-                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:border-indigo-500 outline-none cursor-pointer"
-              >
-                <option value="">No Linked Bank Account</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
+                valueLabel={
+                  formData.accountId
+                    ? (() => {
+                        const acc = accounts.find((a) => a.id === formData.accountId);
+                        return acc ? `${acc.name} (${acc.type})` : undefined;
+                      })()
+                    : "No Linked Bank Account"
+                }
+                items={accounts}
+                isFetching={isAccountsFetching}
+                onSearch={setAccountSearch}
+                onSelect={(acc) => setFormData((prev) => ({ ...prev, accountId: acc.id }))}
+                onClear={() => setFormData((prev) => ({ ...prev, accountId: "" }))}
+                getOptionKey={(acc) => acc.id}
+                icon={<Wallet className="w-4 h-4 text-slate-500 shrink-0" />}
+                placeholder="No Linked Bank Account"
+                emptyMessage="No matching accounts"
+                renderOption={(acc) => (
+                  <span className="truncate">
                     {acc.name} ({acc.type})
-                  </option>
-                ))}
-              </select>
+                  </span>
+                )}
+              />
             </div>
           </div>
 

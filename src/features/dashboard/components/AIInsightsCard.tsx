@@ -98,7 +98,9 @@ export const AIInsightsCard: React.FC = () => {
 
                 <button
                   onClick={() => handleComplete(item.id, item.version)}
-                  className="p-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer"
+                  disabled={completeMutation.isPending || dismissMutation.isPending}
+                  aria-label="Mark Done"
+                  className="p-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Mark Done"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -106,7 +108,9 @@ export const AIInsightsCard: React.FC = () => {
 
                 <button
                   onClick={() => handleDismiss(item.id, item.version)}
-                  className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all cursor-pointer"
+                  disabled={completeMutation.isPending || dismissMutation.isPending}
+                  aria-label="Dismiss"
+                  className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Dismiss"
                 >
                   <X className="w-3.5 h-3.5" />
