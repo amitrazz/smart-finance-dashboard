@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from "react";
-import { DollarSign, Search, Download, RefreshCw, AlertTriangle } from "lucide-react";
-import { useCardPayments } from "../hooks/useCreditCardQueries";
+import { DollarSign, Search, Download, RefreshCw, AlertTriangle, Undo2, AlertOctagon } from "lucide-react";
+import { useCardPayments, useReverseCardPayment } from "../hooks/useCreditCardQueries";
+import { CreditCardPayment } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import { Pagination } from "../../../components/common/Pagination";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
+import { BouncePaymentModal } from "./BouncePaymentModal";
 
 interface PaymentsTabProps {
   cardId: string;
@@ -17,6 +20,9 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ cardId, onRecordPaymen
   const [pageSize, setPageSize] = useState(10);
 
   const { data: payments = [], isLoading, isError, error, refetch } = useCardPayments(cardId);
+  const reverseMutation = useReverseCardPayment();
+  const [reversingPayment, setReversingPayment] = useState<CreditCardPayment | null>(null);
+  const [bouncingPayment, setBouncingPayment] = useState<CreditCardPayment | null>(null);
 
   const getVal = (val: unknown): number => {
     if (typeof val === "object" && val !== null) return parseFloat((val as { amount?: string }).amount || "0");
@@ -116,9 +122,9 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ cardId, onRecordPaymen
             className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
           >
             <option value="all">All Statuses</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="PENDING">Pending</option>
-            <option value="REVERSED">Reversed</option>
+            <option value="SUCCEEDED">Succeeded</option>
+            <option value="BOUNCED">Bounced</option>
+            <option value="FAILED">Failed</option>
           </select>
         </div>
 
@@ -167,11 +173,13 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ cardId, onRecordPaymen
                   <th className="py-3.5 px-4">Statement Period</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Created By</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {paginatedPayments.map((pmt) => {
                   const amt = getVal(pmt.amount);
+                  const isSucceeded = pmt.status === "SUCCEEDED" || pmt.status === "COMPLETED";
                   return (
                     <tr key={pmt.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-slate-100">{pmt.paymentDate}</td>
@@ -186,17 +194,40 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ cardId, onRecordPaymen
                       <td className="py-3.5 px-4">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            pmt.status === "COMPLETED"
+                            isSucceeded
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : pmt.status === "REVERSED"
-                              ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              ? "bg-slate-800 text-slate-400"
+                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                           }`}
+                          title={pmt.failureReason || undefined}
                         >
                           {pmt.status}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-400">{pmt.createdBy || "System / User"}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        {isSucceeded && (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setReversingPayment(pmt)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                              title="Reverse Payment"
+                              aria-label="Reverse Payment"
+                            >
+                              <Undo2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setBouncingPayment(pmt)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors"
+                              title="Report Bounced / Failed"
+                              aria-label="Report Bounced / Failed"
+                            >
+                              <AlertOctagon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -218,6 +249,34 @@ export const PaymentsTab: React.FC<PaymentsTabProps> = ({ cardId, onRecordPaymen
           />
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(reversingPayment)}
+        title="Reverse Payment?"
+        message={`This will undo this payment of ${
+          reversingPayment ? formatCurrency({ amount: getVal(reversingPayment.amount).toFixed(2), currency: "INR" }) : ""
+        } and restore the card's outstanding balance. This action cannot be undone.`}
+        confirmText="Reverse Payment"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={reverseMutation.isPending}
+        onConfirm={() => {
+          if (reversingPayment) {
+            reverseMutation.mutate(
+              { cardId, paymentId: reversingPayment.id },
+              { onSuccess: () => setReversingPayment(null) }
+            );
+          }
+        }}
+        onClose={() => setReversingPayment(null)}
+      />
+
+      <BouncePaymentModal
+        cardId={cardId}
+        payment={bouncingPayment}
+        isOpen={Boolean(bouncingPayment)}
+        onClose={() => setBouncingPayment(null)}
+      />
     </div>
   );
 };

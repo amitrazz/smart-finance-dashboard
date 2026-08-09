@@ -82,6 +82,8 @@ export interface CreditCard {
   expiryDate?: string;
   rewardProgram?: string;
   rewardPoints?: number;
+  cashbackRatePercent?: string | number;
+  cashbackBalance?: Money | string | number;
   paymentAccountId?: string;
   paymentAccountName?: string;
   autoPayEnabled?: boolean;
@@ -142,7 +144,9 @@ export interface CreditCardStatement {
   totalAmountDue?: Money | string;
   interest: Money | string;
   fees: Money | string;
-  status: "PAID" | "UNPAID" | "PARTIALLY_PAID" | "OVERDUE";
+  cashAdvance?: Money | string;
+  status: "OPEN" | "PAID" | "UNPAID" | "PARTIALLY_PAID" | "OVERDUE" | "ARCHIVED" | string;
+  version?: number;
   downloadUrl?: string;
   createdAt?: string;
 }
@@ -157,7 +161,9 @@ export interface CreditCardPayment {
   paymentAccountName?: string;
   method?: string;
   reference?: string;
-  status: "COMPLETED" | "PENDING" | "FAILED" | "REVERSED";
+  status: "SUCCEEDED" | "COMPLETED" | "PENDING" | "FAILED" | "BOUNCED" | "REVERSED" | string;
+  failureReason?: string;
+  failedAt?: string;
   statementPeriod?: string;
   createdBy?: string;
   notes?: string;
@@ -186,7 +192,8 @@ export interface CreditCardEmi {
   startDate?: string;
   expectedEndDate?: string;
   originalTransactionDescription?: string;
-  status: "ACTIVE" | "COMPLETED" | "FORECLOSED";
+  status: "ACTIVE" | "COMPLETED" | "CLOSED" | "CANCELLED" | "FORECLOSED" | string;
+  version?: number;
   category?: string;
   createdAt?: string;
 }
@@ -1739,9 +1746,150 @@ export interface FinancialHealthHistoryPoint {
   topRecommendations?: HealthRecommendation[];
 }
 
-export interface CreditCardStatementPaymentInput {
-  paidAmount: string;
-  paidDate?: string;
+export interface CreditCardLimitHistory {
+  id: string;
+  creditCardId: string;
+  oldLimit: Money | string;
+  newLimit: Money | string;
+  effectiveDate: string;
+  reason?: string;
+  revertsAt?: string;
+  revertedAt?: string;
+  createdAt?: string;
+}
+
+export interface ChangeCreditCardLimitInput {
+  newLimit: string;
+  reason?: string;
+  revertsAt?: string;
+}
+
+export interface CreateCreditCardStatementInput {
+  statementDate: string;
+  dueDate: string;
+  statementBalance: string;
+  minimumDue: string;
+}
+
+export interface UpdateCreditCardStatementInput {
+  statementDate?: string;
+  dueDate?: string;
+  openingBalance?: string;
+  closingBalance?: string;
+  statementBalance?: string;
+  minimumDue?: string;
+  interestCharged?: string;
+  fees?: string;
+  cashAdvance?: string;
+}
+
+export interface BounceCreditCardPaymentInput {
+  status: "BOUNCED" | "FAILED";
+  reason: string;
+}
+
+export interface ConvertTransactionToEmiInput {
+  transactionId: string;
+  tenureMonths: number;
+  interestRate: string;
+  knownMonthlyEmi?: string;
+}
+
+export interface UpdateCreditCardEmiInput {
+  monthlyEmi?: string;
+  remainingInstallments?: number;
+  interestRate?: string;
+  nextDueDate?: string;
+}
+
+export interface RedeemCreditCardRewardsInput {
+  points: number;
+  reference?: string;
+}
+
+export type CreditCardDisputeStatus = "OPEN" | "RESOLVED_UPHELD" | "RESOLVED_REVERSED";
+
+export interface CreditCardDispute {
+  id: string;
+  creditCardId: string;
+  disputedTransactionId: string;
+  provisionalCreditTransactionId?: string;
+  reversalTransactionId?: string;
+  reason: string;
+  amount: Money | string;
+  status: CreditCardDisputeStatus | string;
+  raisedDate: string;
+  resolvedDate?: string;
+  resolutionNotes?: string;
+  version?: number;
+  createdAt?: string;
+}
+
+export interface RaiseCreditCardDisputeInput {
+  transactionId: string;
+  reason: string;
+  amount?: string;
+}
+
+export interface ResolveCreditCardDisputeInput {
+  status: "RESOLVED_UPHELD" | "RESOLVED_REVERSED";
+  resolutionNotes?: string;
+}
+
+export type CreditCardBalanceTransferStatus = "ACTIVE" | "CLOSED";
+
+export interface CreditCardBalanceTransfer {
+  id: string;
+  sourceCreditCardId: string;
+  destinationCreditCardId: string;
+  sourceCardNickname?: string;
+  destinationCardNickname?: string;
+  principal: Money | string;
+  remainingPrincipal: Money | string;
+  promoRatePercent: string | number;
+  promoRateExpiresAt: string;
+  transferFeeRate?: string | number;
+  status: CreditCardBalanceTransferStatus | string;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateBalanceTransferInput {
+  sourceCreditCardId: string;
+  amount: string;
+  promoRatePercent: string;
+  promoRateExpiresAt: string;
+}
+
+export interface PrepayBalanceTransferInput {
+  extraPrincipal: string;
+}
+
+export interface CreditCardCashback {
+  id?: string;
+  creditCardId: string;
+  cashbackBalance: Money | string | number;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CreditCardCashbackTransactionType = "EARNED" | "REDEEMED" | "ADJUSTED";
+
+export interface CreditCardCashbackTransaction {
+  id: string;
+  creditCardCashbackId: string;
+  type: CreditCardCashbackTransactionType | string;
+  amount: Money | string;
+  transactionId?: string;
+  reference?: string;
+  createdAt?: string;
+}
+
+export interface RedeemCreditCardCashbackInput {
+  amount: string;
+  reference?: string;
 }
 
 export type ActionPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";

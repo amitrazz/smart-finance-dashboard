@@ -9,7 +9,6 @@ import {
   HealthDimensionDetail,
   HealthRecommendation,
   FinancialHealthHistoryPoint,
-  CreditCardStatementPaymentInput,
 } from "../../../types";
 
 const getErrorMessage = (err: unknown): string => {
@@ -163,43 +162,3 @@ export function useRecalculateHealthScore() {
   });
 }
 
-export function usePayCardStatement() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      cardId,
-      statementId,
-      data,
-    }: {
-      cardId: string;
-      statementId: string;
-      data: CreditCardStatementPaymentInput;
-    }) => api.payCardStatement(cardId, statementId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["creditCards", variables.cardId] });
-      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      useUIStore.getState().showToast("Credit card statement payment recorded!", "success");
-    },
-    onError: (err) => {
-      useUIStore.getState().showToast(getErrorMessage(err), "error");
-    },
-  });
-}
-
-export function useReverseCardStatementPayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ cardId, statementId }: { cardId: string; statementId: string }) =>
-      api.reverseCardStatementPayment(cardId, statementId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["creditCards", variables.cardId] });
-      queryClient.invalidateQueries({ queryKey: ["healthScore"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      useUIStore.getState().showToast("Statement payment reversed", "info");
-    },
-    onError: (err) => {
-      useUIStore.getState().showToast(getErrorMessage(err), "error");
-    },
-  });
-}

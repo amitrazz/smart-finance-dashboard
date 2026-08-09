@@ -1,23 +1,27 @@
 import React, { useState } from "react";
-import { X, FileText, Check, Undo2 } from "lucide-react";
-import { CreditCardStatement } from "../../../types";
+import { X, FileText, DollarSign, Edit2, Check } from "lucide-react";
+import { CreditCardStatement, UpdateCreditCardStatementInput } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
-import { usePayCardStatement, useReverseCardStatementPayment } from "../../../hooks/useFinanceQueries";
-import { ConfirmModal } from "../../../components/common/ConfirmModal";
+import { useUpdateCardStatement } from "../hooks/useCreditCardQueries";
 
 interface StatementDetailsModalProps {
   cardId: string;
   statement: CreditCardStatement | null;
   isOpen: boolean;
   onClose: () => void;
+  onRecordPayment?: (statementId: string) => void;
 }
 
-export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ cardId, statement, isOpen, onClose }) => {
-  const payStatementMutation = usePayCardStatement();
-  const reverseStatementMutation = useReverseCardStatementPayment();
-  const [paidAmount, setPaidAmount] = useState("");
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
-  const [isReversing, setIsReversing] = useState(false);
+export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({
+  cardId,
+  statement,
+  isOpen,
+  onClose,
+  onRecordPayment,
+}) => {
+  const updateStatementMutation = useUpdateCardStatement();
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [correction, setCorrection] = useState<UpdateCreditCardStatementInput>({});
 
   const getVal = (val: unknown): number => {
     if (typeof val === "object" && val !== null) return parseFloat((val as { amount?: string }).amount || "0");
@@ -26,12 +30,15 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ ca
     return 0;
   };
 
-  // Reset the payment form whenever a different statement is opened, and
-  // default the amount to the statement's outstanding balance.
   React.useEffect(() => {
     if (statement) {
-      setPaidAmount(getVal(statement.statementBalance || statement.closingBalance).toFixed(2));
-      setPaidDate(new Date().toISOString().split("T")[0]);
+      setIsCorrecting(false);
+      setCorrection({
+        statementBalance: String(getVal(statement.statementBalance || statement.closingBalance)),
+        minimumDue: String(getVal(statement.minimumDue)),
+        interestCharged: String(getVal(statement.interest)),
+        fees: String(getVal(statement.fees)),
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statement?.id]);
@@ -43,24 +50,13 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ ca
   const minDue = getVal(statement.minimumDue);
   const interest = getVal(statement.interest);
   const fees = getVal(statement.fees);
-  const canPay = statement.status !== "PAID";
-  const canReverse = statement.status === "PAID" || statement.status === "PARTIALLY_PAID";
+  const canPay = statement.status !== "PAID" && statement.status !== "ARCHIVED";
 
-  const handlePay = (e: React.FormEvent) => {
+  const handleSaveCorrection = (e: React.FormEvent) => {
     e.preventDefault();
-    const amountVal = parseFloat(paidAmount || "0");
-    if (amountVal <= 0) return;
-    payStatementMutation.mutate({
-      cardId,
-      statementId: statement.id,
-      data: { paidAmount: String(amountVal), paidDate },
-    });
-  };
-
-  const handleConfirmReverse = () => {
-    reverseStatementMutation.mutate(
-      { cardId, statementId: statement.id },
-      { onSuccess: () => setIsReversing(false) }
+    updateStatementMutation.mutate(
+      { cardId, statementId: statement.id, data: correction },
+      { onSuccess: () => setIsCorrecting(false) }
     );
   };
 
@@ -147,68 +143,97 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ ca
             </div>
           </div>
 
-          {/* Record / Reverse Payment for this specific statement */}
-          {canPay && (
-            <form onSubmit={handlePay} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Record Payment for This Statement</p>
+          {isCorrecting ? (
+            <form onSubmit={handleSaveCorrection} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Correct Statement Figures</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="stmt-paid-amount" className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Amount Paid
+                  <label htmlFor="corr-statement-balance" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Statement Balance
                   </label>
                   <input
-                    id="stmt-paid-amount"
+                    id="corr-statement-balance"
                     type="number"
                     step="any"
-                    required
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                    value={correction.statementBalance ?? ""}
+                    onChange={(e) => setCorrection((c) => ({ ...c, statementBalance: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-purple-500 transition-colors"
                   />
                 </div>
                 <div>
-                  <label htmlFor="stmt-paid-date" className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Paid Date
+                  <label htmlFor="corr-minimum-due" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Minimum Due
                   </label>
                   <input
-                    id="stmt-paid-date"
-                    type="date"
-                    required
-                    value={paidDate}
-                    onChange={(e) => setPaidDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                    id="corr-minimum-due"
+                    type="number"
+                    step="any"
+                    value={correction.minimumDue ?? ""}
+                    onChange={(e) => setCorrection((c) => ({ ...c, minimumDue: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-purple-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="corr-interest" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Interest Charged
+                  </label>
+                  <input
+                    id="corr-interest"
+                    type="number"
+                    step="any"
+                    value={correction.interestCharged ?? ""}
+                    onChange={(e) => setCorrection((c) => ({ ...c, interestCharged: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-purple-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="corr-fees" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Fees
+                  </label>
+                  <input
+                    id="corr-fees"
+                    type="number"
+                    step="any"
+                    value={correction.fees ?? ""}
+                    onChange={(e) => setCorrection((c) => ({ ...c, fees: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-purple-500 transition-colors"
                   />
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={payStatementMutation.isPending || parseFloat(paidAmount || "0") <= 0}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {payStatementMutation.isPending ? (
-                  "Recording Payment..."
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" /> Record Payment
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {canReverse && (
-            <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/20 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-rose-300">Reverse Payment</p>
-                <p className="text-[11px] text-slate-400">Undo the payment recorded against this statement.</p>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={updateStatementMutation.isPending}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                >
+                  {updateStatementMutation.isPending ? "Saving..." : <><Check className="w-4 h-4" /> Save Correction</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCorrecting(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
+            </form>
+          ) : (
+            <div className="flex items-center gap-3">
+              {canPay && (
+                <button
+                  type="button"
+                  onClick={() => onRecordPayment?.(statement.id)}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all"
+                >
+                  <DollarSign className="w-4 h-4" /> Record Payment for This Statement
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setIsReversing(true)}
-                disabled={reverseStatementMutation.isPending}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setIsCorrecting(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all shrink-0"
               >
-                <Undo2 className="w-3.5 h-3.5" /> Reverse
+                <Edit2 className="w-3.5 h-3.5" /> Correct
               </button>
             </div>
           )}
@@ -223,18 +248,6 @@ export const StatementDetailsModal: React.FC<StatementDetailsModalProps> = ({ ca
           </button>
         </div>
       </div>
-
-      <ConfirmModal
-        isOpen={isReversing}
-        title="Reverse Statement Payment?"
-        message="This will undo the payment recorded against this statement and restore its outstanding balance. This action cannot be undone."
-        confirmText="Reverse Payment"
-        cancelText="Cancel"
-        variant="danger"
-        isLoading={reverseStatementMutation.isPending}
-        onConfirm={handleConfirmReverse}
-        onClose={() => setIsReversing(false)}
-      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Gift, Award, Clock, RefreshCw, AlertTriangle } from "lucide-react";
-import { useCardRewards } from "../hooks/useCreditCardQueries";
+import { useCardRewards, useCardRewardsHistory } from "../hooks/useCreditCardQueries";
+import { RedeemRewardsModal } from "./RedeemRewardsModal";
 
 type RewardHistoryItem = { id: string; date: string; description: string; points: number; type: string };
 
@@ -10,6 +11,8 @@ interface CardRewardsTabProps {
 
 export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
   const { data: rewards, isLoading, isError, error, refetch } = useCardRewards(cardId);
+  const { data: rewardsHistory = [] } = useCardRewardsHistory(cardId);
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   if (isLoading) {
     return (
@@ -42,7 +45,8 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
   const lifetimeEarned = rewards?.lifetimeEarned || 0;
   const redeemed = rewards?.redeemed || 0;
   const expiringSoon = rewards?.expiringSoon || 0;
-  const history = (rewards?.history || []) as RewardHistoryItem[];
+  const history: RewardHistoryItem[] =
+    rewardsHistory.length > 0 ? rewardsHistory : ((rewards?.history || []) as RewardHistoryItem[]);
 
   return (
     <div className="space-y-6">
@@ -59,9 +63,8 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
             </div>
           </div>
           <button
-            disabled
-            title="Reward redemption isn't available yet — no backend endpoint exists"
-            className="px-4 py-2 rounded-xl bg-amber-500/30 text-amber-200/60 font-bold text-xs shrink-0 cursor-not-allowed"
+            onClick={() => setIsRedeeming(true)}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 transition-all"
           >
             Redeem Now
           </button>
@@ -98,11 +101,11 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
             <Award className="w-4 h-4 text-amber-400" /> Reward Points History
           </h3>
           <button
-            disabled
-            title="Reward catalogue & redemption isn't available yet — no backend endpoint exists"
-            className="px-4 py-2 rounded-xl bg-indigo-600/30 text-indigo-200/50 font-bold text-xs cursor-not-allowed"
+            onClick={() => setIsRedeeming(true)}
+            disabled={rewardBalance <= 0}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Gift className="w-4 h-4 inline mr-1" /> Redeem Catalogue
+            <Gift className="w-4 h-4 inline mr-1" /> Redeem Points
           </button>
         </div>
 
@@ -145,6 +148,13 @@ export const CardRewardsTab: React.FC<CardRewardsTabProps> = ({ cardId }) => {
           </div>
         )}
       </div>
+
+      <RedeemRewardsModal
+        cardId={cardId}
+        availablePoints={rewardBalance}
+        isOpen={isRedeeming}
+        onClose={() => setIsRedeeming(false)}
+      />
     </div>
   );
 };

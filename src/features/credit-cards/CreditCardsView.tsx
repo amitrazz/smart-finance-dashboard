@@ -22,6 +22,7 @@ export const CreditCardsView: React.FC = () => {
   const [isAddWizardOpen, setAddWizardOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
   const [payingCard, setPayingCard] = useState<CreditCard | null>(null);
+  const [payingStatementId, setPayingStatementId] = useState<string | undefined>(undefined);
 
   // Sync activeSubTab into view mode
   useEffect(() => {
@@ -114,7 +115,10 @@ export const CreditCardsView: React.FC = () => {
           onSelectCard={handleSelectCard}
           onAddCard={() => setAddWizardOpen(true)}
           onEditCard={(card) => setEditingCard(card)}
-          onPayCard={(card) => setPayingCard(card)}
+          onPayCard={(card, statementId) => {
+            setPayingCard(card);
+            setPayingStatementId(statementId);
+          }}
         />
       )}
 
@@ -123,7 +127,10 @@ export const CreditCardsView: React.FC = () => {
           cardId={selectedCardId}
           onBack={handleBackToList}
           onEditCard={(card) => setEditingCard(card)}
-          onPayCard={(card) => setPayingCard(card)}
+          onPayCard={(card, statementId) => {
+            setPayingCard(card);
+            setPayingStatementId(statementId);
+          }}
         />
       )}
 
@@ -138,8 +145,12 @@ export const CreditCardsView: React.FC = () => {
 
       <RecordPaymentModal
         card={payingCard}
+        statementId={payingStatementId}
         isOpen={Boolean(payingCard)}
-        onClose={() => setPayingCard(null)}
+        onClose={() => {
+          setPayingCard(null);
+          setPayingStatementId(undefined);
+        }}
       />
     </div>
   );

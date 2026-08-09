@@ -355,6 +355,7 @@ export const CardTransactionsTab: React.FC<CardTransactionsTabProps> = ({ cardId
 
       {/* Transaction Details Modal */}
       <TransactionDetailsModal
+        cardId={cardId}
         transaction={selectedTx}
         isOpen={isDetailsOpen}
         onClose={() => {

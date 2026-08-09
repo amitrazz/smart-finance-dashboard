@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import React, { lazy, Suspense, useEffect } from 'react';
 import { useOnboardingStatus } from '../../features/onboarding/hooks/useOnboarding';
 import { CommandPaletteModal } from '../../features/search/CommandPaletteModal';
@@ -72,7 +73,7 @@ const TabFallbackSkeleton: React.FC = () => (
 export const AppShell: React.FC = () => {
   const { activeTab, activeSubTab, setActiveTab } = useUIStore();
   const { theme } = useSettingsStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
   const { data: onboardingStatus } = useOnboardingStatus();
 
   // Listen to Network Online / Offline status changes
@@ -110,8 +111,11 @@ export const AppShell: React.FC = () => {
   // Dynamic document title update based on activeTab & activeSubTab
   useEffect(() => {
     const tabName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ');
-    const subName = activeSubTab
-      ? ` > ${activeSubTab.charAt(0).toUpperCase() + activeSubTab.slice(1).replace('-', ' ')}`
+    // activeSubTab may carry extra route segments after the base name (e.g.
+    // imports' "staged-preview/<jobId>") — only the base belongs in the title.
+    const subTabBase = activeSubTab?.split('/')[0] ?? null;
+    const subName = subTabBase
+      ? ` > ${subTabBase.charAt(0).toUpperCase() + subTabBase.slice(1).replace('-', ' ')}`
       : '';
     document.title = `Cashflow | ${tabName}${subName}`;
   }, [activeTab, activeSubTab]);
@@ -143,6 +147,15 @@ export const AppShell: React.FC = () => {
       }
     }
   }, [isAuthenticated, onboardingStatus, setActiveTab]);
+
+  if (isAuthLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" aria-hidden="true" />
+        <span className="sr-only">Checking session…</span>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <AuthView />;

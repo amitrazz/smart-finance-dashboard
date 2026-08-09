@@ -10,6 +10,9 @@ import {
   FileText,
   Award,
   ShieldCheck,
+  ShieldAlert,
+  ArrowLeftRight,
+  Wallet,
   Zap,
   Trash2,
 } from "lucide-react";
@@ -23,6 +26,9 @@ import { CardEmisTab } from "./CardEmisTab";
 import { CardRewardsTab } from "./CardRewardsTab";
 import { CardDocumentsTab } from "./CardDocumentsTab";
 import { CardSettingsTab } from "./CardSettingsTab";
+import { DisputesTab } from "./DisputesTab";
+import { BalanceTransfersTab } from "./BalanceTransfersTab";
+import { CashbackTab } from "./CashbackTab";
 import { CreditCard } from "../../../types";
 import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
@@ -31,10 +37,21 @@ interface CreditCardDetailsViewProps {
   cardId: string;
   onBack: () => void;
   onEditCard: (card: CreditCard) => void;
-  onPayCard: (card: CreditCard) => void;
+  onPayCard: (card: CreditCard, statementId?: string) => void;
 }
 
-type DetailTab = "overview" | "statements" | "payments" | "transactions" | "emis" | "rewards" | "documents" | "settings";
+type DetailTab =
+  | "overview"
+  | "statements"
+  | "payments"
+  | "transactions"
+  | "emis"
+  | "rewards"
+  | "cashback"
+  | "disputes"
+  | "balanceTransfers"
+  | "documents"
+  | "settings";
 
 export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
   cardId,
@@ -118,6 +135,9 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
     { id: "transactions", label: "Transactions", icon: <Zap className="w-4 h-4" /> },
     { id: "emis", label: "EMIs", icon: <Layers className="w-4 h-4" /> },
     { id: "rewards", label: "Rewards", icon: <Award className="w-4 h-4" /> },
+    { id: "cashback", label: "Cashback", icon: <Wallet className="w-4 h-4" /> },
+    { id: "disputes", label: "Disputes", icon: <ShieldAlert className="w-4 h-4" /> },
+    { id: "balanceTransfers", label: "Balance Transfers", icon: <ArrowLeftRight className="w-4 h-4" /> },
     { id: "documents", label: "Documents", icon: <FileText className="w-4 h-4" /> },
     { id: "settings", label: "Settings", icon: <ShieldCheck className="w-4 h-4" /> },
   ];
@@ -252,6 +272,9 @@ export const CreditCardDetailsView: React.FC<CreditCardDetailsViewProps> = ({
         {activeTab === "transactions" && <CardTransactionsTab cardId={cardId} />}
         {activeTab === "emis" && <CardEmisTab cardId={cardId} />}
         {activeTab === "rewards" && <CardRewardsTab cardId={cardId} />}
+        {activeTab === "cashback" && <CashbackTab cardId={cardId} />}
+        {activeTab === "disputes" && <DisputesTab cardId={cardId} />}
+        {activeTab === "balanceTransfers" && <BalanceTransfersTab cardId={cardId} />}
         {activeTab === "documents" && <CardDocumentsTab cardId={cardId} />}
         {activeTab === "settings" && <CardSettingsTab cardId={cardId} onEditCard={onEditCard} />}
       </div>

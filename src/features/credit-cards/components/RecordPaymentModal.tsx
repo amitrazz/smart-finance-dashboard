@@ -8,13 +8,14 @@ import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect"
 
 interface RecordPaymentModalProps {
   card: CreditCard | null;
+  statementId?: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
 type PaymentOption = "FULL" | "MINIMUM" | "PARTIAL" | "CUSTOM";
 
-export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, isOpen, onClose }) => {
+export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, statementId, isOpen, onClose }) => {
   const recordPaymentMutation = useRecordCardPayment();
   const [accountSearch, setAccountSearch] = useState("");
   const { data: accounts = [], isFetching: isAccountsFetching } = useAccounts({
@@ -102,6 +103,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
 
     const payload: RecordCreditCardPaymentInput = {
       cardId: card.id,
+      statementId: statementId || undefined,
       paymentType: paymentOption,
       paymentDate,
       amount: String(paymentAmountVal),
@@ -133,6 +135,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ card, is
               <h3 className="text-lg font-bold text-slate-100">Pay Credit Card Bill</h3>
               <p className="text-xs text-slate-400">
                 {card.nickname} • {card.issuer} (•••• {card.lastFourDigits || "CARD"})
+                {statementId && <span className="text-cyan-400 font-semibold"> • Applied to selected statement</span>}
               </p>
             </div>
           </div>

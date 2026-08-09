@@ -11,19 +11,29 @@ import {
   CalendarEventItem,
   CashFlowSnapshot,
   Category,
+  ChangeCreditCardLimitInput,
+  BounceCreditCardPaymentInput,
+  ConvertTransactionToEmiInput,
+  CreateBalanceTransferInput,
   CreateCreditCardInput,
+  CreateCreditCardStatementInput,
   CreateGoalInput,
   CreateLoanInput,
   CreateTradeInput,
   CreateTransactionInput,
   CreditCard,
+  CreditCardBalanceTransfer,
+  CreditCardCashback,
+  CreditCardCashbackTransaction,
   CreditCardDashboardData,
+  CreditCardDispute,
   CreditCardDocument,
   CreditCardEmi,
+  CreditCardLimitHistory,
   CreditCardPayment,
+  CreditCardRewardHistoryItem,
   CreditCardRewards,
   CreditCardStatement,
-  CreditCardStatementPaymentInput,
   DebtBreakdownResponse,
   FinancialHealthHistoryPoint,
   FinancialHealthScore,
@@ -73,10 +83,15 @@ import {
   Portfolio,
   PortfolioDetail,
   PortfolioSnapshot,
+  PrepayBalanceTransferInput,
+  RaiseCreditCardDisputeInput,
   RealizedGain,
   ReconciliationRecord,
   ReconciliationSummary,
   RecordCreditCardPaymentInput,
+  RedeemCreditCardCashbackInput,
+  RedeemCreditCardRewardsInput,
+  ResolveCreditCardDisputeInput,
   ResolveReviewClusterInput,
   RetirementForecastResponse,
   ReviewClusterStatus,
@@ -91,7 +106,9 @@ import {
   Transfer,
   CreateTransferInput,
   ReverseTransferResult,
+  UpdateCreditCardEmiInput,
   UpdateCreditCardInput,
+  UpdateCreditCardStatementInput,
   UpdateGoalInput,
   UpdateLoanInput,
   UpdateTransactionInput,
@@ -856,6 +873,25 @@ export const api = {
         method: 'DELETE',
       },
     ),
+  changeCreditCardLimit: (cardId: string, data: ChangeCreditCardLimitInput, version = 1) =>
+    fetchWithAuth<CreditCard>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/limit${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getCreditCardLimitHistory: (cardId: string) =>
+    fetchWithAuth<PaginatedResponse<CreditCardLimitHistory> | CreditCardLimitHistory[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/limit-history`,
+    ),
+  closeCreditCard: (cardId: string, version = 1) =>
+    fetchWithAuth<CreditCard>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/close${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
   getCardStatements: (cardId: string, params?: { limit?: number; status?: string }) =>
     fetchWithAuth<PaginatedResponse<CreditCardStatement> | CreditCardStatement[]>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/statements${buildQuery(params)}`,
@@ -864,19 +900,20 @@ export const api = {
     fetchWithAuth<CreditCardStatement>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}`,
     ),
-  payCardStatement: (cardId: string, statementId: string, data: CreditCardStatementPaymentInput) =>
-    fetchWithAuth<{ success: boolean; statementId: string; paidAmount: string }>(
-      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}/pay`,
+  createCardStatement: (cardId: string, data: CreateCreditCardStatementInput) =>
+    fetchWithAuth<CreditCardStatement>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements`,
       {
         method: 'POST',
         body: JSON.stringify(data),
       },
     ),
-  reverseCardStatementPayment: (cardId: string, statementId: string) =>
-    fetchWithAuth<{ success: boolean; statementId: string }>(
-      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}/pay/reverse`,
+  updateCardStatement: (cardId: string, statementId: string, data: UpdateCreditCardStatementInput) =>
+    fetchWithAuth<CreditCardStatement>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/statements/${encodeURIComponent(statementId)}`,
       {
-        method: 'POST',
+        method: 'PATCH',
+        body: JSON.stringify(data),
       },
     ),
   getCardPayments: (cardId: string, params?: { limit?: number; cursor?: string }) =>
@@ -886,6 +923,21 @@ export const api = {
   recordCardPayment: (cardId: string, data: RecordCreditCardPaymentInput) =>
     fetchWithAuth<CreditCardPayment>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/payments`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  reverseCardPayment: (cardId: string, paymentId: string) =>
+    fetchWithAuth<CreditCardPayment>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/payments/${encodeURIComponent(paymentId)}/reverse`,
+      {
+        method: 'POST',
+      },
+    ),
+  bounceCardPayment: (cardId: string, paymentId: string, data: BounceCreditCardPaymentInput) =>
+    fetchWithAuth<CreditCardPayment>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/payments/${encodeURIComponent(paymentId)}/bounce`,
       {
         method: 'POST',
         body: JSON.stringify(data),
@@ -902,8 +954,112 @@ export const api = {
     fetchWithAuth<PaginatedResponse<CreditCardEmi> | CreditCardEmi[]>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/emis${buildQuery(params)}`,
     ),
+  convertTransactionToEmi: (cardId: string, data: ConvertTransactionToEmiInput) =>
+    fetchWithAuth<CreditCardEmi>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/emis`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  updateCardEmi: (cardId: string, emiId: string, data: UpdateCreditCardEmiInput, version = 1) =>
+    fetchWithAuth<CreditCardEmi>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/emis/${encodeURIComponent(emiId)}${buildQuery({ version })}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      },
+    ),
+  closeCardEmi: (cardId: string, emiId: string, version = 1) =>
+    fetchWithAuth<CreditCardEmi>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/emis/${encodeURIComponent(emiId)}/close${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
   getCardRewards: (cardId: string) =>
     fetchWithAuth<CreditCardRewards>(`/finance/credit-cards/${encodeURIComponent(cardId)}/rewards`),
+  redeemCardRewards: (cardId: string, data: RedeemCreditCardRewardsInput) =>
+    fetchWithAuth<CreditCardRewards>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/rewards/redeem`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getCardRewardsHistory: (cardId: string, params?: { limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardRewardHistoryItem> | CreditCardRewardHistoryItem[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/rewards/history${buildQuery(params)}`,
+    ),
+  raiseCardDispute: (cardId: string, data: RaiseCreditCardDisputeInput) =>
+    fetchWithAuth<CreditCardDispute>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/disputes`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getCardDisputes: (cardId: string, params?: { limit?: number; cursor?: string; status?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardDispute> | CreditCardDispute[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/disputes${buildQuery(params)}`,
+    ),
+  getCardDispute: (cardId: string, disputeId: string) =>
+    fetchWithAuth<CreditCardDispute>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/disputes/${encodeURIComponent(disputeId)}`,
+    ),
+  resolveCardDispute: (cardId: string, disputeId: string, data: ResolveCreditCardDisputeInput) =>
+    fetchWithAuth<CreditCardDispute>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/disputes/${encodeURIComponent(disputeId)}/resolve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  createBalanceTransfer: (cardId: string, data: CreateBalanceTransferInput) =>
+    fetchWithAuth<CreditCardBalanceTransfer>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/balance-transfers`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getBalanceTransfers: (cardId: string, params?: { limit?: number; cursor?: string; status?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardBalanceTransfer> | CreditCardBalanceTransfer[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/balance-transfers${buildQuery(params)}`,
+    ),
+  getBalanceTransfer: (cardId: string, balanceTransferId: string) =>
+    fetchWithAuth<CreditCardBalanceTransfer>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/balance-transfers/${encodeURIComponent(balanceTransferId)}`,
+    ),
+  prepayBalanceTransfer: (cardId: string, balanceTransferId: string, data: PrepayBalanceTransferInput, version = 1) =>
+    fetchWithAuth<CreditCardBalanceTransfer>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/balance-transfers/${encodeURIComponent(balanceTransferId)}/prepay${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  closeBalanceTransfer: (cardId: string, balanceTransferId: string, version = 1) =>
+    fetchWithAuth<CreditCardBalanceTransfer>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/balance-transfers/${encodeURIComponent(balanceTransferId)}/close${buildQuery({ version })}`,
+      {
+        method: 'POST',
+      },
+    ),
+  getCardCashback: (cardId: string) =>
+    fetchWithAuth<CreditCardCashback>(`/finance/credit-cards/${encodeURIComponent(cardId)}/cashback`),
+  redeemCardCashback: (cardId: string, data: RedeemCreditCardCashbackInput) =>
+    fetchWithAuth<CreditCardCashback>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/cashback/redeem`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getCardCashbackHistory: (cardId: string, params?: { limit?: number; cursor?: string }) =>
+    fetchWithAuth<PaginatedResponse<CreditCardCashbackTransaction> | CreditCardCashbackTransaction[]>(
+      `/finance/credit-cards/${encodeURIComponent(cardId)}/cashback/history${buildQuery(params)}`,
+    ),
   getCardDocuments: (cardId: string) =>
     fetchWithAuth<CreditCardDocument[] | PaginatedResponse<CreditCardDocument>>(
       `/finance/credit-cards/${encodeURIComponent(cardId)}/documents`,

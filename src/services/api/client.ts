@@ -43,6 +43,56 @@ export const setOnUnauthorizedCallback = (cb: () => void) => {
   onUnauthorizedCallback = cb;
 };
 
+// Endpoints that must never trigger a refresh-and-retry cycle on 401 —
+// refresh/register 401s are real auth failures, and retrying login/refresh
+// itself would recurse forever.
+const NO_REFRESH_RETRY_PATHS = new Set(["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"]);
+
+// Serializes refresh calls across browser tabs of the same origin (when the
+// Web Locks API is available). The backend rotates the refresh-token cookie
+// on every use and revokes ALL sessions if it sees the same token replayed,
+// so two tabs refreshing concurrently must not race — the lock makes the
+// second tab's call wait and pick up the cookie the first tab just rotated.
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks =
+    typeof navigator !== "undefined"
+      ? (navigator as Navigator & { locks?: { request: (name: string, cb: () => Promise<T>) => Promise<T> } }).locks
+      : undefined;
+  if (locks) {
+    return locks.request("pf-token-refresh", fn);
+  }
+  return fn();
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+
+// Exchanges the httpOnly refresh-token cookie for a new access token. Dedupes
+// concurrent callers within the same tab (they all await the same in-flight
+// request) and serializes across tabs via withRefreshLock.
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = withRefreshLock(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { accessToken?: string };
+      if (!data.accessToken) return null;
+      setAccessToken(data.accessToken);
+      return data.accessToken;
+    } catch {
+      return null;
+    }
+  }).finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 export type ErrorCategory =
   | "NETWORK"
   | "AUTH"
@@ -79,7 +129,7 @@ export class ApiError extends Error {
 
 export async function fetchWithAuth<T>(
   endpoint: string,
-  options: RequestInit & { timeoutMs?: number } = {}
+  options: RequestInit & { timeoutMs?: number; _isRetry?: boolean } = {}
 ): Promise<T> {
   if (typeof window !== "undefined" && !navigator.onLine) {
     throw new ApiError(
@@ -90,7 +140,7 @@ export async function fetchWithAuth<T>(
     );
   }
 
-  const { timeoutMs = 15000, ...fetchOptions } = options;
+  const { timeoutMs = 15000, _isRetry = false, ...fetchOptions } = options;
 
   const headers = new Headers(fetchOptions.headers || {});
 
@@ -130,6 +180,7 @@ export async function fetchWithAuth<T>(
   try {
     const res = await fetch(url, {
       cache: "no-store",
+      credentials: "include",
       ...fetchOptions,
       signal: composedSignal,
       headers,
@@ -137,6 +188,13 @@ export async function fetchWithAuth<T>(
     clearTimeout(timeoutId);
 
     if (res.status === 401) {
+      if (!_isRetry && !NO_REFRESH_RETRY_PATHS.has(path)) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          return fetchWithAuth<T>(endpoint, { ...options, _isRetry: true });
+        }
+      }
+
       setAccessToken(null);
       if (onUnauthorizedCallback) {
         onUnauthorizedCallback();

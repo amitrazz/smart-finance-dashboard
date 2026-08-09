@@ -1,8 +1,11 @@
-import React from "react";
-import { Layers, RefreshCw, AlertTriangle } from "lucide-react";
-import { useCardEmis } from "../hooks/useCreditCardQueries";
+import React, { useState } from "react";
+import { Layers, RefreshCw, AlertTriangle, Edit2, Lock, Plus } from "lucide-react";
+import { useCardEmis, useCloseCardEmi } from "../hooks/useCreditCardQueries";
 import { CreditCardEmi } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { ConvertToEmiModal } from "./ConvertToEmiModal";
+import { EditEmiModal } from "./EditEmiModal";
+import { ConfirmModal } from "../../../components/common/ConfirmModal";
 
 interface CardEmisTabProps {
   cardId: string;
@@ -10,6 +13,10 @@ interface CardEmisTabProps {
 
 export const CardEmisTab: React.FC<CardEmisTabProps> = ({ cardId }) => {
   const { data: emis = [], isLoading, isError, error, refetch } = useCardEmis(cardId);
+  const closeEmiMutation = useCloseCardEmi();
+  const [isConverting, setIsConverting] = useState(false);
+  const [editingEmi, setEditingEmi] = useState<CreditCardEmi | null>(null);
+  const [closingEmi, setClosingEmi] = useState<CreditCardEmi | null>(null);
 
   if (isLoading) {
     return (
@@ -87,11 +94,10 @@ export const CardEmisTab: React.FC<CardEmisTabProps> = ({ cardId }) => {
           </p>
         </div>
         <button
-          disabled
-          title="Converting a transaction to EMI isn't available yet — no backend endpoint exists"
-          className="px-4 py-2 rounded-xl bg-teal-600/30 text-teal-200/50 font-bold text-xs cursor-not-allowed shrink-0"
+          onClick={() => setIsConverting(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-teal-600/20 shrink-0"
         >
-          + Convert to EMI
+          <Plus className="w-4 h-4" /> Convert to EMI
         </button>
       </div>
 
@@ -152,11 +158,49 @@ export const CardEmisTab: React.FC<CardEmisTabProps> = ({ cardId }) => {
                   <span>Next Due: {emi.nextDueDate}</span>
                   <span>End: {emi.expectedEndDate || "—"}</span>
                 </div>
+
+                {emi.status === "ACTIVE" && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                    <button
+                      onClick={() => setEditingEmi(emi)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition-colors"
+                    >
+                      <Edit2 className="w-3 h-3" /> Correct
+                    </button>
+                    <button
+                      onClick={() => setClosingEmi(emi)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[11px] font-semibold transition-colors"
+                    >
+                      <Lock className="w-3 h-3" /> Settle / Close
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
+
+      <ConvertToEmiModal cardId={cardId} isOpen={isConverting} onClose={() => setIsConverting(false)} />
+      <EditEmiModal cardId={cardId} emi={editingEmi} isOpen={Boolean(editingEmi)} onClose={() => setEditingEmi(null)} />
+      <ConfirmModal
+        isOpen={Boolean(closingEmi)}
+        title="Settle EMI Plan?"
+        message={`Mark this EMI plan for "${closingEmi?.merchantName || closingEmi?.merchant}" as settled. This is for plans that have been fully paid off or foreclosed outside the app.`}
+        confirmText="Settle Plan"
+        cancelText="Cancel"
+        variant="warning"
+        isLoading={closeEmiMutation.isPending}
+        onConfirm={() => {
+          if (closingEmi) {
+            closeEmiMutation.mutate(
+              { cardId, emiId: closingEmi.id, version: closingEmi.version || 1 },
+              { onSuccess: () => setClosingEmi(null) }
+            );
+          }
+        }}
+        onClose={() => setClosingEmi(null)}
+      />
     </div>
   );
 };

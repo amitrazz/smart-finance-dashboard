@@ -559,15 +559,21 @@ export const ImportsView: React.FC = () => {
   type StepType = "UPLOAD" | "PROCESSING" | "MAPPING" | "PREVIEW" | "QUEUE" | "CLUSTERS";
   const [activeStep, setActiveStep] = useState<StepType>("UPLOAD");
 
-  const prevSubTabRef = useRef<string | null>(activeSubTab);
+  // Starts `null` (not `activeSubTab`) so the mount-sync effect below always
+  // runs once on first render too — otherwise a fresh mount that already
+  // lands on e.g. "staged-preview" (deep link, tab switch back, browser
+  // back/forward) never triggers the sync, leaving `activeStep` stuck on
+  // its hardcoded "UPLOAD" default until a hard refresh forces a full app
+  // reinit that happens to coincide with a manual re-navigation.
+  const prevSubTabRef = useRef<string | null>(null);
 
-  const changeStep = (step: StepType) => {
+  const changeStep = (step: StepType, jobId?: string) => {
     setActiveStep(step);
     const subTabMap: Record<StepType, string> = {
       UPLOAD: "wizard",
       PROCESSING: "processing",
       MAPPING: "mapping",
-      PREVIEW: "staged-preview",
+      PREVIEW: jobId ? `staged-preview/${jobId}` : "staged-preview",
       QUEUE: "review-queue",
       CLUSTERS: "counterparties",
     };
@@ -671,7 +677,7 @@ export const ImportsView: React.FC = () => {
       });
     }
     const isCsvLike = !!file && (file.name.endsWith(".csv") || file.name.endsWith(".txt"));
-    changeStep(isCsvLike ? "MAPPING" : "PREVIEW");
+    changeStep(isCsvLike ? "MAPPING" : "PREVIEW", job.id);
   };
 
   const handleFailedJob = (job: ImportJob) => {
@@ -727,31 +733,67 @@ export const ImportsView: React.FC = () => {
     return () => clearInterval(timer);
   }, [activeStep, processingGaveUp, processingStartedAt]);
 
-  // Sync activeSubTab from global route navigation only when activeSubTab changes externally
+  // Sync activeStep from global route navigation — runs on the very first
+  // render too (see prevSubTabRef init above), not just on later changes, so
+  // a (re)mount that lands directly on e.g. "staged-preview" — a deep link,
+  // switching to a different top-level tab and back, or browser back/forward
+  // — resolves immediately instead of requiring a hard refresh. The job id
+  // travels in the route itself ("staged-preview/<jobId>", set by
+  // `changeStep`), so reopening the route recovers the exact job rather than
+  // guessing one.
   useEffect(() => {
     if (prevSubTabRef.current !== activeSubTab) {
       prevSubTabRef.current = activeSubTab;
-      if (activeSubTab === "review-queue") {
+      const [base, jobIdFromRoute] = (activeSubTab ?? "").split("/");
+      if (base === "review-queue") {
         setActiveStep("QUEUE");
-      } else if (activeSubTab === "counterparties") {
+      } else if (base === "counterparties") {
         setActiveStep("CLUSTERS");
-      } else if (activeSubTab === "staged-preview") {
+      } else if (base === "staged-preview") {
         setActiveStep("PREVIEW");
-      } else if (activeSubTab === "wizard") {
+        setPreviewReady(true);
+        if (jobIdFromRoute) {
+          setCurrentJobId(jobIdFromRoute);
+        }
+      } else if (base === "wizard") {
         setActiveStep("UPLOAD");
       }
     }
   }, [activeSubTab]);
 
+  // Last-resort fallback for links/bookmarks that predate the job id being
+  // embedded in the route (plain "#/imports/staged-preview" with no id):
+  // guess the most recent resumable job instead of showing an empty screen.
+  useEffect(() => {
+    if (activeStep !== "PREVIEW" || currentJobId) return;
+    const resumable = [...importJobs]
+      .filter((job) => job.status === "AWAITING_REVIEW" || job.status === "PARTIALLY_COMPLETED")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (resumable) {
+      setCurrentJobId(resumable.id);
+      setPreviewReady(true);
+    }
+  }, [activeStep, currentJobId, importJobs]);
+
+  // Gated on activeStep, not just currentJobId: currentJobId is set the
+  // instant upload succeeds (handleUploadSubmit), well before the job
+  // finishes PARSING/OCR and actually has any rows staged. Without this
+  // gate, the preview query fires immediately, caches a legitimate "0 rows"
+  // snapshot for that job id, and — since the global QueryClient disables
+  // refetchOnMount and uses a 60s staleTime — never refetches once the job
+  // reaches AWAITING_REVIEW with real rows, permanently showing "0 rows
+  // staged" until a hard refresh wipes the cache.
   const {
     data: previewData,
     isLoading: isLoadingPreview,
     isFetching: isFetchingPreview,
     isPending: isPendingPreview,
+    isError: isPreviewError,
+    error: previewError,
     fetchNextPage: fetchNextPreviewPage,
     hasNextPage: hasNextPreviewPage,
     isFetchingNextPage: isFetchingNextPreviewPage,
-  } = useImportPreviewInfinite(currentJobId || "");
+  } = useImportPreviewInfinite(currentJobId || "", undefined, { enabled: activeStep === "PREVIEW" });
 
   const stagedRows = useMemo<ImportRowStaging[]>(() => {
     if (!previewData) return [];
@@ -891,7 +933,7 @@ export const ImportsView: React.FC = () => {
       { id: currentJobId, mapping: dtoPayload as unknown as Record<string, string> },
       {
         onSuccess: () => {
-          setActiveStep("PREVIEW");
+          changeStep("PREVIEW", currentJobId);
         },
       }
     );
@@ -901,7 +943,7 @@ export const ImportsView: React.FC = () => {
     if (!currentJobId) return;
     commitMutation.mutate(currentJobId, {
       onSuccess: () => {
-        setActiveStep("UPLOAD");
+        changeStep("UPLOAD");
         setSelectedFile(null);
         setCurrentJobId(null);
         setPreviewReady(false);
@@ -1078,7 +1120,7 @@ export const ImportsView: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-100">Ingestion & Import Pipeline</h2>
           <p className="text-xs text-slate-400">
             {activeSubTab
-              ? `Sub-View: ${activeSubTab.replace("-", " ").toUpperCase()}`
+              ? `Sub-View: ${activeSubTab.split("/")[0].replace("-", " ").toUpperCase()}`
               : "Import statements (CSV, Excel, PDF) with AI parsing, OCR, fuzzy duplicate detection & column mapping"}
           </p>
         </div>
@@ -1095,7 +1137,7 @@ export const ImportsView: React.FC = () => {
           </button>
           {currentJobId && previewReady && (
             <button
-              onClick={() => changeStep("PREVIEW")}
+              onClick={() => changeStep("PREVIEW", currentJobId ?? undefined)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeStep === "PREVIEW" ? "bg-emerald-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-slate-200"
               }`}
@@ -1434,6 +1476,13 @@ export const ImportsView: React.FC = () => {
               <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
               <span>Loading staged row preview...</span>
             </div>
+          ) : isPreviewError ? (
+            <div className="py-12 text-center text-xs space-y-2">
+              <p className="text-rose-400 font-semibold">Couldn't load staged rows for this job.</p>
+              <p className="text-slate-500">
+                {previewError instanceof Error ? previewError.message : "Please try again."}
+              </p>
+            </div>
           ) : stagedRows.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs space-y-1">
               <p>No rows are staged for this job.</p>
@@ -1675,7 +1724,7 @@ export const ImportsView: React.FC = () => {
                               onClick={() => {
                                 setCurrentJobId(row.importJobId);
                                 setPreviewReady(true);
-                                changeStep("PREVIEW");
+                                changeStep("PREVIEW", row.importJobId);
                               }}
                               title="Open this row's import job"
                               aria-label="Open this row's import job"
@@ -1895,7 +1944,7 @@ export const ImportsView: React.FC = () => {
                             onClick={() => {
                               setCurrentJobId(job.id);
                               setPreviewReady(true);
-                              changeStep("PREVIEW");
+                              changeStep("PREVIEW", job.id);
                             }}
                             className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold"
                           >

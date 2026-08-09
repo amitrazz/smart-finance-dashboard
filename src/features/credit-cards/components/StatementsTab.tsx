@@ -7,28 +7,33 @@ import {
   Eye,
   RefreshCw,
   AlertTriangle,
+  DollarSign,
+  Plus,
 } from "lucide-react";
-import { useCardStatements } from "../hooks/useCreditCardQueries";
+import { useCardStatements, useCreditCard } from "../hooks/useCreditCardQueries";
 import { CreditCard, CreditCardStatement } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
 import { StatementDetailsModal } from "./StatementDetailsModal";
+import { AddStatementModal } from "./AddStatementModal";
 import { Pagination } from "../../../components/common/Pagination";
 import { useUIStore } from "../../../store/useUIStore";
 
 interface StatementsTabProps {
   cardId: string;
-  onPayCard?: (card: CreditCard) => void;
+  onPayCard?: (card: CreditCard, statementId?: string) => void;
 }
 
-export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
+export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId, onPayCard }) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedStatement, setSelectedStatement] = useState<CreditCardStatement | null>(null);
   const [isDetailsOpen, setDetailsOpen] = useState(false);
+  const [isAddingStatement, setIsAddingStatement] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const { data: card } = useCreditCard(cardId);
   const { data: statements = [], isLoading, isError, error, refetch } = useCardStatements(cardId);
   const { setActiveTab, setImportModalOpen } = useUIStore();
 
@@ -145,6 +150,13 @@ export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setIsAddingStatement(true)}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-purple-600/20"
+          >
+            <Plus className="w-4 h-4" /> Add Statement
+          </button>
+
+          <button
             onClick={handleImportPDF}
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-500/20 text-xs font-semibold transition-all"
           >
@@ -236,17 +248,29 @@ export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedStatement(stmt);
-                            setDetailsOpen(true);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                          title="View Statement Details"
-                          aria-label="View Statement Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {stmt.status !== "PAID" && stmt.status !== "ARCHIVED" && card && (
+                            <button
+                              onClick={() => onPayCard?.(card, stmt.id)}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors"
+                              title="Pay This Statement"
+                              aria-label="Pay This Statement"
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedStatement(stmt);
+                              setDetailsOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                            title="View Statement Details"
+                            aria-label="View Statement Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -279,7 +303,13 @@ export const StatementsTab: React.FC<StatementsTabProps> = ({ cardId }) => {
           setDetailsOpen(false);
           setSelectedStatement(null);
         }}
+        onRecordPayment={(statementId) => {
+          setDetailsOpen(false);
+          if (card) onPayCard?.(card, statementId);
+        }}
       />
+
+      <AddStatementModal cardId={cardId} isOpen={isAddingStatement} onClose={() => setIsAddingStatement(false)} />
     </div>
   );
 };

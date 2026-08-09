@@ -22,7 +22,7 @@ interface CreditCardListProps {
   onSelectCard: (id: string) => void;
   onAddCard: () => void;
   onEditCard: (card: CreditCard) => void;
-  onPayCard: (card: CreditCard) => void;
+  onPayCard: (card: CreditCard, statementId?: string) => void;
 }
 
 type SortField = "name" | "outstanding" | "availableCredit" | "creditLimit" | "nextDueDate";

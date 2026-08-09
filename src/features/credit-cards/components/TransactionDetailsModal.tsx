@@ -1,20 +1,31 @@
-import React from "react";
-import { X, ArrowUpRight } from "lucide-react";
+import React, { useState } from "react";
+import { X, ArrowUpRight, Layers, ShieldAlert } from "lucide-react";
 import { Transaction } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
+import { ConvertToEmiModal } from "./ConvertToEmiModal";
+import { RaiseDisputeModal } from "./RaiseDisputeModal";
 
 interface TransactionDetailsModalProps {
+  cardId?: string;
   transaction: Transaction | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
+  cardId,
   transaction,
   isOpen,
   onClose,
 }) => {
+  const [isConverting, setIsConverting] = useState(false);
+  const [isDisputing, setIsDisputing] = useState(false);
+
   if (!isOpen || !transaction) return null;
+
+  const canManage = Boolean(cardId) && transaction.direction === "OUTFLOW" && !transaction.emiId;
+  const txLabel = transaction.merchantName || transaction.description;
+  const txAmount = parseFloat(transaction.amount?.amount || "0");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -69,6 +80,23 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           </div>
         </div>
 
+        {canManage && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsConverting(true)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600/10 hover:bg-teal-600/20 text-teal-400 border border-teal-500/20 text-xs font-semibold transition-colors"
+            >
+              <Layers className="w-3.5 h-3.5" /> Convert to EMI
+            </button>
+            <button
+              onClick={() => setIsDisputing(true)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition-colors"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" /> Raise Dispute
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
           <button
             onClick={onClose}
@@ -78,6 +106,32 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           </button>
         </div>
       </div>
+
+      {cardId && (
+        <>
+          <ConvertToEmiModal
+            cardId={cardId}
+            isOpen={isConverting}
+            onClose={() => {
+              setIsConverting(false);
+              onClose();
+            }}
+            transactionId={transaction.id}
+            transactionLabel={txLabel}
+          />
+          <RaiseDisputeModal
+            cardId={cardId}
+            isOpen={isDisputing}
+            onClose={() => {
+              setIsDisputing(false);
+              onClose();
+            }}
+            transactionId={transaction.id}
+            transactionLabel={txLabel}
+            transactionAmount={txAmount}
+          />
+        </>
+      )}
     </div>
   );
 };

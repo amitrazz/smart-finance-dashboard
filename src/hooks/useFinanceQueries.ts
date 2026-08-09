@@ -189,8 +189,6 @@ export {
   useHealthComponents,
   useHealthRecommendations,
   useRecalculateHealthScore,
-  usePayCardStatement,
-  useReverseCardStatementPayment,
 } from "../features/health/hooks/useFinancialHealth";
 
 // Accounts
@@ -1003,13 +1001,13 @@ export function useImportPreview(id: string, params?: { limit?: number }) {
   });
 }
 
-export function useImportPreviewInfinite(id: string, params?: { limit?: number }) {
+export function useImportPreviewInfinite(id: string, params?: { limit?: number }, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: [...QUERY_KEYS.importPreview(id, params), "infinite"],
     queryFn: ({ pageParam }: { pageParam?: string }) => api.getImportPreview(id, { ...params, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => (lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined),
-    enabled: isAuth() && Boolean(id),
+    enabled: isAuth() && Boolean(id) && (options?.enabled ?? true),
   });
 }
 
@@ -1267,12 +1265,37 @@ export {
   useCreditCard,
   useCreateCreditCard,
   useUpdateCreditCard,
+  useDeleteCreditCard,
+  useChangeCreditCardLimit,
+  useCreditCardLimitHistory,
+  useCloseCreditCard,
   useCardStatements,
+  useCreateCardStatement,
+  useUpdateCardStatement,
   useCardPayments,
   useRecordCardPayment,
+  useReverseCardPayment,
+  useBounceCardPayment,
   useCardTransactions,
+  useCardTransactionsInfinite,
   useCardEmis,
+  useConvertTransactionToEmi,
+  useUpdateCardEmi,
+  useCloseCardEmi,
   useCardRewards,
+  useCardRewardsHistory,
+  useRedeemCardRewards,
+  useCardDisputes,
+  useCardDispute,
+  useRaiseCardDispute,
+  useResolveCardDispute,
+  useBalanceTransfers,
+  useCreateBalanceTransfer,
+  usePrepayBalanceTransfer,
+  useCloseBalanceTransfer,
+  useCardCashback,
+  useCardCashbackHistory,
+  useRedeemCardCashback,
   useCardDocuments,
   useUploadCardDocument,
   useDeleteCardDocument,
