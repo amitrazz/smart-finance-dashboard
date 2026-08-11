@@ -1378,19 +1378,12 @@ export interface CreateMilestoneInput {
   targetDate: string;
 }
 
-export type InsightSeverity = "INFO" | "WARNING" | "CRITICAL";
-
-export interface Insight {
-  id: string;
-  ruleCode: string;
-  title: string;
-  description: string;
-  severity: InsightSeverity;
-  category: string;
-  actionableLink?: string;
-  isDismissed: boolean;
-  createdAt: string;
-}
+// `Insight` / `InsightSeverity` removed 2026-08-11 with the backend context.
+// Worth recording why the shape is not worth resurrecting: it described fields
+// (`description`, `category`, `isDismissed`, `actionableLink`) that the API
+// never actually returned — it served `body`, `severity`, `status`, `metadata`.
+// Use `SmartActionItem` and its `evidence`, which are checked against the real
+// contract.
 
 export interface FinancialHealthScore {
   snapshotDate?: string;
@@ -1909,7 +1902,59 @@ export type ActionCategory =
   | "SYSTEM"
   | (string & {});
 
-export type ActionStatus = "ACTIVE" | "COMPLETED" | "DISMISSED" | "SNOOZED" | "EXPIRED";
+export type ActionStatus =
+  | "ACTIVE"
+  | "COMPLETED"
+  | "DISMISSED"
+  | "SNOOZED"
+  | "EXPIRED"
+  // Auto-resolved: the condition cleared without the user acting. Deliberately
+  // distinct from COMPLETED, which is user-driven.
+  | "ARCHIVED";
+
+/** How to format an evidence `value` — don't infer it from the metric name. */
+export type EvidenceUnit =
+  | "CURRENCY"
+  | "PERCENT"
+  | "RATIO"
+  | "MONTHS"
+  | "DAYS"
+  | "COUNT"
+  | "SCORE_POINTS";
+
+/** A typed reference back to the row a figure came from. */
+export interface EvidenceEntityRef {
+  type: string;
+  id: string;
+}
+
+/**
+ * The machine-readable form of an action's `explanation` — the deterministic
+ * metrics the backend rule actually fired on.
+ *
+ * Build "vs. your 3-month average" chips from `baseline` + `comparison` rather
+ * than parsing numbers back out of `explanation`, and use `sourceEntityIds` for
+ * a "show me the rows behind this" affordance without inventing a lookup.
+ *
+ * `source` is always a deterministic producer — there is no AI source, by
+ * design. AI may narrate these numbers, never author them.
+ */
+export interface ActionEvidence {
+  metric: string;
+  value: number;
+  unit: EvidenceUnit;
+  period: string | null;
+  baseline: { value: number; period: string | null; label: string } | null;
+  comparison: {
+    kind: "ABOVE" | "BELOW" | "EQUAL";
+    changePercent: number | null;
+    changeAbsolute: number | null;
+  } | null;
+  source: string;
+  sourceEntityIds: EvidenceEntityRef[];
+  /** 0–1. Below 1 means the rule projected or inferred the figure. */
+  confidence: number;
+}
 
 export interface SmartActionItem {
   id: string;
@@ -1930,6 +1975,13 @@ export interface SmartActionItem {
   dismissible: boolean;
   actionable: boolean;
   metadata?: Record<string, unknown>;
+  /**
+   * Structured metrics behind this action, or `null` when the rule makes no
+   * numeric claim (UNCATEGORIZED_TRANSACTION, TRANSFER_REVIEW, …) and for rows
+   * created before 2026-08-11. Render the text-only layout when null — don't
+   * show an empty evidence panel.
+   */
+  evidence?: ActionEvidence[] | null;
   version: number;
   createdAt: string;
   updatedAt?: string;

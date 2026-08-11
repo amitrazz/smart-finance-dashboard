@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, Insight, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -1469,32 +1469,12 @@ export function useRetirementForecast(params?: { currentAge?: number; retirement
   });
 }
 
-export function useInsights(params?: { limit?: number }) {
-  return useQuery({
-    queryKey: QUERY_KEYS.insights(params),
-    queryFn: () => api.getInsights(params),
-    enabled: isAuth(),
-    select: (res) => unwrapList<Insight>(res),
-  });
-}
-
-export function useDismissInsight() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (param: string | { id: string; version?: number }) => {
-      const id = typeof param === "string" ? param : param.id;
-      const version = typeof param === "string" ? 1 : param.version;
-      return api.dismissInsight(id, version);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["insights"] });
-      useUIStore.getState().showToast("Insight dismissed", "info");
-    },
-    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
-  });
-}
-
-export const useDeleteInsight = useDismissInsight;
+// `useInsights` / `useDismissInsight` were removed: `/finance/insights` is a
+// frozen feed that has returned zero rows since generation was retired, and
+// neither hook had a single consumer. The Smart Action Center
+// (`useSmartActions` et al) is the live equivalent — see the backend's
+// docs/10-frontend-action-center-migration.md. `useDeleteInsight`, an alias of
+// the latter, went with them — it had no consumers either.
 
 // Expenses & Income
 export function useExpensesByCategory() {

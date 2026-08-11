@@ -4,6 +4,7 @@ import {
   Money,
   HealthDimensionDetail,
   LoanType,
+  SmartActionItem,
 } from "../../../types";
 import {
   FinancialHealthOverview,
@@ -130,6 +131,65 @@ const EMPTY_SUBSCRIPTIONS: SubscriptionAnalytics = {
 const EMPTY_TRENDS: TrendAnalytics = { timeframe: "MONTHLY", trends: [], accelerationCategory: "N/A", decelerationCategory: "N/A" };
 const EMPTY_FORECASTS: ForecastAnalytics = { horizon: "1Y", forecasts: [], confidenceScorePercent: 0 };
 const EMPTY_RISKS: RiskMatrixAnalytics = { criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, risks: [] };
+
+/**
+ * Which action categories represent a *risk*, and what this page calls it.
+ *
+ * Acting as an allow-list is the point: the action feed also carries
+ * DATA_QUALITY, IMPORT, SYSTEM and OPPORTUNITY items ("a transaction needs a
+ * category"), which are chores, not risks. Listing them on a severity
+ * dashboard would inflate the counts and train users to ignore it.
+ */
+const RISK_CATEGORIES: Record<string, RiskItem["category"] | undefined> = {
+  SPENDING: "OVERSPENDING",
+  PAYMENT: "CASH_FLOW",
+  INCOME: "CASH_FLOW",
+  CREDIT: "CREDIT",
+  INVESTMENT: "INVESTMENTS",
+  SAVINGS: "EMERGENCY_FUND",
+  GOALS: "EMERGENCY_FUND",
+};
+
+/** The backend's 5 priorities collapse onto this page's 4 severities; INFO is not its own band. */
+const RISK_SEVERITY: Record<string, RiskItem["severity"] | undefined> = {
+  CRITICAL: "CRITICAL",
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  LOW: "LOW",
+  INFO: "LOW",
+};
+
+/**
+ * Confidence in the *detection*, taken from the evidence the rule fired on
+ * rather than the hardcoded 85% this page used to show.
+ *
+ * Evidence read straight off a snapshot or ledger is `confidence: 1`; anything
+ * lower means the rule projected the figure (e.g. a goal shortfall). The
+ * weakest piece of evidence governs — a risk is only as certain as its
+ * shakiest input. With no evidence at all the rule still fired on a
+ * deterministic threshold, so this reports high-but-not-certain rather than
+ * implying a precision it cannot back.
+ */
+function riskConfidencePercent(action: SmartActionItem): number {
+  const evidence = action.evidence ?? [];
+  if (evidence.length === 0) return 90;
+  const weakest = Math.min(...evidence.map((e) => e.confidence));
+  return Math.round(weakest * 100);
+}
+
+/**
+ * What the risk is *about*. Prefers a named entity from the evidence over the
+ * bare category — "the credit card this concerns" beats "CREDIT".
+ */
+function riskSubject(action: SmartActionItem): string {
+  const ref = (action.evidence ?? []).flatMap((e) => e.sourceEntityIds)[0];
+  if (!ref) return String(action.category);
+  return ref.type
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 const mapLoanType = (type: LoanType): DebtItem["type"] => {
   switch (type) {
@@ -770,20 +830,29 @@ export const insightsApi = {
   },
 
   getRiskMatrix: async (): Promise<RiskMatrixAnalytics> => {
-    const res = await api.getInsights({ limit: 50 }).catch(() => null);
-    const list = unwrapList(res).filter((i) => !i.isDismissed);
+    // Sourced from the Smart Action Center, not the retired `/finance/insights`
+    // feed. That endpoint still responds but has returned zero rows since
+    // generation was retired, so this page rendered 0/0/0/0 with no cards —
+    // silently, because "no risks" looks identical to "working fine". The old
+    // mapping was doubly broken: it read `description`/`category`/`isDismissed`/
+    // `actionableLink`, none of which that endpoint ever returned.
+    const res = await api
+      .getSmartActions({ status: "ACTIVE", limit: 50 })
+      .catch(() => null);
+    const list = unwrapList(res).filter((a) => RISK_CATEGORIES[a.category]);
     if (list.length === 0) return EMPTY_RISKS;
 
-    const CATEGORY_SET: RiskItem["category"][] = ["OVERSPENDING", "CASH_FLOW", "DEBT", "CREDIT", "INVESTMENTS", "EMERGENCY_FUND"];
-    const risks: RiskItem[] = list.map((insight) => ({
-      id: insight.id,
-      title: insight.title,
-      category: (CATEGORY_SET.includes(insight.category as RiskItem["category"]) ? insight.category : "OVERSPENDING") as RiskItem["category"],
-      severity: insight.severity === "CRITICAL" ? "CRITICAL" : insight.severity === "WARNING" ? "HIGH" : "LOW",
-      confidencePercent: 85,
-      reason: insight.description,
-      affectedAccount: insight.category,
-      resolutionSteps: insight.actionableLink ? [insight.actionableLink] : [],
+    const risks: RiskItem[] = list.map((action) => ({
+      id: action.id,
+      title: action.title,
+      category: RISK_CATEGORIES[action.category] ?? "OVERSPENDING",
+      severity: RISK_SEVERITY[action.priority] ?? "LOW",
+      confidencePercent: riskConfidencePercent(action),
+      // `explanation` is the rule's structured "why" — always a concrete
+      // comparison, never vague — which is exactly what this card wants.
+      reason: action.explanation || action.description,
+      affectedAccount: riskSubject(action),
+      resolutionSteps: action.recommendation ? [action.recommendation] : [],
     }));
 
     return {

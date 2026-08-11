@@ -56,7 +56,6 @@ import {
   ImportRowStaging,
   UpdateImportRowInput,
   IncomeTrendResponse,
-  Insight,
   InvestmentReturnsPortfolio,
   Loan,
   LoanDashboardData,
@@ -1127,16 +1126,9 @@ export const api = {
       `/finance/analytics/retirement-forecast${buildQuery(params)}`,
     ),
 
-  // Insights
-  getInsights: (params?: { limit?: number }) =>
-    fetchWithAuth<PaginatedResponse<Insight>>(`/finance/insights${buildQuery(params)}`),
-  dismissInsight: (id: string, version = 1) =>
-    fetchWithAuth<{ success: boolean }>(
-      `/finance/insights/${encodeURIComponent(id)}/dismiss${buildQuery({ version })}`,
-      {
-        method: 'POST',
-      },
-    ),
+  // Insights — removed 2026-08-11 with the backend context that served them.
+  // The Smart Action Center below is the live replacement; `getRiskMatrix` was
+  // the last caller and now reads from it.
 
   // Financial Health & Dashboard
   getFinancialHealth: () => fetchWithAuth<FinancialHealthScore>('/finance/financial-health'),
@@ -1184,8 +1176,13 @@ export const api = {
     }),
   getActionById: (id: string) =>
     fetchWithAuth<SmartActionItem>(`/finance/actions/${encodeURIComponent(id)}`),
+  // `GET /finance/actions/category/:category` does not exist on the backend —
+  // the controller has no such route, so it 404s. Filtering is a query param on
+  // the list endpoint.
   getActionsByCategory: (category: string) =>
-    fetchWithAuth<SmartActionItem[]>(`/finance/actions/category/${encodeURIComponent(category)}`),
+    fetchWithAuth<PaginatedResponse<SmartActionItem>>(
+      `/finance/actions${buildQuery({ category, status: 'ACTIVE' })}`,
+    ),
   dismissSmartAction: (id: string, version = 1) =>
     fetchWithAuth<{ success: boolean; status?: string }>(
       `/finance/actions/${encodeURIComponent(id)}/dismiss${buildQuery({ version })}`,
