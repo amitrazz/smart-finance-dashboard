@@ -93,9 +93,11 @@ export const IncomeSection: React.FC = () => {
                   <li key={source.id} className="flex items-center justify-between gap-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-xs text-slate-300">{source.name}</p>
-                      <p className="text-[11px] capitalize text-slate-500">
-                        {source.frequency.toLowerCase()}
-                      </p>
+                      {source.frequency && (
+                        <p className="text-[11px] capitalize text-slate-500">
+                          {source.frequency.toLowerCase()}
+                        </p>
+                      )}
                     </div>
                     <span className="shrink-0 text-xs font-medium tabular-nums text-slate-200">
                       <Money value={source.expectedAmount} />

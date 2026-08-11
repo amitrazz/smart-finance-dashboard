@@ -10,6 +10,8 @@ import {
   mapForecast,
   mapGoals,
   mapInvestments,
+  mapIncome,
+  riskSubject,
   mapNetWorth,
   mapRecommendations,
   mapRisks,
@@ -446,5 +448,69 @@ describe("malformed rows never take down a section", () => {
     expect(() =>
       mapFinancialHealth(health, [{ overallScore: 40 }, { snapshotDate: "2026-07-01", overallScore: 50 }] as never),
     ).not.toThrow();
+  });
+});
+
+describe("optional wire fields never reach a string method", () => {
+  // Regression: the wire types declare `frequency` and `billingCycle` as
+  // required, but manually-created rows come back without them. The component
+  // called `.toLowerCase()` on the value and took the section down with
+  // "Cannot read properties of undefined (reading 'toLowerCase')". The mappers
+  // normalise absent to `null` so the type forces callers to handle it.
+  it("normalises a missing income frequency to null", () => {
+    const result = mapIncome(
+      [
+        { id: "s1", name: "Salary", frequency: "MONTHLY", expectedAmount: money("100000") },
+        { id: "s2", name: "Consulting", expectedAmount: money("25000") },
+      ] as never,
+      null,
+      null,
+    );
+
+    expect(result!.sources.map((s) => s.frequency)).toEqual(["MONTHLY", null]);
+  });
+
+  it("normalises a missing subscription billing cycle to null", () => {
+    const result = mapSubscriptions([
+      { id: "s1", name: "Unknown cadence", amount: money("499"), nextDueDate: "" },
+    ] as never);
+
+    expect(result!.subscriptions[0].billingCycle).toBeNull();
+    // An unknown cycle is not a monthly one, so it contributes no monthly cost.
+    expect(result!.totalMonthlyCost).toBeNull();
+  });
+
+  it("returns no risk subject when the evidence entity has no type", () => {
+    const base = {
+      id: "a1",
+      type: "T",
+      category: "PAYMENT",
+      priority: "HIGH",
+      status: "ACTIVE",
+      title: "t",
+      description: "d",
+      explanation: "e",
+      dismissible: true,
+      actionable: true,
+      version: 1,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const evidence = (sourceEntityIds: unknown) => ({
+      metric: "m",
+      value: 1,
+      unit: "CURRENCY",
+      period: null,
+      baseline: null,
+      comparison: null,
+      source: "s",
+      sourceEntityIds,
+      confidence: 1,
+    });
+
+    expect(riskSubject({ ...base, evidence: [evidence([{}])] } as never)).toBeNull();
+    expect(riskSubject({ ...base, evidence: [evidence(undefined)] } as never)).toBeNull();
+    expect(
+      riskSubject({ ...base, evidence: [evidence([{ type: "CREDIT_CARD" }])] } as never),
+    ).toBe("Credit Card");
   });
 });

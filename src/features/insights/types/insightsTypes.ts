@@ -195,8 +195,12 @@ export interface SpendingAnalytics {
 export interface IncomeSource {
   id: string;
   name: string;
-  /** As stated by the backend (MONTHLY, WEEKLY, …) — never normalised client-side. */
-  frequency: string;
+  /**
+   * As stated by the backend (MONTHLY, WEEKLY, …) — never normalised
+   * client-side. `null` when the source doesn't declare one; the wire type says
+   * `string`, but manually-created sources come back without it.
+   */
+  frequency: string | null;
   expectedAmount: Money;
 }
 
@@ -302,7 +306,8 @@ export interface SubscriptionItem {
   id: string;
   name: string;
   amount: Money;
-  billingCycle: string;
+  /** `null` when the detector couldn't establish a cycle. */
+  billingCycle: string | null;
   nextDueDate: string | null;
 }
 

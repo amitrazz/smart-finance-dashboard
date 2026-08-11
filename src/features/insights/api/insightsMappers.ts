@@ -452,7 +452,7 @@ export function mapIncome(
     sources: sourcesRaw.map((s) => ({
       id: s.id,
       name: s.name,
-      frequency: s.frequency,
+      frequency: s.frequency ?? null,
       expectedAmount: s.expectedAmount,
     })),
     history,
@@ -671,7 +671,7 @@ export function mapSubscriptions(
       id: s.id,
       name: s.name,
       amount: s.amount,
-      billingCycle: s.billingCycle,
+      billingCycle: s.billingCycle ?? null,
       nextDueDate: s.nextDueDate || null,
     })),
   };
@@ -931,8 +931,8 @@ export function riskConfidencePercent(action: SmartActionItem): number | null {
 
 /** What the risk is *about* — prefers a named entity from the evidence. */
 export function riskSubject(action: SmartActionItem): string | null {
-  const ref = (action.evidence ?? []).flatMap((e) => e.sourceEntityIds)[0];
-  if (!ref) return null;
+  const ref = (action.evidence ?? []).flatMap((e) => e.sourceEntityIds ?? [])[0];
+  if (!ref?.type) return null;
   return ref.type
     .toLowerCase()
     .split("_")
