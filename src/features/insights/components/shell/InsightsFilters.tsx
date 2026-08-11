@@ -69,7 +69,13 @@ export const InsightsFilters: React.FC = () => {
         <div
           role="dialog"
           aria-label="Insights filters"
-          className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-2xl backdrop-blur-xl"
+          // Anchored to the trigger's left edge, not its right. This control is
+          // the first item in a left-aligned row, so right-anchoring pushed the
+          // panel's left edge to a negative offset — and `main` computes to
+          // `overflow-x: auto` because it sets `overflow-y: auto`, so the
+          // overhang was clipped rather than allowed to overflow. The width cap
+          // keeps it on screen on narrow viewports for the same reason.
+          className="absolute left-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-2xl backdrop-blur-xl"
         >
           <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             History window
