@@ -70,19 +70,21 @@ export const GoalsSection: React.FC = () => {
                     )}
                   </div>
 
-                  <div
-                    className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
-                    role="presentation"
-                  >
+                  {typeof goal.progressPercent === "number" && (
                     <div
-                      className="h-full rounded-full bg-blue-500"
-                      style={{ width: `${Math.min(100, Math.max(0, goal.progressPercent))}%` }}
-                    />
-                  </div>
+                      className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
+                      role="presentation"
+                    >
+                      <div
+                        className="h-full rounded-full bg-blue-500"
+                        style={{ width: `${Math.min(100, Math.max(0, goal.progressPercent))}%` }}
+                      />
+                    </div>
+                  )}
 
                   <p className="text-[11px] tabular-nums text-slate-400">
-                    <Money value={goal.currentAmount} /> of <Money value={goal.targetAmount} /> ·{" "}
-                    {goal.progressPercent.toFixed(0)}%
+                    <Money value={goal.currentAmount} /> of <Money value={goal.targetAmount} />
+                    {typeof goal.progressPercent === "number" && ` · ${goal.progressPercent.toFixed(0)}%`}
                   </p>
 
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">

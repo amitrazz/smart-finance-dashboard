@@ -6,7 +6,7 @@ import { AnalyticsKpi, AnalyticsKpiRow } from "../../components/common/Analytics
 import { ChartFrame, MoneyTooltip } from "../../components/charts/ChartFrame";
 import { CHART_AXIS, useCompactMoneyAxis } from "../../components/charts/chartConfig";
 import { BreakdownList } from "./BreakdownList";
-import { Money } from "../../../../components/common/Money";
+import { MetricValue } from "../../components/common/MetricValue";
 import { EmptyAnalyticsState } from "../../components/common/AnalyticsStates";
 import { useUIStore } from "../../../../store/useUIStore";
 
@@ -112,7 +112,7 @@ export const SpendingSection: React.FC = () => {
                         </p>
                       </div>
                       <span className="shrink-0 text-xs font-medium tabular-nums text-slate-200">
-                        <Money value={merchant.amount} />
+                        <MetricValue value={merchant.amount} money emptyClassName="text-slate-500" />
                       </span>
                     </li>
                   ))}

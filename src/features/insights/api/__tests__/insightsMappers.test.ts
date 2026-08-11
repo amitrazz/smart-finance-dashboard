@@ -3,6 +3,7 @@ import {
   diffMoney,
   diffPercent,
   diffPercentPoints,
+  mapBudgets,
   mapCashFlow,
   mapChanges,
   mapDebt,
@@ -11,6 +12,7 @@ import {
   mapGoals,
   mapInvestments,
   mapIncome,
+  mapSpending,
   riskSubject,
   mapNetWorth,
   mapRecommendations,
@@ -512,5 +514,118 @@ describe("optional wire fields never reach a string method", () => {
     expect(
       riskSubject({ ...base, evidence: [evidence([{ type: "CREDIT_CARD" }])] } as never),
     ).toBe("Credit Card");
+  });
+});
+
+describe("wire numbers arriving as decimal strings", () => {
+  /**
+   * Regression: this backend serialises decimals as strings on many routes even
+   * where the DTO declares `number`. TypeScript believed the declaration, the
+   * component called `.toFixed()`, and the section died with "toFixed is not a
+   * function". Every numeric now passes through `num()` at the boundary.
+   */
+  it("coerces a string goal progress into a number", () => {
+    const result = mapGoals(null, [
+      {
+        id: "g1",
+        name: "House",
+        targetAmount: money("1000000"),
+        currentAmount: money("250000"),
+        progressPercent: "25.5",
+        currency: "INR",
+        targetDate: "2030-01-01",
+        goalHealth: "GOOD",
+      },
+    ] as never);
+
+    const progress = result!.goals[0].progressPercent;
+    expect(progress).toBe(25.5);
+    expect(typeof progress).toBe("number");
+    expect(() => (progress as number).toFixed(0)).not.toThrow();
+  });
+
+  it("reports unknown goal progress as null, not as zero percent", () => {
+    const result = mapGoals(null, [
+      { id: "g1", name: "House", targetAmount: money("1"), currency: "INR", targetDate: "2030-01-01" },
+    ] as never);
+
+    expect(result!.goals[0].progressPercent).toBeNull();
+  });
+
+  it("coerces a string health score and its component scores", () => {
+    const result = mapFinancialHealth(
+      {
+        overallScore: "39",
+        rating: "CRITICAL",
+        monthlyTrend: "2.5",
+        componentScores: { CASH_FLOW: { code: "CASH_FLOW", score: "0" } },
+        topRecommendations: [],
+      } as never,
+      null,
+    );
+
+    expect(result!.overallScore).toBe(39);
+    expect(result!.monthlyTrend).toBe(2.5);
+    // "0" is a real zero and must survive as one, not become "not enough data".
+    expect(result!.dimensions[0].score).toBe(0);
+  });
+
+  it("coerces a string category share", () => {
+    const result = mapSpending(
+      [{ categoryId: "c1", categoryName: "Rent", amount: money("40000"), percentage: "33.3" }] as never,
+      null,
+      null,
+      [],
+    );
+
+    expect(result!.categories[0].percentage).toBe(33.3);
+  });
+
+  it("coerces a string budget utilisation and health score", () => {
+    const result = mapBudgets({
+      totalBudget: "50000",
+      totalSpent: "20000",
+      overallUtilization: "40",
+      budgetHealthScore: "72",
+      activeBudgets: [
+        {
+          id: "b1",
+          name: "Food",
+          currency: "INR",
+          totalLimit: money("10000"),
+          totalSpent: money("9000"),
+          utilizationPercent: "90",
+        },
+      ],
+      exceededBudgets: [],
+      nearLimitBudgets: [],
+    } as never);
+
+    expect(result!.budgetHealthScore).toBe(72);
+    expect(result!.budgets[0].percentUsed).toBe(90);
+    expect(result!.budgets[0].status).toBe("WARNING");
+  });
+
+  it("coerces a string loan interest rate and tenure", () => {
+    const result = mapDebt(
+      [
+        {
+          id: "l1",
+          name: "Car",
+          type: "VEHICLE",
+          currency: "INR",
+          interestRate: "9.25",
+          remainingTenureMonths: "36",
+          outstandingPrincipal: money("400000"),
+          status: "ACTIVE",
+          version: 1,
+        },
+      ] as never,
+      null,
+      null,
+    );
+
+    expect(result!.debts[0].interestRatePercent).toBe(9.25);
+    expect(result!.debts[0].remainingTenureMonths).toBe(36);
   });
 });

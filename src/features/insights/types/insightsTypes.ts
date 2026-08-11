@@ -152,13 +152,15 @@ export interface CashFlowAnalytics {
 export interface CategorySpending {
   categoryId: string;
   categoryName: string;
-  amount: Money;
-  percentage: number;
+  /** `null` when the row carried no amount — rendered as absent, not as zero. */
+  amount: Money | null;
+  /** Share of total spend. `null` when the backend didn't compute one. */
+  percentage: number | null;
 }
 
 export interface MerchantSpending {
   merchantName: string;
-  amount: Money;
+  amount: Money | null;
   transactionCount: number | null;
   category: string | null;
 }
@@ -173,7 +175,8 @@ export interface SpendingAnomaly {
   title: string;
   description: string;
   date: string;
-  amount: Money;
+  /** `null` when the rule quantified no figure. */
+  amount: Money | null;
 }
 
 export interface SpendingAnalytics {
@@ -249,7 +252,8 @@ export interface GoalAnalyticsItem {
   name: string;
   targetAmount: Money;
   currentAmount: Money;
-  progressPercent: number;
+  /** `null` when the goal has no computed progress yet. */
+  progressPercent: number | null;
   monthlyContribution: Money | null;
   projectedCompletionDate: string | null;
   isBehindSchedule: boolean | null;

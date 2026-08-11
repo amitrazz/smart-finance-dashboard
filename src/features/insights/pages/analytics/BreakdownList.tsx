@@ -1,11 +1,13 @@
 import React from "react";
 import { Money as MoneyType } from "../../../../types";
-import { Money } from "../../../../components/common/Money";
+import { MetricValue } from "../../components/common/MetricValue";
 
 interface BreakdownItem {
   category: string;
-  value: MoneyType;
-  percentage: number;
+  /** `null` renders "Not enough data" rather than a confident ₹0.00. */
+  value: MoneyType | null;
+  /** `null` renders the row without a bar rather than as a 0% share. */
+  percentage: number | null;
 }
 
 /**
@@ -32,26 +34,28 @@ export const BreakdownList: React.FC<{
             <div className="flex items-baseline justify-between gap-3 text-xs">
               <span className="truncate text-slate-300">{item.category}</span>
               <span className="shrink-0 tabular-nums text-slate-200">
-                <Money value={item.value} />
+                <MetricValue value={item.value} money emptyClassName="text-slate-500" />
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="h-1 flex-1 overflow-hidden rounded-full bg-slate-800"
-                role="presentation"
-              >
+            {typeof item.percentage === "number" && (
+              <div className="flex items-center gap-2">
                 <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, item.percentage))}%`,
-                    backgroundColor: accent,
-                  }}
-                />
+                  className="h-1 flex-1 overflow-hidden rounded-full bg-slate-800"
+                  role="presentation"
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, item.percentage))}%`,
+                      backgroundColor: accent,
+                    }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-slate-500">
+                  {item.percentage.toFixed(0)}%
+                </span>
               </div>
-              <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-slate-500">
-                {item.percentage.toFixed(0)}%
-              </span>
-            </div>
+            )}
           </li>
         ))}
       </ul>

@@ -13,7 +13,7 @@ import { RiskFilter, RiskSummary } from "../components/intelligence/RiskSummary"
 import { ChartFrame, ChartLegendItem, MoneyTooltip } from "../components/charts/ChartFrame";
 import { CHART_AXIS, CHART_GRID, useCompactMoneyAxis } from "../components/charts/chartConfig";
 import { EmptyAnalyticsState } from "../components/common/AnalyticsStates";
-import { Money } from "../../../components/common/Money";
+import { MetricValue } from "../components/common/MetricValue";
 import { IMPACT, shortPeriodLabel, sortRecommendations, sortRisks } from "../utils/insightsFormat";
 import { RecommendationImpact } from "../types/insightsTypes";
 import { AskSection } from "./intelligence/AskSection";
@@ -176,7 +176,7 @@ const AnomaliesView: React.FC = () => {
                 </div>
                 <p className="text-xs leading-relaxed text-slate-400">{anomaly.description}</p>
                 <p className="text-sm font-medium tabular-nums text-slate-200">
-                  <Money value={anomaly.amount} />
+                  <MetricValue value={anomaly.amount} money emptyClassName="text-slate-500" />
                 </p>
               </li>
             ))}

@@ -72,7 +72,17 @@ import {
 // Primitives
 // ---------------------------------------------------------------------------
 
-/** Parses a wire decimal. Returns `null` — never 0 — when there is no number. */
+/**
+ * Parses a wire number. Returns `null` — never 0 — when there is no number.
+ *
+ * Every numeric field coming off the API goes through here, including ones the
+ * DTOs declare as `number`. That is not belt-and-braces: this backend serialises
+ * decimals as *strings* on many routes, so a field typed `progressPercent:
+ * number` arrives as `"42.5"`. TypeScript believes the declaration, the
+ * component calls `.toFixed()`, and the section dies with "toFixed is not a
+ * function". Coercing at the boundary means the view models are true to their
+ * own types even where the wire types are not.
+ */
 export function num(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined || v === "") return null;
   const parsed = typeof v === "number" ? v : parseFloat(v);
@@ -151,6 +161,25 @@ export function byAscending<T>(key: (item: T) => string | null | undefined) {
   return (a: T, b: T) => (key(a) ?? "").localeCompare(key(b) ?? "");
 }
 
+/**
+ * Currency for a collection, taken from the first row that actually carries
+ * one.
+ *
+ * Reading `rows[0].amount.currency` is the obvious version and it is a landmine:
+ * one row without an amount — which happens, because these list DTOs declare
+ * `amount` required and the API does not always send it — throws "Cannot read
+ * properties of undefined (reading 'currency')" and takes the section down. The
+ * currency of a list is a property of the list, not of whichever row sorted
+ * first.
+ */
+function currencyOf<T>(rows: T[], pick: (row: T) => Money | null | undefined, fallback = "INR"): string {
+  for (const row of rows) {
+    const currency = pick(row)?.currency;
+    if (currency) return currency;
+  }
+  return fallback;
+}
+
 export function unwrapList<T>(res: T[] | PaginatedResponse<T> | null | undefined): T[] {
   if (Array.isArray(res)) return res;
   if (res && Array.isArray((res as PaginatedResponse<T>).data)) {
@@ -167,7 +196,8 @@ export function mapFinancialHealth(
   health: FinancialHealthScore | null | undefined,
   historyRes: FinancialHealthHistoryPoint[] | PaginatedResponse<FinancialHealthHistoryPoint> | null | undefined,
 ): FinancialHealthOverview | null {
-  if (!health || typeof health.overallScore !== "number") return null;
+  const overallScore = num(health?.overallScore);
+  if (!health || overallScore === null) return null;
 
   const componentScores = health.componentScores || health.components || {};
   const topRecommendations = health.topRecommendations || [];
@@ -179,26 +209,26 @@ export function mapFinancialHealth(
     label: d.label || HEALTH_DIMENSION_LABELS[d.code] || d.code,
     // A dimension the engine could not score comes back without a number. It
     // is not a zero-scored dimension, and must not be charted as one.
-    score: typeof d.score === "number" ? d.score : null,
+    score: num(d.score),
     why: d.why || d.reason || null,
     improvement:
       d.recommendations?.[0]?.text ||
       d.recommendationText ||
       topRecommendations.find((r) => r.component === d.code)?.text ||
       null,
-    scoreImpact: typeof d.scoreImpact === "number" ? d.scoreImpact : null,
+    scoreImpact: num(d.scoreImpact),
     deepLink: d.deepLink || null,
   }));
 
   const history = unwrapList(historyRes)
-    .map((h) => ({ date: h.snapshotDate || h.date || "", score: h.overallScore ?? h.score ?? null }))
-    .filter((p): p is { date: string; score: number } => Boolean(p.date) && typeof p.score === "number")
+    .map((h) => ({ date: h.snapshotDate || h.date || "", score: num(h.overallScore ?? h.score) }))
+    .filter((p): p is { date: string; score: number } => Boolean(p.date) && p.score !== null)
     .sort(byAscending((p) => p.date));
 
   return {
-    overallScore: health.overallScore,
+    overallScore,
     rating: health.rating,
-    monthlyTrend: typeof health.monthlyTrend === "number" ? health.monthlyTrend : null,
+    monthlyTrend: num(health.monthlyTrend),
     history,
     dimensions,
     asOf: health.snapshotDate || health.lastCalculatedAt || health.updatedAt || null,
@@ -215,7 +245,7 @@ export function mapNetWorth(
 ): NetWorthAnalytics | null {
   if (!current?.netWorth) return null;
 
-  const currency = current.netWorth.currency;
+  const currency = current.netWorth?.currency ?? "INR";
   const sorted = [...unwrapList(historyRes)].sort(byAscending((s) => s.date));
 
   const history: NetWorthPoint[] = sorted
@@ -366,7 +396,7 @@ export function mapSpending(
   const categoriesRaw = Array.isArray(categoriesRes) ? categoriesRes : [];
   if (categoriesRaw.length === 0) return null;
 
-  const currency = categoriesRaw[0].amount.currency;
+  const currency = currencyOf(categoriesRaw, (c) => c.amount);
   const totalSpent = categoriesRaw.reduce((sum, c) => sum + (moneyValue(c.amount) ?? 0), 0);
 
   const transactions = unwrapList(transactionsRes);
@@ -376,7 +406,7 @@ export function mapSpending(
     const matching = transactions.filter((t) => t.merchantName === m.merchantName);
     return {
       merchantName: m.merchantName,
-      amount: m.amount,
+      amount: m.amount ?? null,
       transactionCount: matching.length > 0 ? matching.length : null,
       category: matching[0]?.categoryName ?? null,
     };
@@ -401,7 +431,7 @@ export function mapSpending(
       title: a.title,
       description: a.explanation || a.description,
       date: a.createdAt,
-      amount: asMoney(a.amount ?? a.financialImpact, currency) ?? money(0, currency),
+      amount: asMoney(a.amount ?? a.financialImpact, currency),
     }));
 
   return {
@@ -409,8 +439,8 @@ export function mapSpending(
     categories: categoriesRaw.map((c) => ({
       categoryId: c.categoryId,
       categoryName: c.categoryName,
-      amount: c.amount,
-      percentage: c.percentage,
+      amount: c.amount ?? null,
+      percentage: num(c.percentage),
     })),
     topMerchants,
     dailyVelocity,
@@ -478,7 +508,8 @@ export function mapBudgets(dashboard: BudgetDashboardData | null | undefined): B
     const spent = moneyValue(budget.totalSpent) ?? 0;
     // The backend reports utilisation per budget; fall back to the ratio of two
     // backend figures only when it doesn't.
-    const percentUsed = budget.utilizationPercent ?? (allocated > 0 ? (spent / allocated) * 100 : 0);
+    const percentUsed =
+      num(budget.utilizationPercent) ?? (allocated > 0 ? (spent / allocated) * 100 : 0);
     return {
       budgetId: budget.id,
       name: budget.name,
@@ -500,7 +531,7 @@ export function mapBudgets(dashboard: BudgetDashboardData | null | undefined): B
     totalSpent: money(totalSpent ?? 0, currency),
     overallPercentUsed: num(dashboard.overallUtilization),
     budgetHealthScore:
-      typeof dashboard.budgetHealthScore === "number" ? dashboard.budgetHealthScore : null,
+      num(dashboard.budgetHealthScore),
     budgets,
   };
 }
@@ -527,7 +558,7 @@ export function mapGoals(
       name: g.name,
       targetAmount: g.targetAmount,
       currentAmount: g.currentAmount || g.currentCorpus || money(0, g.currency),
-      progressPercent: g.progressPercent,
+      progressPercent: num(g.progressPercent),
       monthlyContribution: g.monthlyContribution || g.autoContributionAmount || null,
       projectedCompletionDate:
         g.estimatedCompletionDate || g.forecastCompletionDate || g.targetDate || null,
@@ -539,7 +570,7 @@ export function mapGoals(
 
   return {
     totalGoalsCount: dashboard
-      ? dashboard.activeGoalsCount + dashboard.completedGoalsCount
+      ? (num(dashboard.activeGoalsCount) ?? 0) + (num(dashboard.completedGoalsCount) ?? 0)
       : goals.length,
     onTrackCount: scored.length > 0 ? scored.filter((g) => !g.isBehindSchedule).length : null,
     behindCount: scored.length > 0 ? scored.filter((g) => g.isBehindSchedule).length : null,
@@ -584,7 +615,7 @@ export function mapInvestments(
     allocation: (allocationRes?.allocations ?? []).map((a) => ({
       label: a.assetClass,
       value: a.amount,
-      percentage: a.percentage,
+      percentage: num(a.percentage) ?? 0,
     })),
   };
 }
@@ -610,9 +641,9 @@ export function mapDebt(
       name: l.name,
       type: l.type,
       principalOutstanding: outstanding,
-      interestRatePercent: typeof l.interestRate === "number" ? l.interestRate : null,
+      interestRatePercent: num(l.interestRate),
       monthlyEMI: asMoney(l.monthlyEmi ?? l.emiAmount ?? l.installmentAmount, l.currency),
-      remainingTenureMonths: l.remainingTenureMonths ?? l.tenureMonths ?? null,
+      remainingTenureMonths: num(l.remainingTenureMonths ?? l.tenureMonths),
     };
   });
 
@@ -655,7 +686,7 @@ export function mapSubscriptions(
   const list = unwrapList(res);
   if (list.length === 0) return null;
 
-  const currency = list[0].amount.currency;
+  const currency = currencyOf(list, (s) => s.amount);
   const monthly = list
     .filter((s) => MONTHLY_CYCLES.test(s.billingCycle ?? ""))
     .map((s) => moneyValue(s.amount))
@@ -729,7 +760,7 @@ export function mapForecast(
     currentAge: forecast?.currentAge ?? null,
     retirementAge: forecast?.retirementAge ?? null,
     expectedReturnPercent:
-      typeof forecast?.expectedReturnPercent === "number" ? forecast.expectedReturnPercent : null,
+      num(forecast?.expectedReturnPercent),
     history: netWorth?.history ?? [],
   };
 }
@@ -864,11 +895,7 @@ export function mapRecommendations(
 
   return list.map((r, idx) => {
     const scoreImpact =
-      typeof r.estimatedImpact === "number"
-        ? r.estimatedImpact
-        : typeof r.scoreImpact === "number"
-          ? r.scoreImpact
-          : null;
+      num(r.estimatedImpact) ?? num(r.scoreImpact);
     const title = r.title || r.text;
     const reason = r.description && r.description !== title ? r.description : null;
     return {
@@ -925,8 +952,9 @@ const RISK_SEVERITY: Record<string, RiskItem["severity"] | undefined> = {
  */
 export function riskConfidencePercent(action: SmartActionItem): number | null {
   const evidence = action.evidence ?? [];
-  if (evidence.length === 0) return null;
-  return Math.round(Math.min(...evidence.map((e) => e.confidence)) * 100);
+  const confidences = evidence.map((e) => num(e.confidence)).filter((c): c is number => c !== null);
+  if (confidences.length === 0) return null;
+  return Math.round(Math.min(...confidences) * 100);
 }
 
 /** What the risk is *about* — prefers a named entity from the evidence. */
@@ -954,7 +982,7 @@ export function mapRisks(actions: SmartActionItem[]): RiskMatrixAnalytics {
       reason: action.explanation || action.description,
       affectedEntity: riskSubject(action),
       financialImpact: asMoney(action.amount ?? action.financialImpact, "INR"),
-      dueInDays: typeof action.dueInDays === "number" ? action.dueInDays : null,
+      dueInDays: num(action.dueInDays),
       resolution: action.recommendation ?? null,
       deepLink: action.deepLink ?? null,
     }));
