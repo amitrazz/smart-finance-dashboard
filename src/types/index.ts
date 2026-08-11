@@ -1993,6 +1993,32 @@ export interface SmartActionItem {
   amount?: Money | string;
 }
 
+/**
+ * Outcome of a grounded financial question (`POST /finance/ai/query`).
+ *
+ * `status` is the field that matters, and it is not decorative:
+ * - `ANSWERED`   — every figure was verified present in the deterministic
+ *                  context, every cited metric exists, and every declared claim
+ *                  binds a figure to that metric's real value. It does **not**
+ *                  mean "correct" — it means "asserts nothing unsupported".
+ * - `UNGROUNDED` — the model asserted something unsupported, so the backend
+ *                  discarded the answer. `answer` is fallback copy, never the
+ *                  fabricated claim.
+ * - `UNAVAILABLE`— no financial context to ground against, or every provider
+ *                  failed. In the former case no provider was called at all.
+ */
+export type AnswerStatus = "ANSWERED" | "UNGROUNDED" | "UNAVAILABLE";
+
+export interface FinancialAnswer {
+  status: AnswerStatus;
+  intent: string;
+  answer: string;
+  usedMetrics: string[];
+  confidence: number;
+  /** Snapshot date the figures describe — answers never implicitly mean "now". */
+  asOf: string;
+}
+
 export interface ActionCategoryCount {
   category: string;
   count: number;

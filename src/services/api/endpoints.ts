@@ -36,6 +36,7 @@ import {
   CreditCardStatement,
   DebtBreakdownResponse,
   FinancialHealthHistoryPoint,
+  FinancialAnswer,
   FinancialHealthScore,
   FinancialInstitution,
   Goal,
@@ -1208,6 +1209,16 @@ export const api = {
   refreshSmartActions: () =>
     fetchWithAuth<{ status: string; refreshedCount?: number }>('/finance/actions/refresh', {
       method: 'POST',
+    }),
+
+  // AI — grounded question answering over the caller's own finances.
+  // The backend rejects any answer asserting a figure absent from the
+  // deterministic context it assembled, so `status` must be handled: an
+  // UNGROUNDED response carries fallback text, not the model's claim.
+  askFinancialQuestion: (question: string) =>
+    fetchWithAuth<FinancialAnswer>('/finance/ai/query', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
     }),
 
   // Expenses

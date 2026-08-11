@@ -30,6 +30,7 @@ import {
   Droplet,
 } from "lucide-react";
 import { SmartActionItem, ActionPriority } from "../../../types";
+import { ActionEvidenceList } from "./ActionEvidenceList";
 
 interface SmartActionCardProps {
   action: SmartActionItem;
@@ -195,6 +196,20 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
                   {action.dueInDays === 0 ? "Due Today" : `Due in ${action.dueInDays}d`}
                 </span>
               )}
+              {/*
+                Without this, the Snoozed tab answers "what did I snooze?" but
+                not "when does it come back?" — which is the only reason to open
+                it. The backend's hourly sweep flips these to ACTIVE on their own.
+              */}
+              {action.status === "SNOOZED" && action.snoozedUntil && (
+                <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                  Returns{" "}
+                  {new Date(action.snoozedUntil).toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+              )}
             </div>
 
             <h3 className="text-sm font-bold text-slate-100 mt-1 font-sans">
@@ -348,6 +363,10 @@ export const SmartActionCard: React.FC<SmartActionCardProps> = ({
                 <p className="leading-relaxed">{action.explanation}</p>
                 {action.recommendation && (
                   <p className="text-emerald-400 font-medium pt-1">💡 Recommendation: {action.recommendation}</p>
+                )}
+                {/* Null for rules that make no numeric claim — the component renders nothing, no empty panel. */}
+                {action.evidence && action.evidence.length > 0 && (
+                  <ActionEvidenceList evidence={action.evidence} />
                 )}
               </div>
             </motion.div>

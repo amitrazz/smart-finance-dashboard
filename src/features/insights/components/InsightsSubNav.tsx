@@ -57,6 +57,7 @@ const INSIGHTS_SECTIONS: InsightsSectionConfig[] = [
       { id: "forecasts", label: "Predictive Forecasts" },
       { id: "recommendations", label: "Recommendations Inbox" },
       { id: "risks", label: "Risk Matrix & Warnings" },
+      { id: "ask", label: "Ask Your Finances" },
     ],
   },
   {

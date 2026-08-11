@@ -10,6 +10,7 @@ import {
   Zap,
   Archive,
   History,
+  Clock,
 } from "lucide-react";
 import {
   useSmartActions,
@@ -128,6 +129,22 @@ export const SmartActionCenter: React.FC = () => {
             >
               <CheckCircle2 className="w-3 h-3" /> Done
             </button>
+            {/*
+              Snoozed needs its own tab: the card offers a full snooze menu, but
+              a snoozed action leaves the Active list and — without this — is
+              visible nowhere until the backend's hourly sweep wakes it. From
+              the user's side that made snoozing indistinguishable from deleting.
+            */}
+            <button
+              onClick={() => setActiveStatus("SNOOZED")}
+              className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                activeStatus === "SNOOZED"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Clock className="w-3 h-3" /> Snoozed
+            </button>
             <button
               onClick={() => setActiveStatus("DISMISSED")}
               className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
@@ -221,6 +238,8 @@ export const SmartActionCenter: React.FC = () => {
           <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10">
             {activeStatus === "ACTIVE" ? (
               <CheckCircle2 className="w-8 h-8" />
+            ) : activeStatus === "SNOOZED" ? (
+              <Clock className="w-8 h-8 text-indigo-400" />
             ) : (
               <History className="w-8 h-8 text-indigo-400" />
             )}
@@ -230,12 +249,18 @@ export const SmartActionCenter: React.FC = () => {
             <h3 className="text-lg font-extrabold text-white">
               {activeStatus === "ACTIVE"
                 ? "You're all caught up!"
-                : `No ${activeStatus.toLowerCase()} actions found`}
+                : activeStatus === "SNOOZED"
+                  ? "Nothing snoozed"
+                  : `No ${activeStatus.toLowerCase()} actions found`}
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
               {activeStatus === "ACTIVE"
                 ? "No urgent financial actions require your attention right now. Great job keeping your finances organized!"
-                : "No historical action records match this filter query."}
+                : activeStatus === "SNOOZED"
+                  ? // Snoozed is not history — it returns on its own. Say so, so an
+                    // empty list doesn't read as "your snooze was lost".
+                    "Actions you snooze wait here and return to Active automatically once their snooze period ends."
+                  : "No historical action records match this filter query."}
             </p>
           </div>
 

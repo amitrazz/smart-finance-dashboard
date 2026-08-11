@@ -16,6 +16,7 @@ import { TrendsPage } from "./submodules/TrendsPage";
 import { ForecastsPage } from "./submodules/ForecastsPage";
 import { RecommendationsPage } from "./submodules/RecommendationsPage";
 import { RisksPage } from "./submodules/RisksPage";
+import { AskPage } from "./submodules/AskPage";
 import { ReportsPage } from "./submodules/ReportsPage";
 import { TimeHorizon } from "./types/insightsTypes";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,8 @@ export const InsightsView: React.FC = () => {
         return <RecommendationsPage />;
       case "risks":
         return <RisksPage />;
+      case "ask":
+        return <AskPage />;
       case "reports":
         return <ReportsPage />;
       case "overview":
