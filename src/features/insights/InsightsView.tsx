@@ -1,95 +1,76 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useUIStore } from "../../store/useUIStore";
-import { InsightsSubNav } from "./components/InsightsSubNav";
-import { OverviewPage } from "./submodules/OverviewPage";
-import { FinancialHealthPage } from "./submodules/FinancialHealthPage";
-import { NetWorthPage } from "./submodules/NetWorthPage";
-import { CashFlowPage } from "./submodules/CashFlowPage";
-import { SpendingPage } from "./submodules/SpendingPage";
-import { IncomePage } from "./submodules/IncomePage";
-import { BudgetsPage } from "./submodules/BudgetsPage";
-import { GoalsPage } from "./submodules/GoalsPage";
-import { InvestmentsPage } from "./submodules/InvestmentsPage";
-import { DebtsPage } from "./submodules/DebtsPage";
-import { SubscriptionsPage } from "./submodules/SubscriptionsPage";
-import { TrendsPage } from "./submodules/TrendsPage";
-import { ForecastsPage } from "./submodules/ForecastsPage";
-import { RecommendationsPage } from "./submodules/RecommendationsPage";
-import { RisksPage } from "./submodules/RisksPage";
-import { AskPage } from "./submodules/AskPage";
-import { ReportsPage } from "./submodules/ReportsPage";
-import { TimeHorizon } from "./types/insightsTypes";
-import { useQueryClient } from "@tanstack/react-query";
+import { InsightsShell } from "./components/shell/InsightsShell";
+import {
+  InsightsRoute,
+  parseInsightsRoute,
+  serializeInsightsRoute,
+} from "./insightsNav";
+import { useRefreshInsights } from "./hooks/useInsightsQueries";
+import { OverviewPage } from "./pages/OverviewPage";
+import { HealthPage } from "./pages/HealthPage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { IntelligencePage } from "./pages/IntelligencePage";
+import { ReportsPage } from "./pages/ReportsPage";
 
+/**
+ * Insights & Health workspace root.
+ *
+ * Owns exactly two things: translating the app's hash route into an
+ * `InsightsRoute`, and choosing a page. Everything else — chrome, filters,
+ * refresh, data — belongs to the shell and the pages.
+ *
+ * Routing rides `useUIStore.activeSubTab` rather than introducing a router,
+ * matching how every other module in this app navigates, so `#/insights/
+ * analytics/net-worth` is a real bookmarkable URL and browser back works.
+ */
 export const InsightsView: React.FC = () => {
-  const { activeSubTab, showToast } = useUIStore();
-  const [horizon, setHorizon] = useState<TimeHorizon>("1Y");
-  const queryClient = useQueryClient();
+  const activeSubTab = useUIStore((s) => s.activeSubTab);
+  const setActiveSubTab = useUIStore((s) => s.setActiveSubTab);
+  const showToast = useUIStore((s) => s.showToast);
+  const refreshInsights = useRefreshInsights();
 
-  const currentTab = activeSubTab || "overview";
+  const route = useMemo(() => parseInsightsRoute(activeSubTab), [activeSubTab]);
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["insights"] });
-    showToast("Analytics workspace data refreshed", "success");
-  };
+  const navigate = useCallback(
+    (next: InsightsRoute) => setActiveSubTab(serializeInsightsRoute(next)),
+    [setActiveSubTab],
+  );
 
-  const handleExportPdf = () => {
-    // There's no backend PDF/print generation yet (see ReportsPage), so this
-    // takes the user to the Reports tab where that gap is explained honestly,
-    // instead of claiming a download started.
-    useUIStore.getState().setActiveSubTab("reports");
-  };
+  const handleRefresh = useCallback(() => {
+    refreshInsights();
+    showToast("Refreshing analytics", "info");
+  }, [refreshInsights, showToast]);
 
-  const renderActiveSubModule = () => {
-    switch (currentTab) {
-      case "financial-health":
-        return <FinancialHealthPage />;
-      case "net-worth":
-        return <NetWorthPage horizon={horizon} onHorizonChange={setHorizon} />;
-      case "cash-flow":
-        return <CashFlowPage />;
-      case "spending":
-        return <SpendingPage />;
-      case "income":
-        return <IncomePage />;
-      case "budgets":
-        return <BudgetsPage />;
-      case "goals":
-        return <GoalsPage />;
-      case "investments":
-        return <InvestmentsPage />;
-      case "debts":
-        return <DebtsPage />;
-      case "subscriptions":
-        return <SubscriptionsPage />;
-      case "trends":
-        return <TrendsPage />;
-      case "forecasts":
-        return <ForecastsPage horizon={horizon} onHorizonChange={setHorizon} />;
-      case "recommendations":
-        return <RecommendationsPage />;
-      case "risks":
-        return <RisksPage />;
-      case "ask":
-        return <AskPage />;
+  // Export has no backend endpoint. Rather than a download that can't produce a
+  // real document, this lands on Reports, where the gap is explained and each
+  // review links to the section that holds its data.
+  const handleExport = useCallback(() => navigate({ section: "reports", view: null }), [navigate]);
+
+  const page = (() => {
+    switch (route.section) {
+      case "health":
+        return <HealthPage />;
+      case "analytics":
+        return <AnalyticsPage view={route.view} />;
+      case "intelligence":
+        return <IntelligencePage view={route.view} />;
       case "reports":
-        return <ReportsPage />;
+        return <ReportsPage onNavigate={navigate} />;
       case "overview":
       default:
-        return <OverviewPage />;
+        return <OverviewPage onNavigate={navigate} />;
     }
-  };
+  })();
 
   return (
-    <div className="space-y-6">
-      {/* Level 1 & Level 2 Hierarchical SubNav + Persistent Filter Toolbar */}
-      <InsightsSubNav
-        onExportPdf={handleExportPdf}
-        onRefresh={handleRefresh}
-      />
-
-      {/* Active Submodule Workspace View */}
-      {renderActiveSubModule()}
-    </div>
+    <InsightsShell
+      route={route}
+      onNavigate={navigate}
+      onRefresh={handleRefresh}
+      onExport={handleExport}
+    >
+      {page}
+    </InsightsShell>
   );
 };

@@ -11,9 +11,21 @@ import { Toast } from '../common/Toast';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 
-import { AuthView } from '../../features/auth/AuthView';
+// Dashboard stays eager: it is the default route, so code-splitting it would
+// only trade bundle size for a second round-trip on the most common path.
 import { DashboardView } from '../../features/dashboard/DashboardView';
-import { OnboardingView } from '../../features/onboarding/OnboardingView';
+
+// Auth and Onboarding are mutually exclusive with the main shell — a signed-in
+// user never renders AuthView, and a fully onboarded one never renders
+// OnboardingView — so neither belongs in the entry chunk.
+const AuthView = lazy(() =>
+  import('../../features/auth/AuthView').then((m) => ({ default: m.AuthView })),
+);
+const OnboardingView = lazy(() =>
+  import('../../features/onboarding/OnboardingView').then((m) => ({
+    default: m.OnboardingView,
+  })),
+);
 
 // Lazy-loaded routes for optimal bundle code-splitting
 const AccountsView = lazy(() =>
@@ -56,6 +68,13 @@ const NotificationsView = lazy(() =>
 );
 const SettingsView = lazy(() =>
   import('../../features/settings/SettingsView').then((m) => ({ default: m.SettingsView })),
+);
+
+const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
+    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" aria-hidden="true" />
+    <span className="sr-only">{label}</span>
+  </div>
 );
 
 const TabFallbackSkeleton: React.FC = () => (
@@ -149,16 +168,17 @@ export const AppShell: React.FC = () => {
   }, [isAuthenticated, onboardingStatus, setActiveTab]);
 
   if (isAuthLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" aria-hidden="true" />
-        <span className="sr-only">Checking session…</span>
-      </div>
-    );
+    return <FullScreenLoader label="Checking session…" />;
   }
 
   if (!isAuthenticated) {
-    return <AuthView />;
+    // AuthView renders outside the main shell, so it needs its own boundary
+    // rather than the one wrapping the tab content below.
+    return (
+      <Suspense fallback={<FullScreenLoader label="Loading sign-in…" />}>
+        <AuthView />
+      </Suspense>
+    );
   }
 
   const renderActiveTab = () => {

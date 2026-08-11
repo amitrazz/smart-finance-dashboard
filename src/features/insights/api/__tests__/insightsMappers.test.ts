@@ -1,0 +1,450 @@
+import { describe, expect, it } from "vitest";
+import {
+  diffMoney,
+  diffPercent,
+  diffPercentPoints,
+  mapCashFlow,
+  mapChanges,
+  mapDebt,
+  mapFinancialHealth,
+  mapForecast,
+  mapGoals,
+  mapInvestments,
+  mapNetWorth,
+  mapRecommendations,
+  mapRisks,
+  mapSubscriptions,
+  num,
+  riskConfidencePercent,
+} from "../insightsMappers";
+import type {
+  CashFlowSnapshot,
+  FinancialHealthScore,
+  NetWorthSnapshot,
+  SmartActionItem,
+} from "../../../../types";
+
+const money = (amount: string, currency = "INR") => ({ amount, currency });
+
+/**
+ * These mappers are where "no data" is decided, so they get the closest
+ * scrutiny. Almost every case below is a regression test for a figure the
+ * previous implementation invented.
+ */
+describe("insights mappers — absent data never becomes zero", () => {
+  it("returns null for a health score the backend didn't produce", () => {
+    expect(mapFinancialHealth(null, null)).toBeNull();
+    expect(mapFinancialHealth(undefined, [])).toBeNull();
+  });
+
+  it("returns null rather than a 0/100 'Critical' score when the payload has no score", () => {
+    // The old mapper fell back to `{ overallScore: 0, rating: "Critical" }`, so a
+    // backend outage rendered as the worst possible financial health.
+    const malformed = { rating: "GOOD" } as unknown as FinancialHealthScore;
+    expect(mapFinancialHealth(malformed, null)).toBeNull();
+  });
+
+  it("keeps an unscored dimension null instead of scoring it zero", () => {
+    const health = {
+      overallScore: 42,
+      rating: "POOR",
+      componentScores: {
+        CASH_FLOW: { code: "CASH_FLOW", score: 10, stars: 1, why: "Negative last month" },
+        EMERGENCY_FUND: { code: "EMERGENCY_FUND", why: "Not enough history" },
+      },
+      topRecommendations: [],
+    } as unknown as FinancialHealthScore;
+
+    const result = mapFinancialHealth(health, null);
+    const byCode = Object.fromEntries(result!.dimensions.map((d) => [d.code, d]));
+
+    expect(byCode.CASH_FLOW.score).toBe(10);
+    expect(byCode.EMERGENCY_FUND.score).toBeNull();
+  });
+
+  it("reports no trend when the backend gives no monthly movement", () => {
+    const health = {
+      overallScore: 60,
+      rating: "NEEDS_ATTENTION",
+      componentScores: {},
+      topRecommendations: [],
+    } as unknown as FinancialHealthScore;
+
+    expect(mapFinancialHealth(health, null)!.monthlyTrend).toBeNull();
+  });
+
+  it("drops history points that carry no score", () => {
+    const health = {
+      overallScore: 55,
+      rating: "NEEDS_ATTENTION",
+      componentScores: {},
+      topRecommendations: [],
+    } as unknown as FinancialHealthScore;
+
+    const result = mapFinancialHealth(health, [
+      { snapshotDate: "2026-02-01", overallScore: 50 },
+      { snapshotDate: "2026-01-01" },
+      { snapshotDate: "2026-03-01", overallScore: 55 },
+    ] as never);
+
+    expect(result!.history).toEqual([
+      { date: "2026-02-01", score: 50 },
+      { date: "2026-03-01", score: 55 },
+    ]);
+  });
+
+  it("returns null for debt when there are no loans and no breakdown", () => {
+    expect(mapDebt([], null, null)).toBeNull();
+  });
+
+  it("reports no debt-to-income ratio rather than 0% when the summary is missing", () => {
+    const result = mapDebt(
+      [
+        {
+          id: "l1",
+          name: "Car loan",
+          type: "VEHICLE",
+          currency: "INR",
+          interestRate: 9,
+          outstandingPrincipal: money("400000"),
+          status: "ACTIVE",
+          version: 1,
+        },
+      ] as never,
+      null,
+      null,
+    );
+
+    expect(result!.debtToIncomeRatioPercent).toBeNull();
+    expect(result!.totalDebt).toEqual(money("400000.00"));
+  });
+
+  it("reports no monthly EMI when no loan states one", () => {
+    const result = mapDebt(
+      [
+        {
+          id: "l1",
+          name: "Interest-free family loan",
+          type: "PERSONAL",
+          currency: "INR",
+          interestRate: 0,
+          outstandingPrincipal: money("50000"),
+          status: "ACTIVE",
+          version: 1,
+        },
+      ] as never,
+      null,
+      null,
+    );
+
+    expect(result!.totalMonthlyEMI).toBeNull();
+  });
+
+  it("reports no XIRR when no portfolio publishes one", () => {
+    const result = mapInvestments(
+      [
+        {
+          portfolioId: "p1",
+          name: "Equity",
+          xirr: null,
+          totalMarketValue: "150000",
+          totalCostBasis: "120000",
+          totalUnrealizedGain: "30000",
+          holdings: [],
+        },
+      ],
+      null,
+    );
+
+    expect(result!.xirrPercent).toBeNull();
+    expect(result!.totalGainPercent).toBeCloseTo(25, 5);
+  });
+
+  it("leaves goal pacing unknown when the backend graded no goals", () => {
+    const result = mapGoals(null, [
+      {
+        id: "g1",
+        name: "House",
+        targetAmount: money("1000000"),
+        currentAmount: money("100000"),
+        progressPercent: 10,
+        currency: "INR",
+        targetDate: "2030-01-01",
+      },
+    ] as never);
+
+    // Counting an ungraded goal as "on track" is how the old mapper reported
+    // perfect goal health for accounts with no goal analytics at all.
+    expect(result!.goals[0].isBehindSchedule).toBeNull();
+    expect(result!.onTrackCount).toBeNull();
+    expect(result!.behindCount).toBeNull();
+  });
+
+  it("sums only monthly-billed subscriptions and never divides an annual plan by twelve", () => {
+    const result = mapSubscriptions([
+      { id: "s1", name: "Music", amount: money("199"), billingCycle: "MONTHLY", nextDueDate: "" },
+      { id: "s2", name: "Storage", amount: money("2400"), billingCycle: "ANNUAL", nextDueDate: "" },
+    ]);
+
+    expect(result!.totalMonthlyCost).toEqual(money("199.00"));
+    expect(result!.totalSubscriptionsCount).toBe(2);
+  });
+
+  it("carries no interpolated path or confidence figure on a forecast", () => {
+    const result = mapForecast(
+      {
+        currentAge: 30,
+        retirementAge: 60,
+        expectedReturnPercent: 8,
+        projectedCorpus: money("50000000"),
+        monthlySavingsNeeded: money("25000"),
+      },
+      null,
+    );
+
+    expect(result!.projectedCorpus).toEqual(money("50000000"));
+    expect(result!.history).toEqual([]);
+    // The shape itself forbids the fabricated series and confidence score the
+    // old implementation derived from a single corpus figure.
+    expect(result).not.toHaveProperty("forecasts");
+    expect(result).not.toHaveProperty("confidenceScorePercent");
+  });
+});
+
+describe("num", () => {
+  it("distinguishes absent from zero", () => {
+    expect(num(null)).toBeNull();
+    expect(num(undefined)).toBeNull();
+    expect(num("")).toBeNull();
+    expect(num("not a number")).toBeNull();
+    expect(num("0")).toBe(0);
+    expect(num(0)).toBe(0);
+  });
+});
+
+describe("period-over-period differences", () => {
+  it("returns null when either side is missing", () => {
+    expect(diffMoney(money("100"), null)).toBeNull();
+    expect(diffMoney(null, money("100"))).toBeNull();
+    expect(diffPercent(money("100"), null)).toBeNull();
+    expect(diffPercentPoints(4, null)).toBeNull();
+  });
+
+  it("never leaks binary-float dust into a money string", () => {
+    expect(diffMoney(money("0.3"), money("0.1"))).toEqual(money("0.20"));
+    expect(diffMoney(money("142000.10"), money("100000.11"))).toEqual(money("41999.99"));
+  });
+
+  it("returns null rather than dividing by a zero base", () => {
+    expect(diffPercent(money("100"), money("0"))).toBeNull();
+  });
+
+  it("computes percentage-point movement for rates", () => {
+    expect(diffPercentPoints(12.4, 16.6)).toBe(-4.2);
+  });
+});
+
+describe("mapChanges", () => {
+  const netWorthSnapshot = (date: string, netWorth: string, liabilities: string): NetWorthSnapshot => ({
+    date,
+    netWorth: money(netWorth),
+    totalAssets: money("1000000"),
+    totalLiabilities: money(liabilities),
+    breakdown: {
+      liquidCash: "100000",
+      investments: "400000",
+      realEstate: "500000",
+      loans: liabilities,
+      creditCards: "0",
+    },
+  });
+
+  const cashFlowSnapshot = (period: string, income: string, expense: string, rate: number) =>
+    ({
+      period,
+      totalIncome: money(income),
+      totalExpense: money(expense),
+      netSavings: money(String(Number(income) - Number(expense))),
+      savingsRate: rate,
+      categoryBreakdown: [],
+    }) as CashFlowSnapshot;
+
+  it("produces no rows when there is nothing to compare against", () => {
+    expect(mapChanges(null, null)).toEqual([]);
+  });
+
+  it("omits comparisons that need a prior period rather than reporting zero change", () => {
+    const netWorth = {
+      currentNetWorth: money("500000"),
+      totalAssets: money("500000"),
+      totalLiabilities: money("0"),
+      periodChangeAmount: null,
+      periodChangePercent: null,
+      windowChangeAmount: null,
+      windowChangePercent: null,
+      history: [],
+      assetBreakdown: [],
+      liabilityBreakdown: [],
+      asOf: null,
+    };
+
+    expect(mapChanges(netWorth, null).map((c) => c.id)).toEqual([]);
+  });
+
+  it("reports movement in both directions with the right polarity", () => {
+    const netWorth = mapNetWorthFixture();
+    const cashFlow = mapCashFlow(
+      [cashFlowSnapshot("2026-06", "200000", "120000", 40), cashFlowSnapshot("2026-07", "200000", "140000", 30)],
+      null,
+    );
+
+    const changes = mapChanges(netWorth, cashFlow);
+    const byId = Object.fromEntries(changes.map((c) => [c.id, c]));
+
+    expect(byId.spending.amount).toEqual(money("20000.00"));
+    expect(byId.spending.upIsGood).toBe(false);
+    expect(byId["savings-rate"].points).toBe(-10);
+    expect(byId.debt.upIsGood).toBe(false);
+    expect(byId["net-worth"].upIsGood).toBe(true);
+  });
+
+  function mapNetWorthFixture() {
+    return mapNetWorth(netWorthSnapshot("2026-07-01", "900000", "300000"), [
+      netWorthSnapshot("2026-06-01", "850000", "320000"),
+      netWorthSnapshot("2026-07-01", "900000", "300000"),
+    ]);
+  }
+});
+
+describe("mapRisks", () => {
+  const action = (over: Partial<SmartActionItem>): SmartActionItem =>
+    ({
+      id: "a1",
+      type: "CARD_PAYMENT_DUE",
+      category: "PAYMENT",
+      priority: "HIGH",
+      status: "ACTIVE",
+      title: "Card payment due",
+      description: "Pay your card",
+      explanation: "₹18,000 due in 1 day",
+      dismissible: true,
+      actionable: true,
+      version: 1,
+      createdAt: "2026-08-01T00:00:00Z",
+      ...over,
+    }) as SmartActionItem;
+
+  it("excludes chores that are not risks", () => {
+    const matrix = mapRisks([
+      action({ id: "risk", category: "PAYMENT" }),
+      action({ id: "chore", category: "DATA_QUALITY" }),
+      action({ id: "import", category: "IMPORT" }),
+    ]);
+
+    expect(matrix.risks.map((r) => r.id)).toEqual(["risk"]);
+    expect(matrix.highCount).toBe(1);
+  });
+
+  it("folds INFO priority into the low band", () => {
+    const matrix = mapRisks([action({ priority: "INFO" })]);
+    expect(matrix.risks[0].severity).toBe("LOW");
+    expect(matrix.lowCount).toBe(1);
+  });
+
+  it("reports no confidence when the rule carried no evidence", () => {
+    // The old mapper substituted a flat 90%, dressing an unquantified detection
+    // as a measured one.
+    expect(riskConfidencePercent(action({ evidence: null }))).toBeNull();
+    expect(mapRisks([action({ evidence: null })]).risks[0].confidencePercent).toBeNull();
+  });
+
+  it("takes confidence from the weakest piece of evidence", () => {
+    const withEvidence = action({
+      evidence: [
+        { metric: "a", value: 1, unit: "CURRENCY", period: null, baseline: null, comparison: null, source: "s", sourceEntityIds: [], confidence: 1 },
+        { metric: "b", value: 2, unit: "CURRENCY", period: null, baseline: null, comparison: null, source: "s", sourceEntityIds: [], confidence: 0.6 },
+      ] as never,
+    });
+
+    expect(riskConfidencePercent(withEvidence)).toBe(60);
+  });
+});
+
+describe("mapRecommendations", () => {
+  it("buckets by the score movement the engine attributes", () => {
+    const recs = mapRecommendations([
+      { text: "Big one", estimatedImpact: 8 },
+      { text: "Small one", estimatedImpact: 2 },
+      { text: "Unquantified" },
+    ] as never);
+
+    expect(recs.map((r) => r.impactType)).toEqual(["HIGH_IMPACT", "QUICK_WIN", "LONG_TERM"]);
+    expect(recs[2].scoreImpact).toBeNull();
+  });
+
+  it("carries the raw deep link without resolving or defaulting it", () => {
+    const [withLink, withoutLink] = mapRecommendations([
+      { text: "A", deepLink: "loans" },
+      { text: "B" },
+    ] as never);
+
+    expect(withLink.deepLink).toBe("loans");
+    // The old mapper wrote a magic "#insights/recommendations" sentinel here and
+    // string-compared against it in the card.
+    expect(withoutLink.deepLink).toBeNull();
+  });
+
+  it("never advertises an estimated monetary saving", () => {
+    const [rec] = mapRecommendations([{ text: "A", estimatedImpact: 3 }] as never);
+    expect(rec).not.toHaveProperty("estimatedMonthlySavings");
+    expect(rec).not.toHaveProperty("confidencePercent");
+    expect(rec).not.toHaveProperty("difficulty");
+  });
+});
+
+describe("malformed rows never take down a section", () => {
+  // Regression: a snapshot without a `date` (or a cash-flow row without a
+  // `period`) reached `String.prototype.localeCompare` inside a `.sort()` and
+  // threw, so one bad row blanked the entire workspace behind the error
+  // boundary. Undated rows are now sorted harmlessly and filtered out.
+  it("survives a net-worth snapshot with no date", () => {
+    const good = {
+      date: "2026-07-01",
+      netWorth: money("900000"),
+      totalAssets: money("1200000"),
+      totalLiabilities: money("300000"),
+      breakdown: { liquidCash: "100000", investments: "0", realEstate: "0", loans: "300000", creditCards: "0" },
+    };
+    const undated = { ...good, date: undefined };
+
+    const result = mapNetWorth(good as never, [undated, good] as never);
+
+    expect(result).not.toBeNull();
+    expect(result!.history.map((p) => p.date)).toEqual(["2026-07-01"]);
+  });
+
+  it("survives a cash-flow snapshot with no period", () => {
+    const rows = [
+      { totalIncome: money("100"), totalExpense: money("50"), netSavings: money("50"), savingsRate: 50, categoryBreakdown: [] },
+      { period: "2026-07", totalIncome: money("200"), totalExpense: money("120"), netSavings: money("80"), savingsRate: 40, categoryBreakdown: [] },
+    ];
+
+    const result = mapCashFlow(rows as never, null);
+
+    expect(result!.period).toBe("2026-07");
+    expect(result!.history.map((p) => p.month)).toEqual(["2026-07"]);
+  });
+
+  it("survives a health history point with no date", () => {
+    const health = {
+      overallScore: 50,
+      rating: "POOR",
+      componentScores: {},
+      topRecommendations: [],
+    } as unknown as FinancialHealthScore;
+
+    expect(() =>
+      mapFinancialHealth(health, [{ overallScore: 40 }, { snapshotDate: "2026-07-01", overallScore: 50 }] as never),
+    ).not.toThrow();
+  });
+});
