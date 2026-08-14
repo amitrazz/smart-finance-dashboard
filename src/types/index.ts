@@ -763,8 +763,9 @@ export type LotStatus = "OPEN" | "CLOSED";
 export type InvestmentRecurrenceFrequency = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "IRREGULAR";
 
 // Matches AssetResponseDto — the traded instrument. Global (no userId), so
-// symbol/ISIN are shared across users. No live market-data feed exists;
-// latestPrice/latestPriceAt only update as a side effect of trade recording.
+// symbol/ISIN are shared across users. latestPrice/latestPriceAt update from
+// trade recording AND from the daily/on-demand market-price refresh below
+// (Yahoo Finance-backed) — whichever last wrote a newer tradingDate.
 export interface Asset {
   id: string;
   symbol: string;
@@ -776,6 +777,66 @@ export interface Asset {
   currency: CurrencyCode;
   latestPrice: string | null;
   latestPriceAt: string | null;
+}
+
+// Matches AssetPriceRefreshService's AssetRefreshResult — one entry per
+// asset in a refresh call. Never a raw provider error: `reason` (when
+// present) is always a safe, generic string.
+export type AssetRefreshStatus =
+  | "REFRESHED"
+  | "ALREADY_FRESH"
+  | "MARKET_CLOSED"
+  | "UNSUPPORTED"
+  | "PROVIDER_ERROR"
+  | "INVALID_DATA"
+  | "FAILED";
+
+export interface AssetRefreshResult {
+  assetId: string;
+  status: AssetRefreshStatus;
+  tradingDate: string | null;
+  price: string | null;
+  currency: string | null;
+  provider: string | null;
+  refreshedAt: string | null;
+  reason?: string;
+}
+
+// Matches POST /finance/investments/prices/refresh's response.
+export interface RefreshPricesResponse {
+  total: number;
+  refreshed: number;
+  alreadyFresh: number;
+  marketClosed: number;
+  unsupported: number;
+  providerErrors: number;
+  invalidData: number;
+  failed: number;
+  runId: string;
+  results: AssetRefreshResult[];
+}
+
+// Matches GET /finance/investments/prices/status's response.
+export interface PriceRefreshStatus {
+  activeAssetCount: number;
+  assetsWithNoPriceCount: number;
+  staleAssetCount: number;
+  lastCompletedRun: {
+    runId: string;
+    triggeredBy: string;
+    completedAt: string | null;
+    succeeded: number;
+    failed: number;
+  } | null;
+  myRecentRuns: Array<{
+    runId: string;
+    triggeredBy: string;
+    status: string;
+    startedAt: string;
+    completedAt: string | null;
+    succeeded: number;
+    failed: number;
+  }>;
 }
 
 // Matches HoldingResponseDto. A cached rollup of a portfolio's open Lots for

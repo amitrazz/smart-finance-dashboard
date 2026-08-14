@@ -3,6 +3,7 @@ import {
   ActionCategoryCount,
   ActionPreferences,
   AssetAllocationResponse,
+  AssetRefreshResult,
   Budget,
   BudgetAlert,
   BudgetAnalytics,
@@ -84,6 +85,7 @@ import {
   PortfolioDetail,
   PortfolioSnapshot,
   PrepayBalanceTransferInput,
+  PriceRefreshStatus,
   RaiseCreditCardDisputeInput,
   RealizedGain,
   ReconciliationRecord,
@@ -91,6 +93,7 @@ import {
   RecordCreditCardPaymentInput,
   RedeemCreditCardCashbackInput,
   RedeemCreditCardRewardsInput,
+  RefreshPricesResponse,
   ResolveCreditCardDisputeInput,
   ResolveReviewClusterInput,
   RetirementForecastResponse,
@@ -670,6 +673,22 @@ export const api = {
     fetchWithAuth<PaginatedResponse<RealizedGain>>(
       `/finance/investments/realized-gains${buildQuery(params)}`,
     ),
+
+  // Asset price refresh (Yahoo Finance-backed). Manual refresh always calls
+  // the same AssetPriceRefreshService the daily scheduled job uses — never
+  // a symbol or a price, only internal asset ids resolved server-side.
+  refreshHoldingPrices: (assetIds?: string[]) =>
+    fetchWithAuth<RefreshPricesResponse>('/finance/investments/prices/refresh', {
+      method: 'POST',
+      body: JSON.stringify(assetIds ? { assetIds } : {}),
+    }),
+  refreshAssetPrice: (assetId: string) =>
+    fetchWithAuth<AssetRefreshResult>(
+      `/finance/investments/assets/${encodeURIComponent(assetId)}/prices/refresh`,
+      { method: 'POST' },
+    ),
+  getPriceRefreshStatus: () =>
+    fetchWithAuth<PriceRefreshStatus>('/finance/investments/prices/status'),
 
   // Portfolio
   getPortfolios: () =>

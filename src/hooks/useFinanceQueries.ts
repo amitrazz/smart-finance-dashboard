@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, QueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput, AssetRefreshResult, AssetRefreshStatus, RefreshPricesResponse } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -1172,6 +1172,72 @@ export function useCreateTrade() {
       queryClient.invalidateQueries({ queryKey: ["portfolios"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.investmentReturns });
       useUIStore.getState().showToast("Trade recorded successfully", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+// Asset price refresh (Yahoo Finance-backed). Both hooks call the exact
+// same backend AssetPriceRefreshService the daily scheduled job uses — no
+// separate refresh pipeline on the frontend either.
+function invalidatePriceDependentQueries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ["holdings"] });
+  queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.investmentReturns });
+  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.assetAllocation });
+  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.netWorth });
+}
+
+export function useRefreshHoldingPrices() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assetIds?: string[]) => api.refreshHoldingPrices(assetIds),
+    onSuccess: (res: RefreshPricesResponse) => {
+      invalidatePriceDependentQueries(queryClient);
+
+      let message: string;
+      if (res.total === 0) {
+        message = "No held assets to refresh";
+      } else if (res.refreshed > 0) {
+        message = `Refreshed ${res.refreshed} of ${res.total} asset price${res.total === 1 ? "" : "s"}`;
+        if (res.alreadyFresh > 0) message += ` (${res.alreadyFresh} already fresh)`;
+      } else if (res.alreadyFresh === res.total) {
+        message = "All prices are already up to date";
+      } else {
+        message = `Checked ${res.total} asset${res.total === 1 ? "" : "s"} — no new prices available right now`;
+      }
+      const hasIssues = res.providerErrors > 0 || res.failed > 0;
+      useUIStore.getState().showToast(message, hasIssues ? "info" : "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+const ASSET_REFRESH_STATUS_MESSAGE: Record<AssetRefreshStatus, string> = {
+  REFRESHED: "Price refreshed",
+  ALREADY_FRESH: "Price is already up to date",
+  MARKET_CLOSED: "Market closed — showing the latest available close",
+  UNSUPPORTED: "This asset has no market-data provider mapping",
+  PROVIDER_ERROR: "Could not reach the market-data provider — try again shortly",
+  INVALID_DATA: "The provider returned invalid data — not applied",
+  FAILED: "Refresh failed",
+};
+
+const ASSET_REFRESH_SUCCESS_STATUSES = new Set<AssetRefreshStatus>([
+  "REFRESHED",
+  "ALREADY_FRESH",
+  "MARKET_CLOSED",
+]);
+
+export function useRefreshAssetPrice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assetId: string) => api.refreshAssetPrice(assetId),
+    onSuccess: (res: AssetRefreshResult) => {
+      invalidatePriceDependentQueries(queryClient);
+      const message = res.reason || ASSET_REFRESH_STATUS_MESSAGE[res.status];
+      const tone = ASSET_REFRESH_SUCCESS_STATUSES.has(res.status) ? "success" : "info";
+      useUIStore.getState().showToast(message, tone);
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });

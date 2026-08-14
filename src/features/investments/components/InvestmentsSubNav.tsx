@@ -19,6 +19,7 @@ import { NAV_TAB_L2 } from "../../../styles/navTabTokens";
 interface InvestmentsSubNavProps {
   onOpenTrade: () => void;
   onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 // Backend-accurate navigation — every leaf tab maps to a real, live
@@ -80,7 +81,11 @@ const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
   },
 ];
 
-export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrade, onRefresh }) => {
+export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
+  onOpenTrade,
+  onRefresh,
+  isRefreshing = false,
+}) => {
   const { activeSubTab, setActiveSubTab } = useUIStore();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
@@ -118,10 +123,11 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({ onOpenTrad
               hierarchy="ghost"
               size="icon"
               onClick={onRefresh}
-              title="Refresh Investment Data"
-              aria-label="Refresh Investment Data"
+              disabled={isRefreshing}
+              title="Refresh market prices for all your holdings"
+              aria-label="Refresh market prices for all your holdings"
             >
-              <RefreshCw className="w-4 h-4 text-slate-400" />
+              <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? "animate-spin text-indigo-400" : ""}`} />
             </Button>
           )}
 

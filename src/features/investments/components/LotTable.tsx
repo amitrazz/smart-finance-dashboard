@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Holding, Lot } from "../../../types";
 import { formatCurrency } from "../../../utils/formatters";
-import { useHoldingLots } from "../../../hooks/useFinanceQueries";
-import { ChevronDown, ChevronRight, Layers, ExternalLink } from "lucide-react";
+import { useHoldingLots, useRefreshAssetPrice } from "../../../hooks/useFinanceQueries";
+import { ChevronDown, ChevronRight, Layers, ExternalLink, RefreshCw } from "lucide-react";
 import { GainLossBadge } from "./GainLossBadge";
 
 interface LotTableProps {
@@ -63,6 +63,7 @@ const LotsSubTable: React.FC<{ holdingId: string; currency: string }> = ({ holdi
 
 export const LotTable: React.FC<LotTableProps> = ({ holdings, onSelectAsset }) => {
   const [expandedHoldingId, setExpandedHoldingId] = useState<string | null>(null);
+  const refreshAssetPrice = useRefreshAssetPrice();
 
   const toggleExpand = (id: string) => {
     setExpandedHoldingId((prev) => (prev === id ? null : id));
@@ -146,14 +147,35 @@ export const LotTable: React.FC<LotTableProps> = ({ holdings, onSelectAsset }) =
                         </span>
                       </td>
                       <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => onSelectAsset && onSelectAsset(h)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                          title="View Asset Details"
-                          aria-label="View Asset Details"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {h.security?.id &&
+                            (() => {
+                              const assetId = h.security.id;
+                              const isRefreshingThis =
+                                refreshAssetPrice.isPending && refreshAssetPrice.variables === assetId;
+                              return (
+                                <button
+                                  onClick={() => refreshAssetPrice.mutate(assetId)}
+                                  disabled={isRefreshingThis}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
+                                  title="Refresh market price"
+                                  aria-label="Refresh market price"
+                                >
+                                  <RefreshCw
+                                    className={`w-3.5 h-3.5 ${isRefreshingThis ? "animate-spin text-indigo-400" : ""}`}
+                                  />
+                                </button>
+                              );
+                            })()}
+                          <button
+                            onClick={() => onSelectAsset && onSelectAsset(h)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                            title="View Asset Details"
+                            aria-label="View Asset Details"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
