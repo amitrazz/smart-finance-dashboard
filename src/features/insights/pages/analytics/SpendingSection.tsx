@@ -4,7 +4,12 @@ import { useSpendingAnalytics } from "../../hooks/useInsightsQueries";
 import { AnalyticsSection } from "../../components/common/AnalyticsSection";
 import { AnalyticsKpi, AnalyticsKpiRow } from "../../components/common/AnalyticsKpi";
 import { ChartFrame, MoneyTooltip } from "../../components/charts/ChartFrame";
-import { CHART_AXIS, useCompactMoneyAxis } from "../../components/charts/chartConfig";
+import {
+  CHART_AXIS,
+  useChartAnimation,
+  useCompactMoneyAxis,
+} from "../../components/charts/chartConfig";
+import { shortDayLabel } from "../../utils/insightsFormat";
 import { BreakdownList } from "./BreakdownList";
 import { MetricValue } from "../../components/common/MetricValue";
 import { EmptyAnalyticsState } from "../../components/common/AnalyticsStates";
@@ -24,6 +29,7 @@ import { useUIStore } from "../../../../store/useUIStore";
 export const SpendingSection: React.FC = () => {
   const spending = useSpendingAnalytics();
   const formatAxis = useCompactMoneyAxis();
+  const animation = useChartAnimation();
   const navigateToRoute = useUIStore((s) => s.navigateToRoute);
 
   return (
@@ -58,13 +64,18 @@ export const SpendingSection: React.FC = () => {
                 data={data.dailyVelocity}
                 margin={{ top: 8, right: 8, bottom: 0, left: -8 }}
               >
-                <XAxis dataKey="date" {...CHART_AXIS} minTickGap={30} />
+                <XAxis
+                  dataKey="date"
+                  {...CHART_AXIS}
+                  tickFormatter={shortDayLabel}
+                  minTickGap={30}
+                />
                 <YAxis {...CHART_AXIS} tickFormatter={formatAxis} width={56} />
                 <Tooltip
                   cursor={{ fill: "rgba(148,163,184,0.06)" }}
                   content={<MoneyTooltip currency={data.totalSpent.currency} />}
                 />
-                <Bar dataKey="amount" name="Spent" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="amount" name="Spent" fill="#fb7185" radius={[2, 2, 0, 0]} {...animation} />
               </BarChart>
             </ChartFrame>
           ) : (
@@ -82,7 +93,7 @@ export const SpendingSection: React.FC = () => {
                 value: c.amount,
                 percentage: c.percentage,
               }))}
-              accent="#f59e0b"
+              accent="#fb7185"
             />
 
             <div className="space-y-3">
@@ -112,7 +123,12 @@ export const SpendingSection: React.FC = () => {
                         </p>
                       </div>
                       <span className="shrink-0 text-xs font-medium tabular-nums text-slate-200">
-                        <MetricValue value={merchant.amount} money emptyClassName="text-slate-500" />
+                        <MetricValue
+                          value={merchant.amount}
+                          money
+                          fractionDigits={0}
+                          emptyClassName="text-slate-500"
+                        />
                       </span>
                     </li>
                   ))}

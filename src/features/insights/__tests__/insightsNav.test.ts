@@ -48,23 +48,36 @@ describe("parseInsightsRoute", () => {
   it("keeps a bare section on its default view", () => {
     expect(parseInsightsRoute("intelligence")).toEqual({
       section: "intelligence",
-      view: "actions",
+      view: "feed",
     });
     expect(parseInsightsRoute("health")).toEqual({ section: "health", view: null });
   });
 
   it("lands old bookmarks on their nearest new home instead of the dashboard", () => {
-    // Every one of these was a real sub-tab in the previous workspace.
+    // Every one of these was a real sub-tab in some previous revision, including
+    // the four Intelligence views that the ranked feed replaced. None may
+    // dead-end: the feed contains all of their content.
     expect(parseInsightsRoute("financial-health")).toEqual({ section: "health", view: null });
     expect(parseInsightsRoute("forecasts")).toEqual({ section: "analytics", view: "net-worth" });
     expect(parseInsightsRoute("recommendations")).toEqual({
       section: "intelligence",
-      view: "actions",
+      view: "feed",
     });
-    expect(parseInsightsRoute("risks")).toEqual({ section: "intelligence", view: "risks" });
+    expect(parseInsightsRoute("risks")).toEqual({ section: "intelligence", view: "feed" });
+    expect(parseInsightsRoute("anomalies")).toEqual({ section: "intelligence", view: "feed" });
+    // Trends left Intelligence entirely — income against expenses over time is
+    // analytics, and Cash flow already charts it.
+    expect(parseInsightsRoute("trends")).toEqual({ section: "analytics", view: "cash-flow" });
     expect(parseInsightsRoute("spending")).toEqual({ section: "analytics", view: "spending" });
     expect(parseInsightsRoute("budgets")).toEqual({ section: "analytics", view: "budget" });
     expect(parseInsightsRoute("debts")).toEqual({ section: "analytics", view: "debt" });
+  });
+
+  it("keeps the two-level Intelligence sub-tabs linkable", () => {
+    expect(parseInsightsRoute("intelligence/ask")).toEqual({
+      section: "intelligence",
+      view: "ask",
+    });
   });
 
   it("falls back to Overview for a hash that means nothing", () => {
@@ -80,7 +93,7 @@ describe("serializeInsightsRoute", () => {
 
   it("supplies a default view when a multi-view section is given none", () => {
     expect(serializeInsightsRoute({ section: "intelligence", view: null })).toBe(
-      "intelligence/actions",
+      "intelligence/feed",
     );
   });
 });

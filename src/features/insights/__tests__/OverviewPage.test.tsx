@@ -1,27 +1,22 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { InsightsQueryResult } from "../hooks/useInsightsQueries";
-import type {
-  FinancialHealthOverview,
-  RiskMatrixAnalytics,
-  SmartRecommendation,
-} from "../types/insightsTypes";
+import type { IntelligenceItem } from "../api/intelligenceModel";
+import type { CashFlowAnalytics, FinancialHealthOverview, NetWorthAnalytics } from "../types/insightsTypes";
 import { useUIStore } from "../../../store/useUIStore";
 
 /**
- * Overview is tested through its hooks rather than through the network, so
- * these assertions are about *composition decisions* — what gets shown, how
- * much of it, and in what order — not about fetching.
+ * Overview is tested through its hooks rather than through the network, so these
+ * assertions are about *composition decisions* — what the page says, what it
+ * refuses to say, and in what order — not about fetching.
  */
 const hooks = vi.hoisted(() => ({
-  useFinancialHealth: vi.fn(),
-  useRiskMatrix: vi.fn(),
   useNetWorthAnalytics: vi.fn(),
   useCashFlowAnalytics: vi.fn(),
   useDebtAnalytics: vi.fn(),
-  useInvestmentAnalytics: vi.fn(),
-  useRecommendations: vi.fn(),
+  useFinancialHealth: vi.fn(),
+  useIntelligenceFeed: vi.fn(),
   useForecastAnalytics: vi.fn(),
 }));
 
@@ -29,7 +24,10 @@ vi.mock("../hooks/useInsightsQueries", () => hooks);
 
 import { OverviewPage } from "../pages/OverviewPage";
 
-function result<T>(data: T | null, over: Partial<InsightsQueryResult<T>> = {}): InsightsQueryResult<T> {
+function result<T>(
+  data: T | null,
+  over: Partial<InsightsQueryResult<T>> = {},
+): InsightsQueryResult<T> {
   return {
     data,
     isLoading: false,
@@ -44,118 +42,7 @@ function result<T>(data: T | null, over: Partial<InsightsQueryResult<T>> = {}): 
 
 const money = (amount: string) => ({ amount, currency: "INR" });
 
-const EIGHT_DIMENSIONS = [
-  { code: "CASH_FLOW", label: "Cash flow", score: 0 },
-  { code: "SAVINGS_RATE", label: "Savings rate", score: 4 },
-  { code: "EMERGENCY_FUND", label: "Emergency fund", score: 12 },
-  { code: "DEBT_HEALTH", label: "Debt health", score: 44 },
-  { code: "CREDIT_UTILIZATION", label: "Credit utilisation", score: 52 },
-  { code: "INVESTMENT_DIVERSIFICATION", label: "Investment diversification", score: 61 },
-  { code: "BILL_DISCIPLINE", label: "Bill discipline", score: 78 },
-  { code: "SPENDING_DISCIPLINE", label: "Spending discipline", score: 90 },
-].map((d) => ({ ...d, why: null, improvement: null, scoreImpact: null, deepLink: null }));
-
-const health: FinancialHealthOverview = {
-  overallScore: 36,
-  rating: "CRITICAL",
-  monthlyTrend: 2,
-  history: [],
-  dimensions: EIGHT_DIMENSIONS,
-  asOf: "2026-08-01",
-};
-
-const riskMatrix: RiskMatrixAnalytics = {
-  criticalCount: 1,
-  highCount: 1,
-  mediumCount: 1,
-  lowCount: 1,
-  risks: [
-    {
-      id: "medium-1",
-      title: "Subscription renewed at a higher price",
-      category: "Overspending",
-      severity: "MEDIUM",
-      confidencePercent: 70,
-      reason: "Charged ₹499 against a usual ₹299",
-      affectedEntity: null,
-      financialImpact: null,
-      dueInDays: null,
-      resolution: null,
-      deepLink: null,
-    },
-    {
-      id: "critical-1",
-      title: "Card payment overdue",
-      category: "Credit",
-      severity: "CRITICAL",
-      confidencePercent: 100,
-      reason: "₹18,000 was due two days ago",
-      affectedEntity: "Credit Card",
-      financialImpact: money("18000"),
-      dueInDays: -2,
-      resolution: "Pay the statement balance",
-      deepLink: "credit-cards",
-    },
-    {
-      id: "high-1",
-      title: "Emergency fund below target",
-      category: "Savings",
-      severity: "HIGH",
-      confidencePercent: 90,
-      reason: "Covers 1.2 months against a 6-month target",
-      affectedEntity: null,
-      financialImpact: null,
-      dueInDays: null,
-      resolution: null,
-      deepLink: null,
-    },
-    {
-      id: "low-1",
-      title: "Uncategorised inflow",
-      category: "Cash flow",
-      severity: "LOW",
-      confidencePercent: null,
-      reason: "One transaction has no category",
-      affectedEntity: null,
-      financialImpact: null,
-      dueInDays: null,
-      resolution: null,
-      deepLink: null,
-    },
-  ],
-};
-
-const recommendations: SmartRecommendation[] = [
-  {
-    id: "r-long",
-    title: "Review your asset allocation annually",
-    reason: null,
-    impactType: "LONG_TERM",
-    component: "INVESTMENT_DIVERSIFICATION",
-    scoreImpact: null,
-    deepLink: null,
-  },
-  {
-    id: "r-high",
-    title: "Increase your emergency fund",
-    reason: "₹4,544 remains to reach a six-month target",
-    impactType: "HIGH_IMPACT",
-    component: "EMERGENCY_FUND",
-    scoreImpact: 9,
-    deepLink: null,
-  },
-  {
-    id: "r-quick",
-    title: "Set up autopay on your card",
-    reason: null,
-    impactType: "QUICK_WIN",
-    component: "BILL_DISCIPLINE",
-    scoreImpact: 2,
-    deepLink: null,
-  },
-];
-
-const netWorth = {
+const netWorth: NetWorthAnalytics = {
   currentNetWorth: money("842000"),
   totalAssets: money("1142000"),
   totalLiabilities: money("300000"),
@@ -172,7 +59,7 @@ const netWorth = {
   asOf: "2026-07-01",
 };
 
-const cashFlow = {
+const cashFlow: CashFlowAnalytics = {
   period: "2026-07",
   totalIncome: money("200000"),
   totalExpenses: money("140000"),
@@ -187,213 +74,274 @@ const cashFlow = {
   largestIncomeSource: null,
 };
 
+const health: FinancialHealthOverview = {
+  overallScore: 36,
+  rating: "CRITICAL",
+  monthlyTrend: 2,
+  history: [],
+  dimensions: [
+    { code: "CASH_FLOW", label: "Cash flow", score: 20, why: null, improvement: null, scoreImpact: null, deepLink: null },
+    { code: "SAVINGS_RATE", label: "Savings rate", score: null, why: null, improvement: null, scoreImpact: null, deepLink: null },
+  ],
+  asOf: "2026-08-01",
+};
+
+const feedItem = (over: Partial<IntelligenceItem> = {}): IntelligenceItem => ({
+  id: "action-1",
+  nature: "risk",
+  severity: "CRITICAL",
+  category: "Credit",
+  filters: ["all", "risk", "attention", "debt"],
+  title: "Card payment overdue",
+  observed: "₹18,000 was due two days ago",
+  interpretation: null,
+  suggestedAction: "Pay the statement balance",
+  financialImpact: money("18000"),
+  dueInDays: -2,
+  confidencePercent: 100,
+  scoreImpact: -6,
+  evidence: [],
+  affectedEntity: "Credit Card",
+  deepLink: "credit-cards",
+  component: null,
+  rank: 80,
+  ...over,
+});
+
 function setDefaults() {
-  hooks.useFinancialHealth.mockReturnValue(result(health));
-  hooks.useRiskMatrix.mockReturnValue(result(riskMatrix));
   hooks.useNetWorthAnalytics.mockReturnValue(result(netWorth));
   hooks.useCashFlowAnalytics.mockReturnValue(result(cashFlow));
-  hooks.useDebtAnalytics.mockReturnValue(result({ totalDebt: money("300000"), totalMonthlyEMI: null, debtToIncomeRatioPercent: null, debts: [] }));
-  hooks.useInvestmentAnalytics.mockReturnValue(result(null));
-  hooks.useRecommendations.mockReturnValue(result(recommendations));
-  hooks.useForecastAnalytics.mockReturnValue(result(null));
+  hooks.useDebtAnalytics.mockReturnValue(
+    result({
+      totalDebt: money("300000"),
+      totalMonthlyEMI: null,
+      debtToIncomeRatioPercent: null,
+      debts: [],
+    }),
+  );
+  hooks.useFinancialHealth.mockReturnValue(result(health));
+  hooks.useIntelligenceFeed.mockReturnValue(
+    result([feedItem(), feedItem({ id: "action-2", title: "Second finding", rank: 10 })]),
+  );
+  hooks.useForecastAnalytics.mockReturnValue(
+    result({
+      currentNetWorth: money("842315"),
+      projectedCorpus: money("42800000"),
+      monthlySavingsNeeded: money("38400"),
+      currentAge: 30,
+      retirementAge: 60,
+      expectedReturnPercent: 9,
+      history: [],
+    }),
+  );
 }
 
 const renderOverview = () => render(<OverviewPage onNavigate={vi.fn()} />);
 
-/**
- * Scopes a query to one section. Several words legitimately appear twice on
- * this page — "Critical" is both a health status and a risk severity, "Savings
- * rate" is both a dimension and a trajectory KPI — so page-wide text queries
- * would be ambiguous by design rather than by mistake.
- */
-const section = (name: string) =>
-  within(screen.getByRole("heading", { name, level: 2 }).closest("section")!);
+/** Scopes a query to one section — several labels legitimately repeat on this page. */
+const section = (name: string | RegExp) =>
+  within(screen.getByRole("region", { name }));
 
-// `globals: false` means Testing Library's automatic cleanup never registers,
-// so without this every render accumulates in the document and single-element
-// queries fail with "found multiple elements".
+// `globals: false` means Testing Library's automatic cleanup never registers, so
+// without this every render accumulates in the document.
 afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
   setDefaults();
-  // Privacy mode masks amounts app-wide; reveal them so assertions can read them.
   useUIStore.setState({ moneyVisible: true });
 });
 
-describe("Overview — what it shows", () => {
-  it("leads with the score, its status word and its direction", () => {
+describe("Overview — the thirty-second answer", () => {
+  it("leads with a verdict in words, not with a chart", () => {
     renderOverview();
 
-    const health = section("Financial health");
-    expect(health.getByText("36")).toBeInTheDocument();
-    // Status is text, never colour alone — and the dial carries the same facts
-    // as an accessible label rather than leaving the arc to be interpreted.
+    const story = screen.getByRole("region", { name: "Financial story" });
+    // The fixture moved both ways — net worth and debt improved, spending and
+    // the savings rate deteriorated — so the honest verdict is "mixed".
+    expect(within(story).getByText("Mixed")).toBeInTheDocument();
     expect(
-      health.getByRole("img", {
-        name: "Financial health score 36 out of 100. Status: Critical.",
+      within(story).getByText(/Your financial position moved in both directions/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not report a mixed period as an improvement", () => {
+    // Regression, found in visual QA: the verdict read net worth and stopped, so
+    // a period whose spending rose ₹53,165, whose cash flow ran a ₹1,87,322
+    // shortfall and whose savings rate fell 19.8 points was headlined "Your
+    // financial position improved this period" — the one line a hurried reader
+    // takes away reported the good half and hid the rest.
+    renderOverview();
+    const story = screen.getByRole("region", { name: "Financial story" });
+
+    expect(within(story).queryByText(/position improved/)).not.toBeInTheDocument();
+  });
+
+  it("calls a genuinely one-way period what it is", () => {
+    hooks.useCashFlowAnalytics.mockReturnValue(
+      result({
+        ...cashFlow,
+        savingsRateChangePoints: 3.1,
+        history: [
+          { month: "2026-06", income: 190000, expenses: 150000, netCashFlow: 40000 },
+          { month: "2026-07", income: 200000, expenses: 140000, netCashFlow: 60000 },
+        ],
       }),
-    ).toBeInTheDocument();
-    expect(health.getByText(/\+2 pts vs previous period/)).toBeInTheDocument();
-  });
-
-  it("shows only the three weakest health dimensions, not all eight", () => {
+    );
     renderOverview();
 
-    // The single biggest contributor to the old Overview's density was the full
-    // eight-dimension grid. Only the worst three belong here.
-    const health = section("Financial health");
-    expect(health.getByText("Cash flow")).toBeInTheDocument();
-    expect(health.getByText("Savings rate")).toBeInTheDocument();
-    expect(health.getByText("Emergency fund")).toBeInTheDocument();
-
-    expect(health.queryByText("Bill discipline")).not.toBeInTheDocument();
-    expect(health.queryByText("Spending discipline")).not.toBeInTheDocument();
-    expect(health.queryByText("Credit utilisation")).not.toBeInTheDocument();
-    expect(health.queryByText("Debt health")).not.toBeInTheDocument();
-
-    expect(health.getByRole("button", { name: /View all 8 dimensions/ })).toBeInTheDocument();
+    const story = screen.getByRole("region", { name: "Financial story" });
+    expect(within(story).getByText("Improved")).toBeInTheDocument();
   });
 
-  it("separates diagnosis, attention, change, action and trajectory into distinct sections", () => {
+  it("reports a flat figure as unchanged rather than as a rise of zero", () => {
+    hooks.useCashFlowAnalytics.mockReturnValue(
+      result({
+        ...cashFlow,
+        history: [
+          { month: "2026-06", income: 200000, expenses: 120000, netCashFlow: 80000 },
+          { month: "2026-07", income: 200000, expenses: 140000, netCashFlow: 60000 },
+        ],
+      }),
+    );
     renderOverview();
 
-    for (const heading of [
-      "Financial health",
-      "Attention required",
-      "What changed",
-      "Recommended actions",
-      "Current trajectory",
-    ]) {
-      expect(screen.getByRole("heading", { name: heading, level: 2 })).toBeInTheDocument();
-    }
+    const story = screen.getByRole("region", { name: "Financial story" });
+    expect(story.textContent).toContain("Income was unchanged");
+    expect(story.textContent).not.toMatch(/Income rose ₹0/);
   });
 
-  it("ranks risks by severity and caps the list, pointing at Intelligence for the rest", () => {
+  it("keeps the sign on a negative rate", () => {
+    // Regression: the rate rendered through `Math.abs`, so a −69.8% savings rate
+    // read "to 69.8%" — the sentence said the opposite of the fact.
+    hooks.useCashFlowAnalytics.mockReturnValue(
+      result({ ...cashFlow, savingsRatePercent: -69.8, savingsRateChangePoints: -19.8 }),
+    );
     renderOverview();
 
-    const attention = section("Attention required");
-    const titles = attention.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-
-    expect(titles).toEqual([
-      "Card payment overdue",
-      "Emergency fund below target",
-      "Subscription renewed at a higher price",
-    ]);
-    expect(attention.getByText(/1 more risk under Intelligence/)).toBeInTheDocument();
+    const story = screen.getByRole("region", { name: "Financial story" });
+    expect(story.textContent).toMatch(/to −69\.8%/);
   });
 
-  it("decomposes the risk count instead of stating a bare total", () => {
+  it("states movements as comparisons and never as causes", () => {
     renderOverview();
 
+    const story = screen.getByRole("region", { name: "Financial story" });
+    expect(story.textContent).toMatch(/Income rose .* while spending rose/);
+    // The data supports "while". It does not support "because", and no sentence
+    // in the story may imply one movement produced another.
+    expect(story.textContent).not.toMatch(/because|due to|driven by|caused/i);
+  });
+
+  it("names the baseline the comparison is against", () => {
+    renderOverview();
     expect(
-      section("Attention required").getByText(/1 critical, 1 high, 1 medium, 1 low/),
+      screen.getByText(/Measured between two recorded periods, Jun 26 and Jul 26/),
     ).toBeInTheDocument();
   });
 
-  it("shows the highest-impact recommendations first", () => {
-    renderOverview();
-
-    const titles = section("Recommended actions")
-      .getAllByRole("heading", { level: 3 })
-      .map((h) => h.textContent);
-
-    expect(titles[0]).toBe("Increase your emergency fund");
-    expect(titles).toHaveLength(3);
-  });
-
-  it("never advertises a monetary saving a recommendation doesn't carry", () => {
-    renderOverview();
-
-    const actions = section("Recommended actions");
-    // The previous card always rendered "Est. Monthly Impact +₹0.00" in emerald,
-    // because the mapper hardcoded the figure to zero.
-    expect(actions.queryByText(/Est\. Monthly Impact/i)).not.toBeInTheDocument();
-    expect(actions.queryByText(/Confidence/i)).not.toBeInTheDocument();
-    // What it does show is the score movement the engine actually attributes.
-    expect(actions.getByText("+9 pts to health score")).toBeInTheDocument();
-    expect(actions.getByText("+2 pts to health score")).toBeInTheDocument();
-    // The unquantified one claims no effect at all.
-    expect(actions.queryByText(/0 pts to health score/)).not.toBeInTheDocument();
-  });
-
-  it("reports what moved, with money formatted through the shared currency layer", () => {
+  it("sorts movements by whether they went the user's way, not by direction", () => {
     renderOverview();
 
     const changed = section("What changed");
-    expect(changed.getByText("Net worth")).toBeInTheDocument();
-    // Indian locale grouping via Intl, not hand-concatenated "₹" + amount.
-    expect(changed.getByText("+₹42,000.00")).toBeInTheDocument();
-    expect(changed.getByText("−4.2 pts")).toBeInTheDocument();
+    const improved = changed.getByText("What improved").closest("div")!;
+    const attention = changed.getByText("What needs attention").closest("div")!;
+
+    // Net worth up and debt down are both wins despite opposite arrows; spending
+    // up is a loss despite sharing an arrow with income up.
+    expect(within(improved).getByText("Net worth")).toBeInTheDocument();
+    expect(within(improved).getByText("Debt")).toBeInTheDocument();
+    expect(within(attention).getByText("Spending")).toBeInTheDocument();
+    expect(within(attention).getByText("Savings rate")).toBeInTheDocument();
+  });
+
+  it("shows one next action — the highest-ranked one — rather than a list to triage", () => {
+    renderOverview();
+
+    const next = section("Do this next");
+    expect(next.getByText("Card payment overdue")).toBeInTheDocument();
+    expect(next.queryByText("Second finding")).not.toBeInTheDocument();
+  });
+
+  it("reports what share of income was spent, from reported figures", () => {
+    renderOverview();
+    expect(section("Money flow").getByText("70%")).toBeInTheDocument();
+  });
+
+  it("shows an overspend as exceeding income rather than as a tidy full bar", () => {
+    hooks.useCashFlowAnalytics.mockReturnValue(
+      result({
+        ...cashFlow,
+        totalIncome: money("268315"),
+        totalExpenses: money("455637"),
+        netCashFlow: money("-187322"),
+        savingsRatePercent: -69.8,
+      }),
+    );
+    renderOverview();
+
+    const flow = section("Money flow");
+    expect(flow.getByText(/Spending was/)).toBeInTheDocument();
+    expect(flow.getByText("170%")).toBeInTheDocument();
+    expect(flow.getByText("Beyond income")).toBeInTheDocument();
   });
 });
 
-describe("Overview — data states", () => {
-  it("says the score is unavailable rather than rendering 0 / 100", () => {
-    hooks.useFinancialHealth.mockReturnValue(result<FinancialHealthOverview>(null));
-    renderOverview();
-
-    const health = section("Financial health");
-    expect(health.getByText("No health score yet")).toBeInTheDocument();
-    expect(health.queryByText("36")).not.toBeInTheDocument();
-    // The old mapper's fallback rendered exactly this.
-    expect(health.queryByText("0")).not.toBeInTheDocument();
-    expect(health.queryByText("/ 100")).not.toBeInTheDocument();
-    expect(health.queryByText("Critical")).not.toBeInTheDocument();
-  });
-
-  it("offers a retry when a section's request fails", () => {
-    const refetch = vi.fn();
-    hooks.useFinancialHealth.mockReturnValue(
-      result<FinancialHealthOverview>(null, { isError: true, refetch }),
-    );
-    renderOverview();
-
-    const retry = section("Financial health").getByRole("button", { name: /Retry/i });
-    retry.click();
-    expect(refetch).toHaveBeenCalledOnce();
-  });
-
-  it("flags a section as incomplete when an enrichment source is missing", () => {
-    hooks.useRiskMatrix.mockReturnValue(result(riskMatrix, { isPartial: true }));
-    renderOverview();
-
-    expect(
-      section("Attention required").getByText(/Some of this section's data is unavailable/),
-    ).toBeInTheDocument();
-  });
-
-  it("marks cached figures as updating while a refresh is in flight", () => {
-    hooks.useRiskMatrix.mockReturnValue(result(riskMatrix, { isStale: true }));
-    renderOverview();
-
-    expect(section("Attention required").getByText("Updating…")).toBeInTheDocument();
-  });
-
-  it("reassures rather than showing an empty region when nothing is flagged", () => {
-    hooks.useRiskMatrix.mockReturnValue(
-      result({ criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, risks: [] }),
-    );
-    renderOverview();
-
-    expect(section("Attention required").getByText("Nothing needs your attention")).toBeInTheDocument();
-  });
-
-  it("explains the absence of a comparison instead of reporting zero change", () => {
+describe("Overview — what it refuses to say", () => {
+  it("declines to tell a story when there is nothing to compare against", () => {
     hooks.useNetWorthAnalytics.mockReturnValue(
       result({ ...netWorth, periodChangeAmount: null, periodChangePercent: null, history: [] }),
     );
-    hooks.useCashFlowAnalytics.mockReturnValue(result({ ...cashFlow, history: [], savingsRateChangePoints: null }));
+    hooks.useCashFlowAnalytics.mockReturnValue(
+      result({ ...cashFlow, savingsRateChangePoints: null, history: [] }),
+    );
     renderOverview();
 
-    expect(section("What changed").getByText("No comparison available")).toBeInTheDocument();
+    expect(screen.getByText("Not enough history to tell you what changed")).toBeInTheDocument();
+    expect(screen.queryByText(/Your financial position/)).not.toBeInTheDocument();
   });
 
-  it("shows a KPI as unavailable rather than as zero", () => {
-    // Investments returns null in the default fixture: no portfolios exist.
+  it("says a missing health score is missing rather than rendering 0 / 100", () => {
+    hooks.useFinancialHealth.mockReturnValue(result(null));
     renderOverview();
 
-    const trajectory = section("Current trajectory");
-    expect(trajectory.getAllByText("Not enough data").length).toBeGreaterThan(0);
+    expect(section("Financial health").getByText("No health score yet")).toBeInTheDocument();
+    expect(screen.queryByText("0 / 100")).not.toBeInTheDocument();
+  });
+
+  it("shows an absent net cash flow as absent, not as zero", () => {
+    hooks.useCashFlowAnalytics.mockReturnValue(result({ ...cashFlow, netCashFlow: null }));
+    renderOverview();
+
+    const snapshot = screen.getByRole("region", { name: "Financial story" });
+    expect(within(snapshot).getByText("Not enough data")).toBeInTheDocument();
+  });
+
+  it("announces a failure and offers a retry rather than blanking the page", () => {
+    const refetch = vi.fn();
+    hooks.useNetWorthAnalytics.mockReturnValue(result(null, { isError: true, refetch }));
+    hooks.useCashFlowAnalytics.mockReturnValue(result(null, { isError: true, refetch }));
+    renderOverview();
+
+    // Each section fails independently, so scope to the one that leads the page.
+    const story = screen.getByRole("region", { name: "Financial story" });
+    expect(within(story).getByRole("alert")).toBeInTheDocument();
+
+    fireEvent.click(within(story).getByRole("button", { name: /try again|retry/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it("keeps the narrative inside privacy mode", () => {
+    useUIStore.setState({ moneyVisible: false });
+    renderOverview();
+
+    const story = screen.getByRole("region", { name: "Financial story" });
+    // The sentence structure survives; the amounts inside it do not. A story
+    // built by interpolating rupees into a template string would leak every one
+    // of them straight into the DOM.
+    expect(within(story).getByText(/Your financial position/)).toBeInTheDocument();
+    expect(story.textContent).toContain("••••");
+    expect(story.textContent).not.toContain("42,000");
+    expect(story.textContent).not.toContain("60,000");
   });
 });

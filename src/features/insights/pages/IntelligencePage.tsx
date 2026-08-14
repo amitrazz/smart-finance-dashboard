@@ -1,257 +1,189 @@
-import React, { useState } from "react";
-import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import React, { useMemo, useState } from "react";
+import { InsightsRoute } from "../insightsNav";
+import { useIntelligenceFeed } from "../hooks/useInsightsQueries";
 import {
-  useRecommendations,
-  useRiskMatrix,
-  useSpendingAnalytics,
-  useTrendAnalytics,
-} from "../hooks/useInsightsQueries";
-import { AnalyticsSection } from "../components/common/AnalyticsSection";
-import { RecommendationCard } from "../components/intelligence/RecommendationCard";
-import { RiskCard } from "../components/intelligence/RiskCard";
-import { RiskFilter, RiskSummary } from "../components/intelligence/RiskSummary";
-import { ChartFrame, ChartLegendItem, MoneyTooltip } from "../components/charts/ChartFrame";
-import { CHART_AXIS, CHART_GRID, useCompactMoneyAxis } from "../components/charts/chartConfig";
-import { EmptyAnalyticsState } from "../components/common/AnalyticsStates";
-import { MetricValue } from "../components/common/MetricValue";
-import { IMPACT, shortPeriodLabel, sortRecommendations, sortRisks } from "../utils/insightsFormat";
-import { RecommendationImpact } from "../types/insightsTypes";
+  FEED_FILTERS,
+  FeedFilter,
+  IntelligenceItem,
+  attentionCount,
+} from "../api/intelligenceModel";
+import { InsightCard } from "../components/intelligence/InsightCard";
+import { InsightDetail } from "../components/intelligence/InsightDetail";
+import { SectionHeader } from "../components/primitives/SectionHeader";
+import { Surface } from "../components/primitives/Surface";
+import {
+  FeedSkeleton,
+  InsightsEmptyState,
+  InsightsErrorState,
+} from "../components/primitives/States";
 import { AskSection } from "./intelligence/AskSection";
-import { formatDate } from "../../../utils/formatters";
+
+type IntelligenceTab = "feed" | "ask";
 
 /**
- * Intelligence: what to know, what to worry about, what to do.
+ * Intelligence: one ranked feed, and a way to ask a question of your own.
  *
- * Kept separate from Analytics because the questions are different in kind.
- * Analytics answers "what are my numbers"; this answers "so what". The four
- * item types here are deliberately distinguishable at a glance:
+ * What this replaces: four sub-views — Recommended actions, Risks, Anomalies,
+ * Trends — each with its own list, its own sort and its own card shape. Nothing
+ * in that arrangement told a reader which of the four lists to open first, and a
+ * ₹50 uncategorised transaction in one looked exactly as urgent as a ₹42,000
+ * balance accruing interest in another.
  *
- * - **Recommendation** — action-oriented, filled button, impact bucket.
- * - **Risk** — needs attention, severity rule down the left edge.
- * - **Anomaly** — unusual behaviour, dated, stated as an observation.
- * - **Trend** — direction over time, charted rather than listed.
+ * They are one list now, ranked by `rankOf` (amount at stake, urgency, detection
+ * confidence, actionability). Trends left entirely: a chart of income against
+ * expenses over time is analytics, and Analytics → Cash flow already draws it —
+ * two clicks from here and one from Overview.
  *
- * Previously all four shared one card shape, so a warning and a suggestion were
- * indistinguishable until read.
+ * Ordering and grouping are the only things done client-side. Detection, dedupe
+ * and dismissal belong to the Smart Action lifecycle on the backend, and nothing
+ * here simulates any of them.
  */
-export const IntelligencePage: React.FC<{ view: string | null }> = ({ view }) => {
-  switch (view) {
-    case "risks":
-      return <RisksView />;
-    case "anomalies":
-      return <AnomaliesView />;
-    case "trends":
-      return <TrendsView />;
-    case "ask":
-      return <AskSection />;
-    case "actions":
-    default:
-      return <ActionsView />;
-  }
-};
-
-// ---------------------------------------------------------------------------
-
-const IMPACT_ORDER: RecommendationImpact[] = ["HIGH_IMPACT", "QUICK_WIN", "LONG_TERM"];
-
-/**
- * Recommendations as a priority inbox, grouped by impact bucket and ordered
- * within each by the score movement the engine attributes.
- */
-const ActionsView: React.FC = () => {
-  const recommendations = useRecommendations();
+export const IntelligencePage: React.FC<{
+  view: string | null;
+  onNavigate: (route: InsightsRoute) => void;
+}> = ({ view, onNavigate }) => {
+  // The tab is the route, not local state: Ask stays linkable and the browser's
+  // back button steps out of it the way it does everywhere else in the app.
+  const tab: IntelligenceTab = view === "ask" ? "ask" : "feed";
 
   return (
-    <AnalyticsSection
-      title="Recommended actions"
-      description="Grouped by impact. Within each group, largest attributed effect first."
-      result={recommendations}
-      emptyTitle="No recommendations right now"
-      emptyMessage="The health engine hasn't produced any suggestions for this account."
-    >
-      {(items) => {
-        const sorted = sortRecommendations(items);
-        return (
-          <div className="space-y-8">
-            {IMPACT_ORDER.map((bucket) => {
-              const group = sorted.filter((r) => r.impactType === bucket);
-              if (group.length === 0) return null;
-              return (
-                <div key={bucket} className="space-y-3">
-                  <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {IMPACT[bucket].label}
-                    <span className="ml-2 tabular-nums text-slate-600">{group.length}</span>
-                  </h3>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {group.map((recommendation) => (
-                      <RecommendationCard key={recommendation.id} recommendation={recommendation} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      }}
-    </AnalyticsSection>
+    <div className="space-y-5">
+      <div
+        role="tablist"
+        aria-label="Intelligence views"
+        className="inline-flex items-center gap-0.5 rounded-lg border border-slate-800/80 bg-slate-900/40 p-0.5"
+      >
+        {(
+          [
+            { id: "feed", label: "What needs attention" },
+            { id: "ask", label: "Ask" },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.id}
+            role="tab"
+            type="button"
+            aria-selected={tab === option.id}
+            onClick={() => onNavigate({ section: "intelligence", view: option.id })}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${
+              tab === option.id
+                ? "border border-slate-700/60 bg-slate-800 text-slate-50"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "ask" ? <AskSection /> : <IntelligenceFeed />}
+    </div>
   );
 };
 
 // ---------------------------------------------------------------------------
 
-const RisksView: React.FC = () => {
-  const risks = useRiskMatrix();
-  const [filter, setFilter] = useState<RiskFilter>("ALL");
+const IntelligenceFeed: React.FC = () => {
+  const feed = useIntelligenceFeed();
+  const [filter, setFilter] = useState<FeedFilter>("all");
+  const [openItem, setOpenItem] = useState<IntelligenceItem | null>(null);
+
+  // Memoised so the empty-list fallback doesn't create a new array identity on
+  // every render and invalidate the two derivations below with it.
+  const items = useMemo(() => feed.data ?? [], [feed.data]);
+
+  // Only chips that would return something are offered. A filter row where six
+  // of ten options lead to "nothing matches" teaches people not to use it.
+  const availableFilters = useMemo(
+    () =>
+      FEED_FILTERS.map((chip) => ({
+        ...chip,
+        count:
+          chip.id === "all"
+            ? items.length
+            : items.filter((item) => item.filters.includes(chip.id)).length,
+      })).filter((chip) => chip.count > 0),
+    [items],
+  );
+
+  const visible = useMemo(
+    () => (filter === "all" ? items : items.filter((item) => item.filters.includes(filter))),
+    [items, filter],
+  );
+
+  const attention = attentionCount(items);
 
   return (
-    <AnalyticsSection
-      title="Risks"
-      description="Everything the action rules flagged, with the evidence behind each."
-      result={risks}
-      emptyTitle="No active risks"
-      emptyMessage="Nothing was flagged against your accounts, cards, loans or goals."
-    >
-      {(matrix) => {
-        const visible = sortRisks(matrix.risks).filter(
-          (risk) => filter === "ALL" || risk.severity === filter,
-        );
-        return (
-          <div className="space-y-5">
-            <RiskSummary matrix={matrix} active={filter} onFilterChange={setFilter} />
+    <Surface>
+      <section className="space-y-4 p-4 sm:p-5" aria-label="Financial intelligence">
+        <SectionHeader
+          title={
+            feed.isLoading
+              ? "Financial intelligence"
+              : attention > 0
+                ? `${attention} thing${attention === 1 ? "" : "s"} deserve${attention === 1 ? "s" : ""} your attention`
+                : "Financial intelligence"
+          }
+          description="Everything detected against your accounts and everything the health engine suggests, in one list, highest priority first."
+        />
+
+        {feed.isLoading ? (
+          <FeedSkeleton rows={4} />
+        ) : feed.isError ? (
+          <InsightsErrorState onRetry={feed.refetch} />
+        ) : items.length === 0 ? (
+          <InsightsEmptyState
+            reason="no-data"
+            title="Nothing needs your attention"
+            message="No rule has flagged anything against your accounts, cards, loans or goals, and the health engine has no open suggestions."
+          />
+        ) : (
+          <>
+            <div
+              role="group"
+              aria-label="Filter intelligence"
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {availableFilters.map((chip) => {
+                const isActive = chip.id === filter;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setFilter(chip.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${
+                      isActive
+                        ? "border-slate-600 bg-slate-800 text-slate-100"
+                        : "border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                    }`}
+                  >
+                    {chip.label}
+                    <span className="tabular-nums text-slate-500">{chip.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {visible.length === 0 ? (
-              <EmptyAnalyticsState
-                title="No risks at this severity"
-                message="Clear the filter to see the rest."
+              <InsightsEmptyState
+                reason="no-match"
+                action={{ label: "Clear filter", onClick: () => setFilter("all") }}
               />
             ) : (
-              <div className="space-y-3">
-                {visible.map((risk) => (
-                  <RiskCard key={risk.id} risk={risk} />
+              <ul className="space-y-2">
+                {visible.map((item) => (
+                  <li key={item.id}>
+                    <InsightCard item={item} onOpen={setOpenItem} />
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-          </div>
-        );
-      }}
-    </AnalyticsSection>
-  );
-};
+          </>
+        )}
 
-// ---------------------------------------------------------------------------
-
-/**
- * Anomalies come from the Smart Action feed's own detections.
- *
- * The previous implementation invented them client-side: any day whose outflow
- * exceeded twice the trailing 14-day average was declared an "Unusual Daily
- * Spend", so a single rent payment reliably produced a monthly "anomaly".
- */
-const AnomaliesView: React.FC = () => {
-  const spending = useSpendingAnalytics();
-
-  return (
-    <AnalyticsSection
-      title="Anomalies"
-      description="Behaviour the detection rules flagged as breaking your usual pattern."
-      result={spending}
-      emptyTitle="Nothing unusual detected"
-      emptyMessage="Anomalies are raised by backend rules. None are active."
-    >
-      {(data) =>
-        data.anomalies.length === 0 ? (
-          <EmptyAnalyticsState
-            title="Nothing unusual detected"
-            message="No rule has flagged anomalous activity on your accounts."
-          />
-        ) : (
-          <ul className="space-y-3">
-            {data.anomalies.map((anomaly) => (
-              <li
-                key={anomaly.id}
-                className="space-y-1.5 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-medium text-slate-100">{anomaly.title}</h3>
-                  <span className="text-[11px] text-slate-500">{formatDate(anomaly.date)}</span>
-                </div>
-                <p className="text-xs leading-relaxed text-slate-400">{anomaly.description}</p>
-                <p className="text-sm font-medium tabular-nums text-slate-200">
-                  <MetricValue value={anomaly.amount} money emptyClassName="text-slate-500" />
-                </p>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </AnalyticsSection>
-  );
-};
-
-// ---------------------------------------------------------------------------
-
-const TrendsView: React.FC = () => {
-  const trends = useTrendAnalytics();
-  const formatAxis = useCompactMoneyAxis();
-
-  return (
-    <AnalyticsSection
-      title="Trends"
-      description="Income against expenses over the selected window."
-      result={trends}
-      emptyTitle="No trend data"
-      emptyMessage="Trends need recorded income or expense history over multiple months."
-    >
-      {(data) =>
-        data.trends.length < 2 ? (
-          <EmptyAnalyticsState
-            title="Not enough history"
-            message="A trend needs at least two months of recorded data."
-          />
-        ) : (
-          <ChartFrame
-            height={260}
-            description={`Income and expenses across ${data.trends.length} months, from ${data.trends[0].period} to ${data.trends[data.trends.length - 1].period}.`}
-            legend={
-              <>
-                <ChartLegendItem color="#34d399" label="Income" />
-                <ChartLegendItem color="#fb7185" label="Expenses" />
-              </>
-            }
-          >
-            <LineChart data={data.trends} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
-              <CartesianGrid {...CHART_GRID} />
-              <XAxis
-                dataKey="period"
-                {...CHART_AXIS}
-                tickFormatter={shortPeriodLabel}
-                minTickGap={16}
-              />
-              <YAxis {...CHART_AXIS} tickFormatter={formatAxis} width={56} />
-              <Tooltip content={<MoneyTooltip labelFormatter={shortPeriodLabel} />} />
-              {/* `connectNulls` is off: a month the backend didn't report leaves a
-                  visible gap rather than a straight line implying measurement. */}
-              <Line
-                type="monotone"
-                dataKey="income"
-                name="Income"
-                stroke="#34d399"
-                strokeWidth={2}
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="expense"
-                name="Expenses"
-                stroke="#fb7185"
-                strokeWidth={2}
-                dot={false}
-                connectNulls={false}
-              />
-            </LineChart>
-          </ChartFrame>
-        )
-      }
-    </AnalyticsSection>
+        <InsightDetail item={openItem} onClose={() => setOpenItem(null)} />
+      </section>
+    </Surface>
   );
 };

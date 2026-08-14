@@ -50,11 +50,11 @@ export const InsightsView: React.FC = () => {
   const page = (() => {
     switch (route.section) {
       case "health":
-        return <HealthPage />;
+        return <HealthPage onNavigate={navigate} />;
       case "analytics":
-        return <AnalyticsPage view={route.view} />;
+        return <AnalyticsPage view={route.view} onNavigate={navigate} />;
       case "intelligence":
-        return <IntelligencePage view={route.view} />;
+        return <IntelligencePage view={route.view} onNavigate={navigate} />;
       case "reports":
         return <ReportsPage onNavigate={navigate} />;
       case "overview":

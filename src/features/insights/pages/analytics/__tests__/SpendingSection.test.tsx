@@ -39,7 +39,7 @@ describe("spending payload hostility", () => {
               value: c.amount,
               percentage: c.percentage,
             }))}
-            accent="#f59e0b"
+            accent="#fb7185"
           />,
         ),
       ).not.toThrow();
@@ -62,9 +62,13 @@ describe("spending payload hostility", () => {
     );
 
     expect(result!.totalSpent.currency).toBe("INR");
-    // The amount-less row reports absence, not a confident zero.
-    expect(result!.categories[0].amount).toBeNull();
-    expect(result!.categories[1].amount).toEqual(money("500"));
+    // Rows are ranked by amount now, so the amount-less row sorts last — and it
+    // still reports absence rather than a confident zero.
+    const rent = result!.categories.find((c) => c.categoryName === "Rent")!;
+    const food = result!.categories.find((c) => c.categoryName === "Food")!;
+    expect(rent.amount).toBeNull();
+    expect(food.amount).toEqual(money("500"));
+    expect(result!.categories.map((c) => c.categoryName)).toEqual(["Food", "Rent"]);
   });
 
   it("falls back to a default currency when no row carries one", () => {
@@ -82,7 +86,7 @@ describe("spending payload hostility", () => {
       <BreakdownList
         title="x"
         items={[{ category: "Unknown", value: null, percentage: null }]}
-        accent="#f59e0b"
+        accent="#fb7185"
       />,
     );
     expect(container.textContent).toContain("Not enough data");
@@ -105,7 +109,7 @@ describe("spending payload hostility", () => {
             value: m.amount,
             percentage: null,
           }))}
-          accent="#f59e0b"
+          accent="#fb7185"
         />,
       ),
     ).not.toThrow();
@@ -119,7 +123,7 @@ describe("spending payload hostility", () => {
           { category: "Known", value: money("100"), percentage: 40 },
           { category: "Unknown", value: money("100"), percentage: null },
         ]}
-        accent="#f59e0b"
+        accent="#fb7185"
       />,
     );
     expect(container.textContent).toContain("40%");

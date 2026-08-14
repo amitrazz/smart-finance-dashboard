@@ -15,6 +15,8 @@ interface MetricValueProps {
   className?: string;
   /** Class applied only to the no-data label, which should read quieter. */
   emptyClassName?: string;
+  /** Decimal places for money values; `0` renders whole rupees. */
+  fractionDigits?: number;
 }
 
 /**
@@ -38,6 +40,7 @@ export const MetricValue: React.FC<MetricValueProps> = ({
   precision = 1,
   className = "",
   emptyClassName = "",
+  fractionDigits,
 }) => {
   if (value === null || value === undefined || value === "") {
     return (
@@ -48,7 +51,13 @@ export const MetricValue: React.FC<MetricValueProps> = ({
   }
 
   if (money) {
-    return <Money value={value as MoneyType | number | string} className={className} />;
+    return (
+      <Money
+        value={value as MoneyType | number | string}
+        className={className}
+        fractionDigits={fractionDigits}
+      />
+    );
   }
 
   const text =

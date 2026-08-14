@@ -406,6 +406,64 @@ describe("mapRecommendations", () => {
   });
 });
 
+describe("cash flow reads the shape the endpoint actually sends", () => {
+  // Regression: `/finance/analytics/cash-flow` returns CashFlowResponseDto —
+  // `periodStart`, `netCashFlow`, a fractional `savingsRate` string and bare
+  // string category amounts — not the `CashFlowSnapshot` its client is typed
+  // with. Read literally, the section showed a real income and a real expense
+  // beside "Not enough data" for net cash flow, no period caption, an empty
+  // chart, and a −69.8% savings rate rendered as −0.7%.
+  const wireRow = (periodStart: string, income: string, expense: string, savingsRate: string) => ({
+    periodStart,
+    periodEnd: `${periodStart.slice(0, 8)}28`,
+    totalIncome: money(income),
+    totalExpense: money(expense),
+    netCashFlow: money(String(Number(income) - Number(expense))),
+    savingsRate,
+    categoryBreakdown: [
+      { categoryId: null, categoryName: "Rent", amount: "120000" },
+      { categoryId: "c2", categoryName: "Food", amount: "40000" },
+    ],
+  });
+
+  it("maps the DTO's own field names and scales the fractional rate to percent", () => {
+    const result = mapCashFlow(
+      [
+        wireRow("2026-06-01", "268315", "402472", "-0.5"),
+        wireRow("2026-07-01", "268315", "455637", "-0.6979"),
+      ] as never,
+      null,
+    );
+
+    expect(result!.period).toBe("2026-07-01");
+    expect(result!.netCashFlow).toEqual(money("-187322"));
+    expect(result!.savingsRatePercent).toBe(-69.79);
+    expect(result!.savingsRateChangePoints).toBe(-19.8);
+    expect(result!.history.map((p) => p.month)).toEqual(["2026-06-01", "2026-07-01"]);
+    expect(result!.history[1].netCashFlow).toBe(-187322);
+    expect(result!.largestExpenseCategory).toEqual({ name: "Rent", amount: money("120000.00") });
+  });
+
+  it("still reads the declared DTO, whose rate is already whole percent", () => {
+    const result = mapCashFlow(
+      [
+        {
+          period: "2026-07",
+          totalIncome: money("200000"),
+          totalExpense: money("140000"),
+          netSavings: money("60000"),
+          savingsRate: 30,
+          categoryBreakdown: [],
+        },
+      ] as never,
+      null,
+    );
+
+    expect(result!.savingsRatePercent).toBe(30);
+    expect(result!.netCashFlow).toEqual(money("60000"));
+  });
+});
+
 describe("malformed rows never take down a section", () => {
   // Regression: a snapshot without a `date` (or a cash-flow row without a
   // `period`) reached `String.prototype.localeCompare` inside a `.sort()` and
@@ -627,5 +685,115 @@ describe("wire numbers arriving as decimal strings", () => {
 
     expect(result!.debts[0].interestRatePercent).toBe(9.25);
     expect(result!.debts[0].remainingTenureMonths).toBe(36);
+  });
+});
+
+/**
+ * Zero and "unavailable" are different facts, and the difference is the whole
+ * point of this workspace. These cases are the ones where collapsing them would
+ * be actively reassuring: an unmeasured budget looking healthy, an unreported
+ * loan looking repaid, an unpublished corpus looking unfunded.
+ */
+describe("zero is not the same as unavailable", () => {
+  it("does not call a budget healthy when its spend was never reported", () => {
+    const result = mapBudgets({
+      totalBudget: "60000",
+      totalSpent: "0",
+      overallUtilization: "0",
+      budgetHealthScore: 0,
+      topSpendingCategories: [],
+      activeBudgets: [
+        // No `totalSpent`, no `utilizationPercent` — the backend measured nothing.
+        { id: "b1", name: "Food", currency: "INR", totalLimit: money("60000") },
+      ],
+      exceededBudgets: [],
+      nearLimitBudgets: [],
+    } as never);
+
+    const budget = result!.budgets[0];
+    expect(budget.spentAmount).toBeNull();
+    expect(budget.percentUsed).toBeNull();
+    // The dangerous case: `percentUsed ?? 0` used to land this in the HEALTHY band.
+    expect(budget.status).toBe("UNKNOWN");
+  });
+
+  it("still reports a genuine zero as zero", () => {
+    const result = mapBudgets({
+      totalBudget: "60000",
+      totalSpent: "0",
+      overallUtilization: "0",
+      budgetHealthScore: 80,
+      topSpendingCategories: [],
+      activeBudgets: [
+        {
+          id: "b1",
+          name: "Food",
+          currency: "INR",
+          totalLimit: money("60000"),
+          totalSpent: money("0"),
+          utilizationPercent: "0",
+        },
+      ],
+      exceededBudgets: [],
+      nearLimitBudgets: [],
+    } as never);
+
+    const budget = result!.budgets[0];
+    expect(budget.spentAmount).toEqual(money("0"));
+    expect(budget.percentUsed).toBe(0);
+    expect(budget.status).toBe("HEALTHY");
+  });
+
+  it("reports a dashboard with no totals as having none, not as ₹0 budgeted", () => {
+    const result = mapBudgets({
+      activeBudgets: [{ id: "b1", name: "Food", currency: "INR", totalLimit: money("60000") }],
+      exceededBudgets: [],
+      nearLimitBudgets: [],
+    } as never);
+
+    expect(result!.totalBudgeted).toBeNull();
+    expect(result!.totalSpent).toBeNull();
+  });
+
+  it("never shows an unreported loan balance as ₹0 owed", () => {
+    const result = mapDebt(
+      [{ id: "l1", name: "Home loan", type: "HOME", currency: "INR" }] as never,
+      { totalDebt: money("240000") } as never,
+      null,
+    );
+
+    expect(result!.debts[0].principalOutstanding).toBeNull();
+  });
+
+  it("never shows an unreported goal corpus as ₹0 saved", () => {
+    const result = mapGoals(null, [
+      { id: "g1", name: "Emergency fund", currency: "INR", targetAmount: money("300000") },
+    ] as never);
+
+    expect(result!.goals[0].currentAmount).toBeNull();
+  });
+
+  it("distinguishes a portfolio worth nothing from portfolios that published no valuation", () => {
+    const unreported = mapInvestments(
+      [{ portfolioId: "p1", name: "Equity", xirr: null, holdings: [] }] as never,
+      null,
+    );
+    const genuinelyZero = mapInvestments(
+      [
+        {
+          portfolioId: "p1",
+          name: "Equity",
+          xirr: null,
+          totalMarketValue: "0",
+          totalCostBasis: "0",
+          totalUnrealizedGain: "0",
+          holdings: [],
+        },
+      ] as never,
+      null,
+    );
+
+    expect(unreported!.totalValuation).toBeNull();
+    expect(genuinelyZero!.totalValuation).toEqual(money("0.00"));
   });
 });

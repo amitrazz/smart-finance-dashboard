@@ -3,8 +3,8 @@ import { Info } from "lucide-react";
 import { useDebtAnalytics } from "../../hooks/useInsightsQueries";
 import { AnalyticsSection } from "../../components/common/AnalyticsSection";
 import { AnalyticsKpi, AnalyticsKpiRow } from "../../components/common/AnalyticsKpi";
-import { Money } from "../../../../components/common/Money";
 import { MetricValue } from "../../components/common/MetricValue";
+import { BreakdownList } from "./BreakdownList";
 import { useUIStore } from "../../../../store/useUIStore";
 
 /**
@@ -31,7 +31,9 @@ export const DebtSection: React.FC = () => {
       emptyTitle="No debt recorded"
       emptyMessage="Active loans and card balances appear here once they're tracked."
     >
-      {(data) => (
+      {(data) => {
+        const totalDebtValue = Number(data.totalDebt.amount) || 0;
+        return (
         <div className="space-y-6">
           <AnalyticsKpiRow columns={3}>
             <AnalyticsKpi label="Total debt" value={data.totalDebt} money upIsGood={false} />
@@ -49,6 +51,30 @@ export const DebtSection: React.FC = () => {
               upIsGood={false}
             />
           </AnalyticsKpiRow>
+
+          {/*
+            What the total is made of, before the loan detail. Without this the
+            page states a total that its own rows don't add up to — the
+            difference being card balances, which `getLoans` doesn't return and
+            which usually carry the highest rate on the page.
+          */}
+          {data.composition.length > 0 && (
+            <BreakdownList
+              title="What you owe"
+              items={data.composition.map((item) => ({
+                category:
+                  item.interestRatePercent !== null
+                    ? `${item.name} · ${item.interestRatePercent}% p.a.`
+                    : item.name,
+                value: item.amount,
+                percentage:
+                  totalDebtValue > 0
+                    ? (Number(item.amount.amount) / totalDebtValue) * 100
+                    : null,
+              }))}
+              accent="#fb7185"
+            />
+          )}
 
           {data.debts.length === 0 ? (
             <p className="text-xs text-slate-500">
@@ -76,10 +102,15 @@ export const DebtSection: React.FC = () => {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-medium tabular-nums text-slate-100">
-                      <Money value={item.principalOutstanding} />
+                      <MetricValue
+                        value={item.principalOutstanding}
+                        money
+                        fractionDigits={0}
+                        emptyClassName="text-xs font-normal text-slate-500"
+                      />
                     </p>
                     <p className="text-[11px] tabular-nums text-slate-500">
-                      <MetricValue value={item.monthlyEMI} money /> / month
+                      <MetricValue value={item.monthlyEMI} money fractionDigits={0} /> / month
                     </p>
                   </div>
                 </li>
@@ -95,7 +126,8 @@ export const DebtSection: React.FC = () => {
             </span>
           </p>
         </div>
-      )}
+        );
+      }}
     </AnalyticsSection>
   );
 };

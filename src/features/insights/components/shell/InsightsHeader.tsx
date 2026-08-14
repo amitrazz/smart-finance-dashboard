@@ -4,39 +4,32 @@ import { PageHeader } from "../../../../components/ui/PageHeader";
 import { Button } from "../../../../components/ui/Button";
 import { useUIStore } from "../../../../store/useUIStore";
 import { InsightsFilters } from "./InsightsFilters";
+import { FreshnessIndicator } from "../primitives/FreshnessIndicator";
 
 interface InsightsHeaderProps {
   onRefresh: () => void;
   onExport: () => void;
-  isRefreshing?: boolean;
 }
 
 /**
- * Workspace header, built on the app's shared `PageHeader` and `Button` so the
- * title block, icon tile and control row read the same as every other module.
+ * Workspace header and the *only* place global controls live.
+ *
+ * Period, privacy, refresh and export apply to everything below them, so they
+ * are stated once here rather than repeated per section — and the workspace's
+ * data freshness is stated once beside them, for the same reason.
  *
  * Controls sit in `PageHeader`'s children slot rather than its `primaryAction`
  * slot: that slot also renders a fixed bottom CTA bar on mobile, which is right
  * for "Add transaction" and wrong for a refresh button.
- *
- * The previous chrome stacked five rows before any content — a title block, a
- * five-tab bar, a pill row, a breadcrumb strip and a filter toolbar — on a page
- * whose first job is to be understood in five seconds. The breadcrumb moved
- * into the nav component where the rest of the app keeps it, and the filter
- * toolbar folded into a single popover.
  */
-export const InsightsHeader: React.FC<InsightsHeaderProps> = ({
-  onRefresh,
-  onExport,
-  isRefreshing = false,
-}) => {
+export const InsightsHeader: React.FC<InsightsHeaderProps> = ({ onRefresh, onExport }) => {
   const moneyVisible = useUIStore((s) => s.moneyVisible);
   const toggleMoneyVisibility = useUIStore((s) => s.toggleMoneyVisibility);
 
   return (
     <PageHeader
-      title="Financial intelligence"
-      subtitle="Understand your financial position, identify risks, and decide what to do next."
+      title="Insights"
+      subtitle="Where you stand, what changed, and what to do about it."
       icon={<Lightbulb className="h-5 w-5" aria-hidden="true" />}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -63,12 +56,7 @@ export const InsightsHeader: React.FC<InsightsHeaderProps> = ({
           variant="neutral"
           hierarchy="outline"
           size="md"
-          leftIcon={
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              aria-hidden="true"
-            />
-          }
+          leftIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
           onClick={onRefresh}
         >
           Refresh
@@ -83,6 +71,8 @@ export const InsightsHeader: React.FC<InsightsHeaderProps> = ({
         >
           Export
         </Button>
+
+        <FreshnessIndicator onRefresh={onRefresh} className="ml-auto" />
       </div>
     </PageHeader>
   );

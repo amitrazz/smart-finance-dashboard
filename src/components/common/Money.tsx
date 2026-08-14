@@ -24,6 +24,12 @@ interface MoneyProps {
   showSign?: boolean;
   /** Override the mask string shown when hidden (default "••••••••") */
   hideMask?: string;
+  /**
+   * Fixes the number of decimals. `0` renders whole units, which is what
+   * headline figures in narrow cards need. Left undefined, the amount keeps the
+   * currency's own precision.
+   */
+  fractionDigits?: number;
 }
 
 /**
@@ -39,6 +45,7 @@ export const Money: React.FC<MoneyProps> = memo(
     className = "",
     showSign = false,
     hideMask = DEFAULT_MASK,
+    fractionDigits,
   }) => {
     const moneyVisible = useUIStore((s) => s.moneyVisible);
 
@@ -73,7 +80,11 @@ export const Money: React.FC<MoneyProps> = memo(
         symbol = currCode === "INR" ? "₹" : currCode;
       }
 
-      const full = formatCurrency(value ?? { amount: "0", currency: currCode }, locale);
+      const full = formatCurrency(
+        value ?? { amount: "0", currency: currCode },
+        locale,
+        fractionDigits
+      );
       const sign = showSign ? (neg ? "-" : "+") : "";
 
       return {
@@ -81,7 +92,7 @@ export const Money: React.FC<MoneyProps> = memo(
         currencySymbol: symbol,
         isNegative: neg,
       };
-    }, [value, currency, locale, showSign]);
+    }, [value, currency, locale, showSign, fractionDigits]);
 
     const maskedText = `${currencySymbol}${hideMask}`;
     const displayText = moneyVisible ? formatted : maskedText;

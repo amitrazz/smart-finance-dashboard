@@ -80,11 +80,14 @@ export const INSIGHTS_SECTIONS: InsightsSection[] = [
     id: "intelligence",
     label: "Intelligence",
     icon: Brain,
+    // Risks, recommendations and anomalies were three separate views of one
+    // question — "what should I deal with first?" — which no reader could answer
+    // without comparing three lists by hand. They are one ranked feed now.
+    // Trends left the section entirely: a chart of income against expenses over
+    // time is analytics, and Analytics → Cash flow already draws it. Old links to
+    // any of the four land on the feed, which contains all of their content.
     views: [
-      { id: "actions", label: "Recommended actions", hint: "What to do next, ranked by impact" },
-      { id: "risks", label: "Risks", hint: "What needs attention and why" },
-      { id: "anomalies", label: "Anomalies", hint: "Behaviour that broke pattern" },
-      { id: "trends", label: "Trends", hint: "Direction of travel over time" },
+      { id: "feed", label: "What needs attention", hint: "Everything detected, highest priority first" },
       { id: "ask", label: "Ask", hint: "Questions answered from your own data" },
     ],
   },
@@ -137,11 +140,15 @@ function findViewOwner(viewId: string): InsightsRoute | null {
   return LEGACY_VIEW_ALIASES[viewId] ?? null;
 }
 
-/** Sub-tabs the old workspace used, pointed at their nearest new home. */
+/** Sub-tabs earlier revisions used, pointed at their nearest new home. */
 const LEGACY_VIEW_ALIASES: Record<string, InsightsRoute> = {
   "financial-health": { section: "health", view: null },
   forecasts: { section: "analytics", view: "net-worth" },
-  recommendations: { section: "intelligence", view: "actions" },
+  recommendations: { section: "intelligence", view: "feed" },
+  actions: { section: "intelligence", view: "feed" },
+  risks: { section: "intelligence", view: "feed" },
+  anomalies: { section: "intelligence", view: "feed" },
+  trends: { section: "analytics", view: "cash-flow" },
   budgets: { section: "analytics", view: "budget" },
   debts: { section: "analytics", view: "debt" },
 };

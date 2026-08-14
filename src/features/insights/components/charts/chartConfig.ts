@@ -5,7 +5,24 @@
  * from one axis and grid definition — the previous charts each re-declared
  * their own stroke colours, tick sizes and ₹-formatting, and had drifted.
  */
+import { useReducedMotion } from "framer-motion";
 import { useUIStore } from "../../../../store/useUIStore";
+
+/**
+ * Recharts' entry animations, honouring the OS setting.
+ *
+ * Every series in the workspace spreads these, so "reduced motion" covers the
+ * charts as well as the page transitions — a 1.5s line-draw is exactly the kind
+ * of motion the setting exists to suppress, and it is also why a chart can look
+ * empty for the first second on a slow machine.
+ */
+export function useChartAnimation() {
+  const prefersReducedMotion = useReducedMotion();
+  return {
+    isAnimationActive: !prefersReducedMotion,
+    animationDuration: prefersReducedMotion ? 0 : 600,
+  } as const;
+}
 
 export const CHART_AXIS = {
   stroke: "#475569",

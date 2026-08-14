@@ -73,20 +73,25 @@ describe("AnalyticsSection state machine", () => {
   it("shows the partial notice above real content, not instead of it", () => {
     renderSection(result({ data: "ok", isPartial: true }));
 
-    expect(screen.getByText(/Some of this section's data is unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/Part of this section's data didn't load/)).toBeInTheDocument();
     expect(screen.getByText("Body: ok")).toBeInTheDocument();
   });
 
-  it("marks cached content as updating without hiding it", () => {
+  it("keeps cached content on screen while a refresh runs, and leaves the notice to the header", () => {
+    // Freshness is a property of the workspace, not of each card: one refresh
+    // used to stamp "Updating…" on every section at once. The header states it
+    // once now, so a section's only job while stale is to keep showing what it
+    // has rather than blanking.
     renderSection(result({ data: "ok", isStale: true }));
 
-    expect(screen.getByText("Updating…")).toBeInTheDocument();
     expect(screen.getByText("Body: ok")).toBeInTheDocument();
+    expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
   });
 
-  it("does not show a stale marker while the first load is still running", () => {
+  it("does not blank a section that is loading for the first time", () => {
     renderSection(result({ isLoading: true, isStale: true }));
-    expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Body:")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Net worth" })).toHaveAttribute("aria-busy", "true");
   });
 
   it("offers a handoff to the module that owns the domain", () => {

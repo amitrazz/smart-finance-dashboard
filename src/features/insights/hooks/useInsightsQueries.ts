@@ -55,12 +55,12 @@ import {
   mapInvestments,
   mapNetWorth,
   mapRecommendations,
-  mapRisks,
   mapSpending,
   mapSubscriptions,
   mapTrends,
   unwrapList,
 } from "../api/insightsMappers";
+import { IntelligenceItem, buildIntelligenceFeed } from "../api/intelligenceModel";
 import { useInsightsPeriodMonths } from "./useInsightsFilters";
 import {
   BudgetAnalytics,
@@ -72,8 +72,6 @@ import {
   IncomeAnalytics,
   InvestmentAnalyticsOverview,
   NetWorthAnalytics,
-  RiskMatrixAnalytics,
-  SmartRecommendation,
   SpendingAnalytics,
   SubscriptionAnalytics,
   TrendAnalytics,
@@ -280,20 +278,25 @@ export function useForecastAnalytics(): InsightsQueryResult<ForecastAnalytics> {
   return combine(value, [forecast]);
 }
 
-export function useRecommendations(): InsightsQueryResult<SmartRecommendation[]> {
+/**
+ * The unified Intelligence feed: detections and recommendations, ranked
+ * together.
+ *
+ * Both sources are already in the shared cache — the Smart Action feed backs
+ * Risks and Anomalies, the health recommendations back Actions — so merging them
+ * costs no additional request. `null` when neither produced anything, which the
+ * section renders as an empty state rather than as an empty list.
+ */
+export function useIntelligenceFeed(): InsightsQueryResult<IntelligenceItem[]> {
+  const actions = useQuery(smartActionsSource());
   const recommendations = useQuery(healthRecommendationsSource());
   const value = useMemo(() => {
-    const mapped = mapRecommendations(recommendations.data);
-    return mapped.length > 0 ? mapped : null;
-  }, [recommendations.data]);
-  return combine(value, [recommendations]);
+    const items = buildIntelligenceFeed(
+      unwrapList(actions.data),
+      mapRecommendations(recommendations.data),
+    );
+    return items.length > 0 ? items : null;
+  }, [actions.data, recommendations.data]);
+  return combine(value, [actions], [{ query: recommendations, value: recommendations.data }]);
 }
 
-export function useRiskMatrix(): InsightsQueryResult<RiskMatrixAnalytics> {
-  const actions = useQuery(smartActionsSource());
-  const value = useMemo(() => {
-    const matrix = mapRisks(unwrapList(actions.data));
-    return matrix.risks.length > 0 ? matrix : null;
-  }, [actions.data]);
-  return combine(value, [actions]);
-}

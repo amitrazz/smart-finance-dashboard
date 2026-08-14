@@ -38,19 +38,31 @@ interface Destination {
   label: string;
 }
 
-/** Canonical destinations, named the way the sidebar names them. */
+/**
+ * Canonical destinations, labelled by *intent* rather than by address.
+ *
+ * "Open Transactions" names a place; "Review spending" names the thing the user
+ * came here to do, and the place is an implementation detail of doing it. A
+ * button that says what will be accomplished is also the difference between a
+ * card someone acts on and one they scroll past — "View details" is the
+ * degenerate case and appears nowhere.
+ *
+ * The verb stays neutral ("Review", not "Reduce", "Fix" or "Cut"): Insights
+ * reports and hands off, and instructing someone to reduce a category the
+ * backend merely flagged would be advice this workspace has no standing to give.
+ */
 const DESTINATIONS = {
-  accounts: { tab: "accounts", label: "Open Accounts & Cash" },
-  transactions: { tab: "transactions", label: "Open Transactions" },
-  creditCards: { tab: "credit-cards", label: "Open Credit Cards" },
-  loans: { tab: "loans", label: "Open Loans & Debt" },
-  investments: { tab: "investments", label: "Open Investments" },
-  goals: { tab: "planning", subTab: "goals", label: "Open Goals" },
-  budgets: { tab: "planning", subTab: "budgets", label: "Open Budgets" },
-  planning: { tab: "planning", label: "Open Planning" },
-  calendar: { tab: "notifications", label: "Open Calendar & Alerts" },
-  imports: { tab: "imports", label: "Open File Import" },
-  settings: { tab: "settings", label: "Open Settings" },
+  accounts: { tab: "accounts", label: "Review accounts" },
+  transactions: { tab: "transactions", label: "Review spending" },
+  creditCards: { tab: "credit-cards", label: "Review credit card" },
+  loans: { tab: "loans", label: "Review debt" },
+  investments: { tab: "investments", label: "Review portfolio" },
+  goals: { tab: "planning", subTab: "goals", label: "Review goals" },
+  budgets: { tab: "planning", subTab: "budgets", label: "Review budget" },
+  planning: { tab: "planning", label: "Review plan" },
+  calendar: { tab: "notifications", label: "Review upcoming payments" },
+  imports: { tab: "imports", label: "Import a statement" },
+  settings: { tab: "settings", label: "Open settings" },
 } satisfies Record<string, Destination>;
 
 /**
@@ -140,7 +152,10 @@ export function resolveActionRoute(context: ActionRouteContext): ResolvedAction 
     // A token that happens to be a real tab is still usable; anything else is
     // discarded rather than navigated to on faith.
     if ((VALID_TABS as string[]).includes(token)) {
-      return { tab: token as NavTab, subTab: null, label: "Open" };
+      // A bare "Open" is the "View details" of this resolver: it names neither
+      // the place nor the intent. Naming the section at least tells the reader
+      // where a click lands.
+      return { tab: token as NavTab, subTab: null, label: `Review ${token.replace(/-/g, " ")}` };
     }
   }
 

@@ -6,10 +6,18 @@ import { Money } from "../../../../components/common/Money";
 import { MetricValue } from "../../components/common/MetricValue";
 import { useUIStore } from "../../../../store/useUIStore";
 
+/**
+ * `UNKNOWN` is styled as its own state, not as a healthy one.
+ *
+ * A budget whose spend the backend could not report used to fall through a
+ * `percentUsed ?? 0` default and render as "On track" in emerald — the reader
+ * had no way to tell a well-managed budget from an unmeasured one.
+ */
 const STATUS_STYLE = {
   HEALTHY: { label: "On track", chip: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300", bar: "#34d399" },
   WARNING: { label: "Near limit", chip: "bg-amber-500/10 border-amber-500/30 text-amber-300", bar: "#fbbf24" },
   EXCEEDED: { label: "Over", chip: "bg-rose-500/10 border-rose-500/30 text-rose-300", bar: "#fb7185" },
+  UNKNOWN: { label: "Not measured", chip: "bg-slate-800/60 border-slate-700 text-slate-300", bar: "#475569" },
 } as const;
 
 /**
@@ -71,31 +79,47 @@ export const BudgetSection: React.FC = () => {
                         </span>
                       </div>
                       <span className="shrink-0 text-xs tabular-nums text-slate-400">
-                        <Money value={budget.spentAmount} /> of{" "}
-                        <Money value={budget.allocatedAmount} />
+                        <MetricValue
+                          value={budget.spentAmount}
+                          money
+                          fractionDigits={0}
+                          emptyClassName="text-slate-500"
+                        />{" "}
+                        of <Money value={budget.allocatedAmount} fractionDigits={0} />
                       </span>
                     </div>
 
-                    <div
-                      className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
-                      role="presentation"
-                    >
+                    {/* No bar without a measured share: a zero-width bar reads as
+                        "nothing spent", which is the claim we cannot make. */}
+                    {budget.percentUsed !== null && (
                       <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(100, Math.max(0, budget.percentUsed))}%`,
-                          backgroundColor: style.bar,
-                        }}
-                      />
-                    </div>
+                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
+                        role="presentation"
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, budget.percentUsed))}%`,
+                            backgroundColor: style.bar,
+                          }}
+                        />
+                      </div>
+                    )}
 
                     <p className="text-[11px] text-slate-500">
-                      {budget.percentUsed.toFixed(0)}% used ·{" "}
-                      <Money value={budget.remainingAmount} /> remaining
+                      {budget.percentUsed === null
+                        ? "Spend for this budget wasn't reported"
+                        : `${budget.percentUsed.toFixed(0)}% used`}
+                      {budget.remainingAmount && (
+                        <>
+                          {" · "}
+                          <Money value={budget.remainingAmount} fractionDigits={0} /> remaining
+                        </>
+                      )}
                       {budget.forecastEndOfPeriod && (
                         <>
                           {" · forecast end of period "}
-                          <MetricValue value={budget.forecastEndOfPeriod} money />
+                          <MetricValue value={budget.forecastEndOfPeriod} money fractionDigits={0} />
                         </>
                       )}
                     </p>

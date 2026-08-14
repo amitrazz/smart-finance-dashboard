@@ -59,6 +59,7 @@ import {
   GoalAnalytics,
   InvestmentAnalyticsOverview,
   DebtAnalytics,
+  DebtCompositionItem,
   DebtItem,
   SubscriptionAnalytics,
   TrendAnalytics,
@@ -98,7 +99,7 @@ function moneyValue(m: Money | string | null | undefined): number | null {
   return typeof m === "object" ? num(m.amount) : num(m);
 }
 
-function asMoney(m: Money | string | null | undefined, currency: string): Money | null {
+export function asMoney(m: Money | string | null | undefined, currency: string): Money | null {
   if (m === null || m === undefined) return null;
   if (typeof m === "object") return m;
   const parsed = num(m);
@@ -225,12 +226,49 @@ export function mapFinancialHealth(
     .filter((p): p is { date: string; score: number } => Boolean(p.date) && p.score !== null)
     .sort(byAscending((p) => p.date));
 
+  /**
+   * Read straight through if the engine ever sends it; never derived.
+   *
+   * Attributing a score movement to a dimension needs per-dimension history,
+   * and the engine publishes only current dimension scores plus overall-score
+   * history. Computing "cash flow contributed +4" from those would be a guess
+   * wearing the typography of a measurement, so this stays empty until a real
+   * `scoreAttribution` field arrives — at which point the UI already renders it.
+   */
+  const rawAttribution = (health as unknown as { scoreAttribution?: unknown }).scoreAttribution;
+  const attribution = Array.isArray(rawAttribution)
+    ? (rawAttribution as Array<{
+        code?: string;
+        component?: string;
+        label?: string;
+        pointsContributed?: number | string;
+        points?: number | string;
+      }>)
+        .map((entry) => {
+          const code = entry.code || entry.component || "";
+          const points = num(entry.pointsContributed ?? entry.points);
+          return {
+            code,
+            label:
+              entry.label ||
+              (HEALTH_DIMENSION_LABELS as Record<string, string | undefined>)[code] ||
+              code,
+            pointsContributed: points,
+          };
+        })
+        .filter(
+          (entry): entry is { code: string; label: string; pointsContributed: number } =>
+            Boolean(entry.code) && entry.pointsContributed !== null,
+        )
+    : [];
+
   return {
     overallScore,
     rating: health.rating,
     monthlyTrend: num(health.monthlyTrend),
     history,
     dimensions,
+    scoreAttribution: attribution,
     asOf: health.snapshotDate || health.lastCalculatedAt || health.updatedAt || null,
   };
 }
@@ -319,22 +357,69 @@ interface IncomeSourceWire {
   expectedAmount: Money;
 }
 
+/**
+ * What `/finance/analytics/cash-flow` actually sends.
+ *
+ * It is not `CashFlowSnapshot`. The backend's CashFlowResponseDto labels the
+ * period `periodStart`/`periodEnd` (not `period`), calls the net figure
+ * `netCashFlow` (not `netSavings`), sends `savingsRate` as a decimal *fraction*
+ * string ("-0.6979", not 69.79) and category amounts as bare strings with no
+ * currency. `mapCashFlowSnapshot` in `useFinanceQueries` documents the same
+ * mismatch for the dashboard's copy of this endpoint; Insights reads the
+ * endpoint directly, so it has to do the translation itself.
+ *
+ * Left untranslated, the symptoms are exactly what the workspace exists to
+ * prevent: a "Not enough data" net cash flow next to a real income and a real
+ * expense figure, no period caption, a chart that filters every point away, and
+ * a −69.8% savings rate rendered as −0.7%. Both spellings are read so this keeps
+ * working if the backend is ever aligned to its declared DTO.
+ */
+type CashFlowWire = Omit<Partial<CashFlowSnapshot>, "savingsRate" | "categoryBreakdown"> & {
+  periodStart?: string;
+  periodEnd?: string;
+  netCashFlow?: Money | string | null;
+  savingsRate?: number | string | null;
+  categoryBreakdown?: Array<{
+    categoryId?: string | null;
+    categoryName: string;
+    amount: Money | string;
+  }>;
+};
+
+const periodOf = (snap: CashFlowWire) => snap.period || snap.periodStart || "";
+const netOf = (snap: CashFlowWire) => snap.netSavings ?? snap.netCashFlow ?? null;
+
+/**
+ * Normalises a savings rate to whole percent.
+ *
+ * The wire sends a fraction *string*; the declared DTO types it as a
+ * whole-percent *number*. The runtime type is the reliable signal, so it decides
+ * — guessing from magnitude cannot tell 1% from 100%.
+ */
+function savingsRatePercentOf(snap: CashFlowWire): number | null {
+  const parsed = num(snap.savingsRate);
+  if (parsed === null) return null;
+  if (typeof snap.savingsRate !== "string") return parsed;
+  return Math.round(parsed * 100 * 100) / 100;
+}
+
 export function mapCashFlow(
   snapshotsRes: CashFlowSnapshot[] | PaginatedResponse<CashFlowSnapshot> | null | undefined,
   incomeSourcesRes: IncomeSourceWire[] | PaginatedResponse<IncomeSourceWire> | null | undefined,
 ): CashFlowAnalytics | null {
-  const sorted = [...unwrapList(snapshotsRes)].sort(byAscending((s) => s.period));
+  const sorted = ([...unwrapList(snapshotsRes)] as CashFlowWire[]).sort(byAscending(periodOf));
   if (sorted.length === 0) return null;
 
   const latest = sorted[sorted.length - 1];
   const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
+  const currency = latest.totalIncome?.currency ?? latest.totalExpense?.currency ?? "INR";
 
   const history: CashFlowPoint[] = sorted
     .map((snap) => ({
-      month: snap.period,
+      month: periodOf(snap),
       income: moneyValue(snap.totalIncome),
       expenses: moneyValue(snap.totalExpense),
-      netCashFlow: moneyValue(snap.netSavings),
+      netCashFlow: moneyValue(netOf(snap)),
     }))
     .filter(
       (p): p is CashFlowPoint =>
@@ -347,25 +432,29 @@ export function mapCashFlow(
   const largestExpense = [...(latest.categoryBreakdown ?? [])].sort(
     (a, b) => (moneyValue(b.amount) ?? 0) - (moneyValue(a.amount) ?? 0),
   )[0];
+  // Breakdown lines arrive as bare decimal strings on this endpoint, so they
+  // have to be given the snapshot's currency before they can be rendered.
+  const largestExpenseAmount = asMoney(largestExpense?.amount, currency);
 
   const largestIncome = [...unwrapList(incomeSourcesRes)].sort(
     (a, b) => (moneyValue(b.expectedAmount) ?? 0) - (moneyValue(a.expectedAmount) ?? 0),
   )[0];
 
   return {
-    period: latest.period,
-    totalIncome: latest.totalIncome,
-    totalExpenses: latest.totalExpense,
-    netCashFlow: latest.netSavings,
-    savingsRatePercent: num(latest.savingsRate),
+    period: periodOf(latest),
+    totalIncome: latest.totalIncome as Money,
+    totalExpenses: latest.totalExpense as Money,
+    netCashFlow: asMoney(netOf(latest), currency),
+    savingsRatePercent: savingsRatePercentOf(latest),
     savingsRateChangePoints: diffPercentPoints(
-      num(latest.savingsRate),
-      previous ? num(previous.savingsRate) : null,
+      savingsRatePercentOf(latest),
+      previous ? savingsRatePercentOf(previous) : null,
     ),
     history,
-    largestExpenseCategory: largestExpense
-      ? { name: largestExpense.categoryName, amount: largestExpense.amount }
-      : null,
+    largestExpenseCategory:
+      largestExpense && largestExpenseAmount
+        ? { name: largestExpense.categoryName, amount: largestExpenseAmount }
+        : null,
     largestIncomeSource: largestIncome
       ? { name: largestIncome.name, amount: largestIncome.expectedAmount }
       : null,
@@ -436,12 +525,17 @@ export function mapSpending(
 
   return {
     totalSpent: money(totalSpent, currency),
-    categories: categoriesRaw.map((c) => ({
-      categoryId: c.categoryId,
-      categoryName: c.categoryName,
-      amount: c.amount ?? null,
-      percentage: num(c.percentage),
-    })),
+    // Ranked, largest first. The endpoint's own order is not a ranking — visual
+    // QA found "Uncategorised ₹18,400" printed below "Health ₹12,400" in a list
+    // whose entire job is to answer "where did most of it go?".
+    categories: categoriesRaw
+      .map((c) => ({
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        amount: c.amount ?? null,
+        percentage: num(c.percentage),
+      }))
+      .sort((a, b) => (moneyValue(b.amount) ?? 0) - (moneyValue(a.amount) ?? 0)),
     topMerchants,
     dailyVelocity,
     anomalies,
@@ -504,20 +598,39 @@ export function mapBudgets(dashboard: BudgetDashboardData | null | undefined): B
   const currency = all[0]?.currency || "INR";
 
   const budgets: BudgetHealthItem[] = all.map((budget) => {
-    const allocated = moneyValue(budget.totalLimit) ?? 0;
-    const spent = moneyValue(budget.totalSpent) ?? 0;
-    // The backend reports utilisation per budget; fall back to the ratio of two
-    // backend figures only when it doesn't.
+    const allocated = moneyValue(budget.totalLimit);
+    const spent = moneyValue(budget.totalSpent);
+    /**
+     * Utilisation is the backend's figure, or the ratio of two backend figures,
+     * or nothing.
+     *
+     * It used to fall back to `0`, and the status band below read that zero as
+     * "HEALTHY" — so a budget whose spend the backend could not report rendered
+     * as "₹0 of ₹60,000 · Healthy". That is the most dangerous shape this
+     * workspace can produce: an unmeasured budget wearing the colour and word of
+     * a well-managed one.
+     */
     const percentUsed =
-      num(budget.utilizationPercent) ?? (allocated > 0 ? (spent / allocated) * 100 : 0);
+      num(budget.utilizationPercent) ??
+      (allocated !== null && allocated > 0 && spent !== null ? (spent / allocated) * 100 : null);
+
     return {
       budgetId: budget.id,
       name: budget.name,
       allocatedAmount: budget.totalLimit,
-      spentAmount: budget.totalSpent ?? money(0, budget.currency),
-      remainingAmount: budget.remainingAmount ?? money(allocated - spent, budget.currency),
+      spentAmount: budget.totalSpent ?? null,
+      remainingAmount:
+        budget.remainingAmount ??
+        (allocated !== null && spent !== null ? money(allocated - spent, budget.currency) : null),
       percentUsed,
-      status: percentUsed > 100 ? "EXCEEDED" : percentUsed >= 85 ? "WARNING" : "HEALTHY",
+      status:
+        percentUsed === null
+          ? "UNKNOWN"
+          : percentUsed > 100
+            ? "EXCEEDED"
+            : percentUsed >= 85
+              ? "WARNING"
+              : "HEALTHY",
       forecastEndOfPeriod: budget.forecastMonthEndSpend ?? null,
     };
   });
@@ -527,11 +640,12 @@ export function mapBudgets(dashboard: BudgetDashboardData | null | undefined): B
   if (totalBudgeted === null && budgets.length === 0) return null;
 
   return {
-    totalBudgeted: money(totalBudgeted ?? 0, currency),
-    totalSpent: money(totalSpent ?? 0, currency),
+    // A dashboard that reports no total has no total. Rendering ₹0 would say the
+    // user budgeted nothing, which is a different — and reassuring — claim.
+    totalBudgeted: totalBudgeted === null ? null : money(totalBudgeted, currency),
+    totalSpent: totalSpent === null ? null : money(totalSpent, currency),
     overallPercentUsed: num(dashboard.overallUtilization),
-    budgetHealthScore:
-      num(dashboard.budgetHealthScore),
+    budgetHealthScore: num(dashboard.budgetHealthScore),
     budgets,
   };
 }
@@ -557,7 +671,10 @@ export function mapGoals(
       goalId: g.id,
       name: g.name,
       targetAmount: g.targetAmount,
-      currentAmount: g.currentAmount || g.currentCorpus || money(0, g.currency),
+      // A goal whose corpus the backend didn't report has an unknown balance,
+      // not a zero one. "₹0 of ₹3,00,000" tells someone they have saved nothing
+      // toward a goal they may well have funded.
+      currentAmount: g.currentAmount || g.currentCorpus || null,
       progressPercent: num(g.progressPercent),
       monthlyContribution: g.monthlyContribution || g.autoContributionAmount || null,
       projectedCompletionDate:
@@ -589,9 +706,22 @@ export function mapInvestments(
   const list = Array.isArray(portfolios) ? portfolios : [];
   if (list.length === 0) return null;
 
-  const totalValuation = list.reduce((s, p) => s + (num(p.totalMarketValue) ?? 0), 0);
-  const totalCost = list.reduce((s, p) => s + (num(p.totalCostBasis) ?? 0), 0);
-  const totalGain = list.reduce((s, p) => s + (num(p.totalUnrealizedGain) ?? 0), 0);
+  /**
+   * Summed across the portfolios that reported a figure — and `null` when none
+   * did.
+   *
+   * `reduce(… ?? 0)` alone cannot tell "every portfolio is worth nothing" from
+   * "no portfolio published a valuation", and it renders both as a confident ₹0
+   * portfolio. Counting the contributors keeps the two apart.
+   */
+  const sumReported = (read: (p: InvestmentReturnsPortfolio) => number | null): number | null => {
+    const values = list.map(read).filter((v): v is number => v !== null);
+    return values.length > 0 ? values.reduce((s, v) => s + v, 0) : null;
+  };
+
+  const totalValuation = sumReported((p) => num(p.totalMarketValue));
+  const totalCost = sumReported((p) => num(p.totalCostBasis));
+  const totalGain = sumReported((p) => num(p.totalUnrealizedGain));
 
   // Only portfolios that actually report an XIRR contribute to the average.
   const xirrs = list.map((p) => num(p.xirr)).filter((v): v is number => v !== null);
@@ -606,16 +736,21 @@ export function mapInvestments(
     h ? { symbol: h.symbol ?? "", name: h.name ?? h.symbol ?? "Unnamed holding", returnPercent: h.ret as number } : null;
 
   return {
-    totalValuation: money(totalValuation, "INR"),
-    totalGain: money(totalGain, "INR"),
-    totalGainPercent: totalCost > 0 ? (totalGain / totalCost) * 100 : null,
+    totalValuation: totalValuation === null ? null : money(totalValuation, "INR"),
+    totalGain: totalGain === null ? null : money(totalGain, "INR"),
+    totalGainPercent:
+      totalCost !== null && totalCost > 0 && totalGain !== null
+        ? (totalGain / totalCost) * 100
+        : null,
     xirrPercent: xirrs.length > 0 ? xirrs.reduce((s, v) => s + v, 0) / xirrs.length : null,
     bestHolding: toHolding(holdings[0]),
     worstHolding: holdings.length > 1 ? toHolding(holdings[holdings.length - 1]) : null,
     allocation: (allocationRes?.allocations ?? []).map((a) => ({
       label: a.assetClass,
       value: a.amount,
-      percentage: num(a.percentage) ?? 0,
+      // An allocation line with no published share is unknown, not 0% of the
+      // portfolio — a 0% slice invites the reader to conclude it holds nothing.
+      percentage: num(a.percentage),
     })),
   };
 }
@@ -633,9 +768,12 @@ export function mapDebt(
   if (loans.length === 0 && !breakdown?.totalDebt) return null;
 
   const debts: DebtItem[] = loans.map((l) => {
-    const outstanding =
-      asMoney(l.outstandingPrincipal ?? l.outstandingBalance ?? l.principalAmount, l.currency) ??
-      money(0, l.currency);
+    // A loan whose outstanding principal the backend didn't report is not a
+    // repaid loan. ₹0 owed is the most reassuring possible lie about a debt.
+    const outstanding = asMoney(
+      l.outstandingPrincipal ?? l.outstandingBalance ?? l.principalAmount,
+      l.currency,
+    );
     return {
       id: l.id,
       name: l.name,
@@ -647,7 +785,8 @@ export function mapDebt(
     };
   });
 
-  const currency = breakdown?.totalDebt?.currency ?? debts[0]?.principalOutstanding.currency ?? "INR";
+  const currency =
+    breakdown?.totalDebt?.currency ?? debts[0]?.principalOutstanding?.currency ?? "INR";
   const totalDebt =
     moneyValue(breakdown?.totalDebt) ??
     debts.reduce((s, d) => s + (moneyValue(d.principalOutstanding) ?? 0), 0);
@@ -655,8 +794,29 @@ export function mapDebt(
   const emis = debts.map((d) => moneyValue(d.monthlyEMI)).filter((v): v is number => v !== null);
   const dti = summary ? num(summary.debtToIncomeRatio) : null;
 
+  /**
+   * Every line the total is made of — including the ones that aren't loans.
+   *
+   * `getLoans` returns loans; the total comes from the debt-breakdown endpoint,
+   * which also counts credit-card balances. Listing only the loans meant a page
+   * headed "Total debt ₹2,97,685" showed rows adding to ₹2,55,685, with the
+   * ₹42,000 card balance nowhere on screen — the reader has no way to reconcile
+   * that, and the missing line is usually the most expensive one they hold.
+   */
+  const composition = (breakdown?.items ?? [])
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      amount: asMoney(item.amount, currency),
+      interestRatePercent: num(item.interestRate),
+    }))
+    .filter((item): item is DebtCompositionItem => item.amount !== null)
+    .sort((a, b) => (moneyValue(b.amount) ?? 0) - (moneyValue(a.amount) ?? 0));
+
   return {
     totalDebt: money(totalDebt, currency),
+    composition,
     // Payoff-strategy figures ("debt-free in N months", "₹X interest saved")
     // used to be simulated here. Loans & Debt owns amortisation; Insights
     // reports the position and links there.
@@ -824,7 +984,7 @@ export function mapChanges(
       percent: diffPercent(latest.income, previous.income),
       points: null,
       upIsGood: true,
-      caption: `vs ${previous.month}`,
+      caption: "vs previous period",
     });
 
     changes.push({
@@ -834,7 +994,7 @@ export function mapChanges(
       percent: diffPercent(latest.expenses, previous.expenses),
       points: null,
       upIsGood: false,
-      caption: `vs ${previous.month}`,
+      caption: "vs previous period",
     });
   }
 

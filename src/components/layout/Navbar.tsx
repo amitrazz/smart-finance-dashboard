@@ -19,11 +19,19 @@ export const Navbar: React.FC = () => {
     setImportModalOpen(true);
   };
 
+  // Sub-tabs are slugs, and some are nested ("analytics/cash-flow"). Splitting
+  // on "-" alone left the nesting inside a word — "Analytics/cash Flow" — so
+  // each path segment is title-cased on its own and rejoined with a separator.
   const formatSegment = (segment: string) => {
     return segment
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+      .split("/")
+      .map((part) =>
+        part
+          .split("-")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ")
+      )
+      .join(" › ");
   };
 
   return (
@@ -31,14 +39,18 @@ export const Navbar: React.FC = () => {
       {/* Left: Breadcrumb Navigation & Search Trigger */}
       <div className="flex items-center gap-4">
         {/* Dynamic Breadcrumbs */}
-        <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400">
+        {/* One line, always: a breadcrumb that wraps pushes the 16-unit header
+            out of shape, so the deepest segment truncates instead. */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 whitespace-nowrap">
           <span className="font-semibold text-slate-400">Personal Finance OS</span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+          <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-600" />
           <span className="font-bold text-slate-200">{formatSegment(activeTab)}</span>
           {activeSubTab && (
             <>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-              <span className="font-semibold text-emerald-400">{formatSegment(activeSubTab)}</span>
+              <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-600" />
+              <span className="max-w-[16rem] truncate font-semibold text-emerald-400">
+                {formatSegment(activeSubTab)}
+              </span>
             </>
           )}
         </div>

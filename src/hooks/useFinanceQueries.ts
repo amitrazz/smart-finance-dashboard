@@ -1396,7 +1396,9 @@ function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
     totalIncome: raw.totalIncome,
     totalExpense: raw.totalExpense,
     netSavings: raw.netCashFlow,
-    savingsRate: parseFloat(raw.savingsRate) || 0,
+    // A fraction on the wire ("-0.6979"); every consumer of `CashFlowSnapshot`
+    // reads whole percent, so a −69.8% rate was rendering as −0.7%.
+    savingsRate: Math.round((parseFloat(raw.savingsRate) || 0) * 10000) / 100,
     categoryBreakdown: (raw.categoryBreakdown || []).map((c) => {
       const amountVal = parseFloat(c.amount) || 0;
       return {

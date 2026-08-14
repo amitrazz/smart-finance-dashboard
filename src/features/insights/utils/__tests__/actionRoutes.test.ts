@@ -11,12 +11,12 @@ describe("resolveActionRoute", () => {
     expect(resolveActionRoute({ deepLink: "loans" })).toEqual({
       tab: "loans",
       subTab: null,
-      label: "Open Loans & Debt",
+      label: "Review debt",
     });
   });
 
   it("normalises hash, slash and server-path prefixes to the same destination", () => {
-    const expected = { tab: "credit-cards", subTab: null, label: "Open Credit Cards" };
+    const expected = { tab: "credit-cards", subTab: null, label: "Review credit card" };
     expect(resolveActionRoute({ deepLink: "#/credit-cards" })).toEqual(expected);
     expect(resolveActionRoute({ deepLink: "/finance/credit-cards" })).toEqual(expected);
     expect(resolveActionRoute({ deepLink: "CREDIT-CARDS" })).toEqual(expected);
@@ -27,12 +27,12 @@ describe("resolveActionRoute", () => {
     expect(resolveActionRoute({ deepLink: "goals" })).toEqual({
       tab: "planning",
       subTab: "goals",
-      label: "Open Goals",
+      label: "Review goals",
     });
     expect(resolveActionRoute({ deepLink: "budgets" })).toEqual({
       tab: "planning",
       subTab: "budgets",
-      label: "Open Budgets",
+      label: "Review budget",
     });
   });
 
@@ -48,7 +48,7 @@ describe("resolveActionRoute", () => {
     expect(resolveActionRoute({ component: "EMERGENCY_FUND" })).toEqual({
       tab: "planning",
       subTab: "goals",
-      label: "Open Goals",
+      label: "Review goals",
     });
     expect(resolveActionRoute({ component: "DEBT_HEALTH" })?.tab).toBe("loans");
   });
@@ -78,5 +78,31 @@ describe("resolveActionRoute", () => {
     for (const destination of destinations) {
       expect(destination?.tab).not.toBe("insights");
     }
+  });
+});
+
+describe("action labels state intent, not address", () => {
+  it("never resolves to a label that only names a place or a dialog", () => {
+    // "View details" and "Open" tell the reader nothing about what acting on a
+    // finding will accomplish; every resolvable destination has to name the task.
+    const samples = [
+      resolveActionRoute({ deepLink: "transactions" }),
+      resolveActionRoute({ deepLink: "credit-cards" }),
+      resolveActionRoute({ deepLink: "loans" }),
+      resolveActionRoute({ deepLink: "investments" }),
+      resolveActionRoute({ component: "EMERGENCY_FUND" }),
+      resolveActionRoute({ component: "SAVINGS_RATE" }),
+    ];
+
+    for (const resolved of samples) {
+      expect(resolved).not.toBeNull();
+      expect(resolved!.label).not.toMatch(/^(open|view)\b/i);
+      expect(resolved!.label).not.toMatch(/details/i);
+    }
+  });
+
+  it("names the intent for the finding's own domain", () => {
+    expect(resolveActionRoute({ deepLink: "transactions" })!.label).toBe("Review spending");
+    expect(resolveActionRoute({ deepLink: "investments" })!.label).toBe("Review portfolio");
   });
 });

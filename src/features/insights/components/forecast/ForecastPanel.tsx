@@ -121,7 +121,7 @@ export const ForecastPanel: React.FC<{ forecast: ForecastAnalytics }> = ({ forec
             <p className="text-[11px] text-slate-400">
               Requires{" "}
               <span className="font-medium text-slate-200">
-                <Money value={forecast.monthlySavingsNeeded} />
+                <Money value={forecast.monthlySavingsNeeded} fractionDigits={0} />
               </span>{" "}
               saved monthly.
             </p>

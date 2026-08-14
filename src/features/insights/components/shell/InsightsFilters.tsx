@@ -11,6 +11,30 @@ import {
 const PERIODS = Object.keys(INSIGHTS_PERIOD_MONTHS) as InsightsPeriod[];
 
 /**
+ * The filter surface, including the parts that don't exist yet.
+ *
+ * Insights has exactly one filter the backend honours — the history window,
+ * which maps to a real `limit` parameter. Accounts and comparison-period
+ * filters are named here so the component has a declared shape to grow into,
+ * and are deliberately **not rendered**: a disabled control that looks
+ * functional is a promise the product can't keep, and a client-side
+ * approximation of account filtering would slice figures the backend computed
+ * across *all* accounts — producing totals that look authoritative and are
+ * wrong.
+ *
+ * Adding one means giving it `supported: true` and a control; nothing else in
+ * this component assumes there is only ever one filter.
+ */
+const FILTER_CAPABILITIES = [
+  { id: "period", label: "History window", supported: true },
+  { id: "accounts", label: "Accounts", supported: false },
+  { id: "comparison", label: "Comparison period", supported: false },
+  { id: "currency", label: "Currency", supported: false },
+] as const;
+
+const UNSUPPORTED = FILTER_CAPABILITIES.filter((f) => !f.supported).map((f) => f.label);
+
+/**
  * Workspace filters, behind one control.
  *
  * The old toolbar spent a full row on three chips, two of which were
@@ -107,8 +131,10 @@ export const InsightsFilters: React.FC = () => {
             })}
           </div>
           <p className="mt-2 border-t border-slate-800 px-1 pt-2 text-[11px] leading-relaxed text-slate-500">
-            Applies to every chart and comparison in Insights. Account and currency filters aren't
-            offered because no analytics endpoint accepts them yet.
+            Applies to every chart and comparison in Insights.{" "}
+            {UNSUPPORTED.join(", ").replace(/, ([^,]*)$/, " and $1")} filters aren't offered yet:
+            no analytics endpoint accepts them, and filtering these figures in the browser would
+            produce totals the backend never computed.
           </p>
         </div>
       )}

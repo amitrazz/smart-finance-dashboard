@@ -100,7 +100,7 @@ export const IncomeSection: React.FC = () => {
                       )}
                     </div>
                     <span className="shrink-0 text-xs font-medium tabular-nums text-slate-200">
-                      <Money value={source.expectedAmount} />
+                      <Money value={source.expectedAmount} fractionDigits={0} />
                     </span>
                   </li>
                 ))}

@@ -74,6 +74,24 @@ export interface HealthHistoryPoint {
   score: number;
 }
 
+/**
+ * One dimension's contribution to the *movement* in the overall score.
+ *
+ * The engine does not publish this today, so `FinancialHealthOverview.
+ * scoreAttribution` is empty and the UI shows a current-standing reading
+ * instead. The type exists now so that when a backend `scoreAttribution` field
+ * arrives, the page gains an explanation section without being redesigned —
+ * and so nobody is tempted to derive one on the frontend in the meantime.
+ * Attribution needs per-dimension history, which no endpoint returns; computing
+ * it here would mean guessing which dimension moved.
+ */
+export interface HealthScoreAttribution {
+  code: string;
+  label: string;
+  /** Points this dimension added to (or took from) the overall score. */
+  pointsContributed: number;
+}
+
 export interface FinancialHealthOverview {
   overallScore: number;
   /** Backend rating enum, e.g. `NEEDS_ATTENTION`. Presentational mapping lives in the UI. */
@@ -83,6 +101,11 @@ export interface FinancialHealthOverview {
   /** Oldest → newest. Empty when the history endpoint returned nothing. */
   history: HealthHistoryPoint[];
   dimensions: HealthDimension[];
+  /**
+   * Per-dimension attribution for the score movement. Empty whenever the engine
+   * publishes none, which is currently always — never populated by derivation.
+   */
+  scoreAttribution: HealthScoreAttribution[];
   /** Snapshot the score describes — scores are never implicitly "now". */
   asOf: string | null;
 }
@@ -135,7 +158,8 @@ export interface CashFlowAnalytics {
   period: string;
   totalIncome: Money;
   totalExpenses: Money;
-  netCashFlow: Money;
+  /** `null` when the snapshot carried no net figure under either wire name. */
+  netCashFlow: Money | null;
   /** Backend-computed. `null` when the snapshot omitted it. */
   savingsRatePercent: number | null;
   /** Percentage points moved vs the prior period. */
@@ -228,16 +252,23 @@ export interface BudgetHealthItem {
   budgetId: string;
   name: string;
   allocatedAmount: Money;
-  spentAmount: Money;
-  remainingAmount: Money;
-  percentUsed: number;
-  status: "HEALTHY" | "WARNING" | "EXCEEDED";
+  /** `null` when the backend reported no spend for this budget — not ₹0 spent. */
+  spentAmount: Money | null;
+  remainingAmount: Money | null;
+  /** `null` when utilisation could not be established from any reported figure. */
+  percentUsed: number | null;
+  /**
+   * `UNKNOWN` is a real state and must never collapse into `HEALTHY`: a budget
+   * whose spend the backend could not report is not a budget in good standing.
+   */
+  status: "HEALTHY" | "WARNING" | "EXCEEDED" | "UNKNOWN";
   forecastEndOfPeriod: Money | null;
 }
 
 export interface BudgetAnalytics {
-  totalBudgeted: Money;
-  totalSpent: Money;
+  /** `null` when the dashboard published no total — not a ₹0 budget. */
+  totalBudgeted: Money | null;
+  totalSpent: Money | null;
   overallPercentUsed: number | null;
   budgetHealthScore: number | null;
   budgets: BudgetHealthItem[];
@@ -251,7 +282,8 @@ export interface GoalAnalyticsItem {
   goalId: string;
   name: string;
   targetAmount: Money;
-  currentAmount: Money;
+  /** `null` when no corpus was reported — an unfunded goal and an unreported one differ. */
+  currentAmount: Money | null;
   /** `null` when the goal has no computed progress yet. */
   progressPercent: number | null;
   monthlyContribution: Money | null;
@@ -271,14 +303,15 @@ export interface GoalAnalytics {
 // ---------------------------------------------------------------------------
 
 export interface InvestmentAnalyticsOverview {
-  totalValuation: Money;
-  totalGain: Money;
+  /** `null` when no portfolio published a valuation — not a ₹0 portfolio. */
+  totalValuation: Money | null;
+  totalGain: Money | null;
   totalGainPercent: number | null;
   /** Average XIRR across portfolios that report one. `null` when none do. */
   xirrPercent: number | null;
   bestHolding: { symbol: string; name: string; returnPercent: number } | null;
   worstHolding: { symbol: string; name: string; returnPercent: number } | null;
-  allocation: { label: string; value: Money; percentage: number }[];
+  allocation: { label: string; value: Money; percentage: number | null }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -289,14 +322,32 @@ export interface DebtItem {
   id: string;
   name: string;
   type: string;
-  principalOutstanding: Money;
+  /** `null` when the loan reported no outstanding figure — never ₹0 owed. */
+  principalOutstanding: Money | null;
   interestRatePercent: number | null;
   monthlyEMI: Money | null;
   remainingTenureMonths: number | null;
 }
 
+/**
+ * One line of what the total is made of, loan or not.
+ *
+ * Separate from `DebtItem` because it comes from the debt-breakdown endpoint
+ * rather than from `getLoans`, and carries no EMI or tenure — a credit-card
+ * balance has neither.
+ */
+export interface DebtCompositionItem {
+  id: string;
+  name: string;
+  type: string;
+  amount: Money;
+  interestRatePercent: number | null;
+}
+
 export interface DebtAnalytics {
   totalDebt: Money;
+  /** Every component of `totalDebt`, largest first. Empty when the backend published no breakdown. */
+  composition: DebtCompositionItem[];
   totalMonthlyEMI: Money | null;
   debtToIncomeRatioPercent: number | null;
   debts: DebtItem[];

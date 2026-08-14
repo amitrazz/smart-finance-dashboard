@@ -2,11 +2,21 @@ import { Money } from "../types";
 
 type MoneyLike = Money | { amount: string | number; currency?: string };
 
+/**
+ * `fractionDigits` fixes both the minimum and the maximum, so passing `0`
+ * renders whole rupees (₹2,68,315) rather than Intl's currency default of two.
+ * Headline figures in narrow cards use it: paise are three characters that push
+ * a lakh-scale amount past the width it has, and the exact figure is always one
+ * click away in the underlying list.
+ */
 export function formatCurrency(
   money?: MoneyLike | number | string | null,
-  locale = "en-IN"
+  locale = "en-IN",
+  fractionDigits?: number
 ): string {
-  if (money === undefined || money === null) return "₹0.00";
+  if (money === undefined || money === null) {
+    return fractionDigits === undefined ? "₹0.00" : `₹${(0).toFixed(fractionDigits)}`;
+  }
 
   let val = 0;
   let curr = "INR";
@@ -23,7 +33,9 @@ export function formatCurrency(
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: curr,
-    maximumFractionDigits: 2,
+    ...(fractionDigits === undefined
+      ? { maximumFractionDigits: 2 }
+      : { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }),
   }).format(val);
 }
 

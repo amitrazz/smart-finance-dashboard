@@ -65,7 +65,7 @@ export const SubscriptionsSection: React.FC = () => {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-medium tabular-nums text-slate-200">
-                  <Money value={subscription.amount} />
+                  <Money value={subscription.amount} fractionDigits={0} />
                 </span>
               </li>
             ))}

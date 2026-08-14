@@ -117,15 +117,47 @@ export const getCategoryStyles = (category: FinancialCalendarEventCategory) => {
   }
 };
 
+/**
+ * Midnight, local time, for a date the backend sent.
+ *
+ * `new Date("2026-08-15")` is **not** local midnight — the spec says a date-only
+ * string is parsed as UTC. East of Greenwich that happens to land on the right
+ * local day, which is why this went unnoticed; west of it, it lands on the
+ * *previous* one. For a user in New York every date-only event therefore counted
+ * down a day early: a bill due on the 15th read "Due Today" on the 14th, and
+ * "1 Day Overdue" on the day it was actually due.
+ *
+ * Date-only strings are calendar dates with no instant attached, so they are
+ * built from their parts and interpreted in the reader's own timezone. Full
+ * timestamps do carry an instant, so those are parsed normally and then floored
+ * to the local day they fall in.
+ */
+const startOfLocalDay = (dateString: string): Date | null => {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (dateOnly) {
+    return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  }
+
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
 export const getSmartCountdown = (dateString: string): string => {
   if (!dateString) return "Approaching";
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const eventDate = new Date(dateString);
-  eventDate.setHours(0, 0, 0, 0);
+  const eventDate = startOfLocalDay(dateString);
+  // An unparseable date used to fall through every branch below and reach
+  // `toLocaleDateString`, which renders the string "Invalid Date" into the UI.
+  if (!eventDate) return "Approaching";
 
   const diffTime = eventDate.getTime() - today.getTime();
+  // Rounding rather than flooring keeps this correct across a DST boundary,
+  // where two local midnights are 23 or 25 hours apart.
   const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
 
   if (diffDays === 0) return "Due Today";

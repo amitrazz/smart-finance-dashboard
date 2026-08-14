@@ -244,3 +244,19 @@ export function shortPeriodLabel(period: string | null | undefined): string {
   const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
   return date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
 }
+
+/**
+ * Short day label for day-resolution axes: `2026-08-14` → `14 Aug`.
+ *
+ * Separate from `shortPeriodLabel` because collapsing a daily series to month
+ * names repeats the same tick thirty times. Visual QA found both defects at
+ * once: raw ISO strings on the daily-spend and health-history axes, which are
+ * both wider than the tick they sit in and unreadable at 11px.
+ */
+export function shortDayLabel(date: string | null | undefined): string {
+  if (!date) return "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  if (!match) return date;
+  const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}

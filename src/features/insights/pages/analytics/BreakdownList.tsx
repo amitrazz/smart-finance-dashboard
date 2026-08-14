@@ -34,7 +34,14 @@ export const BreakdownList: React.FC<{
             <div className="flex items-baseline justify-between gap-3 text-xs">
               <span className="truncate text-slate-300">{item.category}</span>
               <span className="shrink-0 tabular-nums text-slate-200">
-                <MetricValue value={item.value} money emptyClassName="text-slate-500" />
+                {/* Whole rupees, as everywhere else in the workspace: a column
+                    of ".00" is three characters of noise per row. */}
+                <MetricValue
+                  value={item.value}
+                  money
+                  fractionDigits={0}
+                  emptyClassName="text-slate-500"
+                />
               </span>
             </div>
             {typeof item.percentage === "number" && (

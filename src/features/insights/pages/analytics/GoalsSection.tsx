@@ -83,7 +83,13 @@ export const GoalsSection: React.FC = () => {
                   )}
 
                   <p className="text-[11px] tabular-nums text-slate-400">
-                    <Money value={goal.currentAmount} /> of <Money value={goal.targetAmount} />
+                    <MetricValue
+                      value={goal.currentAmount}
+                      money
+                      fractionDigits={0}
+                      emptyClassName="text-slate-500"
+                    />{" "}
+                    of <Money value={goal.targetAmount} fractionDigits={0} />
                     {typeof goal.progressPercent === "number" && ` · ${goal.progressPercent.toFixed(0)}%`}
                   </p>
 
