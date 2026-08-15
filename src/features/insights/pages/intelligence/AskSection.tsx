@@ -156,14 +156,23 @@ export const AskSection: React.FC = () => {
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                     Based on
                   </span>
-                  {result.usedMetrics.map((metric) => (
-                    <span
-                      key={metric}
-                      className="rounded border border-slate-800 bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] text-slate-300"
-                    >
-                      {metric}
-                    </span>
-                  ))}
+                  {result.usedMetrics.map((metric, index) => {
+                    const isObj = typeof metric === "object" && metric !== null;
+                    const name = isObj ? metric.metric : metric;
+                    const key = isObj ? `${metric.metric}-${index}` : metric;
+                    const tooltip = isObj
+                      ? `${metric.source}${metric.period ? ` (${metric.period.start} to ${metric.period.end})` : ""}`
+                      : undefined;
+                    return (
+                      <span
+                        key={key}
+                        title={tooltip}
+                        className="rounded border border-slate-800 bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] text-slate-300"
+                      >
+                        {name}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500">

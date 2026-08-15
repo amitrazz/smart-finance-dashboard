@@ -2098,11 +2098,20 @@ export interface SmartActionItem {
  */
 export type AnswerStatus = "ANSWERED" | "UNGROUNDED" | "UNAVAILABLE";
 
+export interface UsedMetric {
+  metric: string;
+  source: string;
+  period?: {
+    start: string;
+    end: string;
+  };
+}
+
 export interface FinancialAnswer {
   status: AnswerStatus;
   intent: string;
   answer: string;
-  usedMetrics: string[];
+  usedMetrics: (string | UsedMetric)[];
   confidence: number;
   /** Snapshot date the figures describe — answers never implicitly mean "now". */
   asOf: string;
