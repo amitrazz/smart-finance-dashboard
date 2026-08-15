@@ -5,7 +5,7 @@ import { useRefreshHoldingPrices } from "../../hooks/useFinanceQueries";
 import { InvestmentsSubNav } from "./components/InvestmentsSubNav";
 import { AddTradeModal } from "./components/AddTradeModal";
 import { AssetDetailDrawer } from "./components/AssetDetailDrawer";
-import { Holding } from "../../types";
+import { Holding, RetirementAccount } from "../../types";
 
 // Submodules
 import { InvestmentDashboardView } from "./submodules/InvestmentDashboardView";
@@ -18,6 +18,15 @@ import { TransactionsView } from "./submodules/TransactionsView";
 import { ImportView } from "./submodules/ImportView";
 import { RealizedGainsView } from "./submodules/RealizedGainsView";
 
+// Retirement (EPF/VPF/PPF/NPS) — a separate, self-contained feature module
+// mounted here as two more submodules, since Retirement & Provident lives
+// under the Investments IA without being a holdings/lots concept itself.
+import { RetirementOverview } from "../retirement/components/RetirementOverview";
+import { RetirementAccountList } from "../retirement/components/RetirementAccountList";
+import { CreateRetirementAccountModal } from "../retirement/components/CreateRetirementAccountModal";
+import { RetirementAccountDetailDrawer } from "../retirement/components/RetirementAccountDetailDrawer";
+import { RecordRetirementTransactionModal } from "../retirement/components/RecordRetirementTransactionModal";
+
 export const InvestmentsView: React.FC = () => {
   const { activeSubTab } = useUIStore();
   const queryClient = useQueryClient();
@@ -25,6 +34,10 @@ export const InvestmentsView: React.FC = () => {
 
   const [isTradeOpen, setIsTradeOpen] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
+
+  const [isCreateRetirementOpen, setIsCreateRetirementOpen] = useState(false);
+  const [selectedRetirementAccount, setSelectedRetirementAccount] = useState<RetirementAccount | null>(null);
+  const [retirementTxAccount, setRetirementTxAccount] = useState<RetirementAccount | null>(null);
 
   const subTab = activeSubTab || "dashboard";
 
@@ -59,6 +72,15 @@ export const InvestmentsView: React.FC = () => {
         return <TransactionsView />;
       case "realized-gains":
         return <RealizedGainsView />;
+      case "retirement-overview":
+        return <RetirementOverview onAddAccount={() => setIsCreateRetirementOpen(true)} />;
+      case "retirement-accounts":
+        return (
+          <RetirementAccountList
+            onSelectAccount={setSelectedRetirementAccount}
+            onCreateAccount={() => setIsCreateRetirementOpen(true)}
+          />
+        );
       case "imports":
         return <ImportView />;
       default:
@@ -81,6 +103,21 @@ export const InvestmentsView: React.FC = () => {
       {/* Global Investment Modals & Drawers */}
       <AddTradeModal isOpen={isTradeOpen} onClose={() => setIsTradeOpen(false)} />
       <AssetDetailDrawer holding={selectedHolding} onClose={() => setSelectedHolding(null)} />
+
+      {/* Global Retirement Modals & Drawers */}
+      <CreateRetirementAccountModal
+        isOpen={isCreateRetirementOpen}
+        onClose={() => setIsCreateRetirementOpen(false)}
+      />
+      <RetirementAccountDetailDrawer
+        account={selectedRetirementAccount}
+        onClose={() => setSelectedRetirementAccount(null)}
+        onRecordTransaction={(account) => setRetirementTxAccount(account)}
+      />
+      <RecordRetirementTransactionModal
+        account={retirementTxAccount}
+        onClose={() => setRetirementTxAccount(null)}
+      />
     </div>
   );
 };

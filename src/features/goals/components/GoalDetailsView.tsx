@@ -7,6 +7,7 @@ import {
   FileText,
   Flag,
   Link as LinkIcon,
+  PiggyBank,
   Plus,
   Sparkles,
   Target,
@@ -22,6 +23,8 @@ import { formatCurrency } from '../../../utils/formatters';
 import { AsyncSearchSelect } from '../../../components/common/AsyncSearchSelect';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { ConfirmModal } from '../../../components/common/ConfirmModal';
+import { useRetirementAccounts } from '../../retirement/hooks/useRetirementQueries';
+import { PRODUCT_TYPE_CONFIG } from '../../retirement/constants/productTypes';
 import {
   useAddGoalMilestone,
   useDeleteGoal,
@@ -78,6 +81,10 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [accountPickerSearch, setAccountPickerSearch] = useState('');
 
+  const [isLinkRetirementModalOpen, setLinkRetirementModalOpen] = useState(false);
+  const [selectedRetirementAccountId, setSelectedRetirementAccountId] = useState('');
+  const [retirementPickerSearch, setRetirementPickerSearch] = useState('');
+
   // Generic destructive-confirmation state shared by goal/contribution/
   // milestone/document deletes below.
   const [pendingDelete, setPendingDelete] = useState<
@@ -97,6 +104,14 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
     search: accountPickerSearch || undefined,
     limit: 100,
   });
+
+  const { data: retirementAccountsPage } = useRetirementAccounts({ limit: 100 });
+  const retirementAccounts = retirementAccountsPage?.data ?? [];
+  const { data: retirementPickerPage, isFetching: isRetirementPickerFetching } = useRetirementAccounts({
+    search: retirementPickerSearch || undefined,
+    limit: 100,
+  });
+  const retirementPickerResults = retirementPickerPage?.data ?? [];
   const {
     data: analytics,
     isLoading: analyticsLoading,
@@ -201,6 +216,30 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
   const handleUnlinkAccount = (accountId: string) => {
     const nextIds = (goal.linkedAccountIds ?? []).filter((id) => id !== accountId);
     updateGoalMutation.mutate({ id: goal.id, data: { linkedAccountIds: nextIds }, version: goal.version });
+  };
+
+  // Same convention as linkedAccountIds/linkedInvestmentIds — no dedicated
+  // link endpoint, just an id array on the goal edited via the regular
+  // update call. currentBalance auto-sums into the goal's corpus server-side.
+  const handleLinkRetirementAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRetirementAccountId) return;
+    const nextIds = Array.from(
+      new Set([...(goal.linkedRetirementAccountIds ?? []), selectedRetirementAccountId]),
+    );
+    updateGoalMutation.mutate(
+      { id: goal.id, data: { linkedRetirementAccountIds: nextIds }, version: goal.version },
+      { onSuccess: () => setLinkRetirementModalOpen(false) },
+    );
+  };
+
+  const handleUnlinkRetirementAccount = (accountId: string) => {
+    const nextIds = (goal.linkedRetirementAccountIds ?? []).filter((id) => id !== accountId);
+    updateGoalMutation.mutate({
+      id: goal.id,
+      data: { linkedRetirementAccountIds: nextIds },
+      version: goal.version,
+    });
   };
 
   const handleConfirmPendingDelete = () => {
@@ -554,6 +593,48 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                 </div>
               )}
             </div>
+
+            {/* Linked Retirement Assets Summary */}
+            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <PiggyBank className="w-4 h-4 text-violet-400" /> Retirement Assets
+                </h3>
+                <button
+                  onClick={() => setLinkRetirementModalOpen(true)}
+                  className="text-xs text-violet-400 font-semibold hover:underline"
+                >
+                  + Link Account
+                </button>
+              </div>
+
+              {goal.linkedRetirementAccountIds && goal.linkedRetirementAccountIds.length > 0 ? (
+                <div className="space-y-2">
+                  {goal.linkedRetirementAccountIds.map((accountId) => {
+                    const account = retirementAccounts.find((a) => a.id === accountId);
+                    return (
+                      <div
+                        key={accountId}
+                        className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                      >
+                        <p className="font-bold text-slate-200">
+                          {account
+                            ? `${account.name} (${PRODUCT_TYPE_CONFIG[account.productType].shortLabel})`
+                            : accountId}
+                        </p>
+                        {account && (
+                          <span className="font-bold text-violet-400">{formatCurrency(account.currentBalance)}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  No EPF, VPF, PPF, or NPS account linked to this goal yet.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -806,6 +887,59 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
             ) : (
               <div className="p-8 text-center text-xs text-slate-400">
                 No accounts linked to this goal. Link a bank account to help track progress.
+              </div>
+            )}
+          </div>
+
+          {/* Linked Retirement Accounts — currentBalance auto-sums into the
+              goal's corpus server-side, same convention as linked investments. */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-100">Linked Retirement Accounts</h3>
+              <button
+                onClick={() => setLinkRetirementModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-400 text-slate-950 font-bold text-xs shadow-md transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Link Account
+              </button>
+            </div>
+            {goal.linkedRetirementAccountIds && goal.linkedRetirementAccountIds.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {goal.linkedRetirementAccountIds.map((accountId) => {
+                  const account = retirementAccounts.find((a) => a.id === accountId);
+                  return (
+                    <div
+                      key={accountId}
+                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between"
+                    >
+                      <p className="font-bold text-sm text-slate-100">
+                        {account
+                          ? `${account.name} (${PRODUCT_TYPE_CONFIG[account.productType].shortLabel})`
+                          : accountId}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        {account && (
+                          <span className="font-extrabold text-violet-400 text-sm">
+                            {formatCurrency(account.currentBalance)}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleUnlinkRetirementAccount(accountId)}
+                          disabled={updateGoalMutation.isPending}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
+                          title="Unlink Retirement Account"
+                          aria-label="Unlink Retirement Account"
+                        >
+                          <Unlink className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No retirement accounts linked. Link an EPF, VPF, PPF, or NPS account to help track progress.
               </div>
             )}
           </div>
@@ -1128,6 +1262,65 @@ export const GoalDetailsView: React.FC<GoalDetailsViewProps> = ({ goalId, onBack
                   type="submit"
                   disabled={updateGoalMutation.isPending}
                   className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs"
+                >
+                  Link Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Link Retirement Account Modal */}
+      {isLinkRetirementModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h3 className="font-bold text-lg text-slate-100">Link Retirement Account</h3>
+            <form onSubmit={handleLinkRetirementAccount} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Select EPF, VPF, PPF, or NPS Account
+                </label>
+                <AsyncSearchSelect
+                  value={selectedRetirementAccountId}
+                  valueLabel={
+                    selectedRetirementAccountId
+                      ? (() => {
+                          const acc = retirementPickerResults.find((a) => a.id === selectedRetirementAccountId);
+                          return acc
+                            ? `${acc.name} (${PRODUCT_TYPE_CONFIG[acc.productType].shortLabel}) — ${formatCurrency(acc.currentBalance)}`
+                            : undefined;
+                        })()
+                      : 'Select a retirement account...'
+                  }
+                  items={retirementPickerResults}
+                  isFetching={isRetirementPickerFetching}
+                  onSearch={setRetirementPickerSearch}
+                  onSelect={(acc) => setSelectedRetirementAccountId(acc.id)}
+                  getOptionKey={(acc) => acc.id}
+                  icon={<PiggyBank className="w-4 h-4 text-slate-500 shrink-0" />}
+                  placeholder="Select a retirement account..."
+                  emptyMessage="No matching retirement accounts"
+                  renderOption={(acc) => (
+                    <span className="truncate">
+                      {acc.name} ({PRODUCT_TYPE_CONFIG[acc.productType].shortLabel}) —{' '}
+                      {formatCurrency(acc.currentBalance)}
+                    </span>
+                  )}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setLinkRetirementModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateGoalMutation.isPending}
+                  className="px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-400 text-slate-950 font-bold text-xs"
                 >
                   Link Account
                 </button>

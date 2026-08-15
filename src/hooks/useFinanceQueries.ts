@@ -1397,6 +1397,7 @@ interface RawNetWorthSnapshot {
   breakdown: {
     cash: string;
     investments: string;
+    retirement: string;
     realEstate: string;
     otherAssets: string;
     loans: string;
@@ -1413,6 +1414,12 @@ function mapNetWorthSnapshot(raw: RawNetWorthSnapshot): NetWorthSnapshot {
     breakdown: {
       liquidCash: raw.breakdown?.cash ?? "0",
       investments: raw.breakdown?.investments ?? "0",
+      // Kept as its own line, disjoint from `investments` on the backend
+      // (RetirementAccount.currentBalance vs Holding.marketValue) — never
+      // sum these into one figure or the total would double-count nothing,
+      // but the two lines would look like they should be merged when they
+      // deliberately aren't (retirement has no lots/cost-basis).
+      retirement: raw.breakdown?.retirement ?? "0",
       realEstate: raw.breakdown?.realEstate ?? "0",
       loans: raw.breakdown?.loans ?? "0",
       creditCards: raw.breakdown?.creditCards ?? "0",

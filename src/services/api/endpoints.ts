@@ -35,6 +35,8 @@ import {
   CreditCardRewardHistoryItem,
   CreditCardRewards,
   CreditCardStatement,
+  CloseRetirementAccountInput,
+  CreateRetirementAccountInput,
   DebtBreakdownResponse,
   FinancialHealthHistoryPoint,
   FinancialAnswer,
@@ -94,9 +96,13 @@ import {
   RedeemCreditCardCashbackInput,
   RedeemCreditCardRewardsInput,
   RefreshPricesResponse,
+  RecordRetirementTransactionInput,
   ResolveCreditCardDisputeInput,
   ResolveReviewClusterInput,
+  RetirementAccount,
   RetirementForecastResponse,
+  RetirementSummary,
+  RetirementTransaction,
   ReviewClusterStatus,
   RunAutoMatchResult,
   SearchResultItem,
@@ -114,6 +120,7 @@ import {
   UpdateCreditCardStatementInput,
   UpdateGoalInput,
   UpdateLoanInput,
+  UpdateRetirementAccountInput,
   UpdateTransactionInput,
   UserSettings,
 } from '../../types';
@@ -702,6 +709,65 @@ export const api = {
     fetchWithAuth<PaginatedResponse<PortfolioSnapshot>>(
       `/finance/portfolio/${encodeURIComponent(id)}/history${buildQuery(params)}`,
     ),
+
+  // Retirement (EPF / VPF / PPF / NPS) — balance/contribution-tracked
+  // accounts, structurally separate from Investments/Portfolio (no lots, no
+  // trades). See packages/finance/src/retirement on the backend.
+  getRetirementAccounts: (params?: {
+    productType?: string;
+    status?: string;
+    search?: string;
+    cursor?: string;
+    limit?: number;
+  }) =>
+    fetchWithAuth<PaginatedResponse<RetirementAccount>>(
+      `/finance/retirement/accounts${buildQuery(params)}`,
+    ),
+  getRetirementAccount: (id: string) =>
+    fetchWithAuth<RetirementAccount>(`/finance/retirement/accounts/${encodeURIComponent(id)}`),
+  createRetirementAccount: (data: CreateRetirementAccountInput) =>
+    fetchWithAuth<RetirementAccount>('/finance/retirement/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRetirementAccount: (id: string, data: UpdateRetirementAccountInput, version = 1) =>
+    fetchWithAuth<RetirementAccount>(
+      `/finance/retirement/accounts/${encodeURIComponent(id)}${buildQuery({ version })}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      },
+    ),
+  closeRetirementAccount: (id: string, data: CloseRetirementAccountInput, version = 1) =>
+    fetchWithAuth<RetirementAccount>(
+      `/finance/retirement/accounts/${encodeURIComponent(id)}/close${buildQuery({ version })}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  getRetirementTransactions: (params?: {
+    retirementAccountId?: string;
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    cursor?: string;
+    limit?: number;
+  }) =>
+    fetchWithAuth<PaginatedResponse<RetirementTransaction>>(
+      `/finance/retirement/transactions${buildQuery(params)}`,
+    ),
+  recordRetirementTransaction: (data: RecordRetirementTransactionInput) =>
+    fetchWithAuth<RetirementTransaction>('/finance/retirement/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  reverseRetirementTransaction: (id: string, version = 1) =>
+    fetchWithAuth<RetirementTransaction>(
+      `/finance/retirement/transactions/${encodeURIComponent(id)}/reverse${buildQuery({ version })}`,
+      { method: 'POST' },
+    ),
+  getRetirementSummary: () => fetchWithAuth<RetirementSummary>('/finance/retirement/summary'),
 
   // Loans
   getLoans: (params?: {

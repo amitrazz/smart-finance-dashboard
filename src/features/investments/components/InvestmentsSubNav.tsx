@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Menu,
+  PiggyBank,
 } from "lucide-react";
 import { InvestmentsBreadcrumb } from "./InvestmentsBreadcrumb";
 import { InvestmentsMobileNavDrawer, NavCategoryConfig } from "./InvestmentsMobileNavDrawer";
@@ -66,6 +67,16 @@ const NAVIGATION_CATEGORIES: NavCategoryConfig[] = [
     ],
   },
   {
+    id: "retirement",
+    label: "Retirement & Provident",
+    defaultSubTab: "retirement-overview",
+    icon: PiggyBank,
+    subTabs: [
+      { id: "retirement-overview", label: "Overview" },
+      { id: "retirement-accounts", label: "EPF / VPF / PPF / NPS" },
+    ],
+  },
+  {
     id: "goals",
     label: "Goals",
     defaultSubTab: "goals",
@@ -117,34 +128,41 @@ export const InvestmentsSubNav: React.FC<InvestmentsSubNavProps> = ({
             <span>Navigation Menu</span>
           </button>
 
-          {onRefresh && (
-            <Button
-              variant="neutral"
-              hierarchy="ghost"
-              size="icon"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              title="Refresh market prices for all your holdings"
-              aria-label="Refresh market prices for all your holdings"
-            >
-              <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? "animate-spin text-indigo-400" : ""}`} />
-            </Button>
-          )}
+          {/* Trading actions only make sense for lot-based holdings — hidden
+              on Retirement & Provident, which has its own contextual "Add
+              Account"/"Record Transaction" actions embedded in its views. */}
+          {activeCategory.id !== "retirement" && (
+            <>
+              {onRefresh && (
+                <Button
+                  variant="neutral"
+                  hierarchy="ghost"
+                  size="icon"
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                  title="Refresh market prices for all your holdings"
+                  aria-label="Refresh market prices for all your holdings"
+                >
+                  <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? "animate-spin text-indigo-400" : ""}`} />
+                </Button>
+              )}
 
-          <Button
-            variant="primary"
-            hierarchy="filled"
-            size="md"
-            leftIcon={<Plus className="w-4 h-4" />}
-            onClick={onOpenTrade}
-          >
-            <span>Record Trade</span>
-          </Button>
+              <Button
+                variant="primary"
+                hierarchy="filled"
+                size="md"
+                leftIcon={<Plus className="w-4 h-4" />}
+                onClick={onOpenTrade}
+              >
+                <span>Record Trade</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Tier 1: Primary Category Tabs */}
-      <div className="hidden md:grid grid-cols-6 gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 backdrop-blur-xl shadow-xl">
+      <div className="hidden md:grid grid-cols-7 gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 backdrop-blur-xl shadow-xl">
         {NAVIGATION_CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const isActive = cat.id === activeCategory.id;

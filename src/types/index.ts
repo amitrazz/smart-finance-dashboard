@@ -1374,6 +1374,10 @@ export interface Goal {
   priority: GoalPriority;
   linkedAccountIds: string[];
   linkedInvestmentIds: string[];
+  // Logical references to RetirementAccount.id — currentBalance auto-sums
+  // into corpus server-side, same convention as linkedInvestmentIds. See
+  // goal-linked-references.service.ts / goal-corpus.ts on the backend.
+  linkedRetirementAccountIds: string[];
   targetAmount: Money;
   currentCorpus?: Money; // Not returned by GET /goals/:id — use currentAmount
   currentAmount?: Money; // Backwards compatibility
@@ -1497,10 +1501,128 @@ export interface NetWorthSnapshot {
   breakdown: {
     liquidCash: string;
     investments: string;
+    // Sum of RetirementAccount.currentBalance across the user's EPF/VPF/PPF/
+    // NPS accounts — structurally disjoint from `investments` (Holding
+    // market value) on the backend, so summing both is safe and never
+    // double-counts. See snapshot-computation.service.ts.
+    retirement: string;
     realEstate: string;
     loans: string;
     creditCards: string;
   };
+}
+
+// --- Retirement (EPF / VPF / PPF / NPS) ---
+// Mirrors packages/finance/src/retirement/* on the backend exactly. Retirement
+// accounts are balance/contribution-tracked (no lots, no cost basis, no
+// market price) — never route them through investments/holdings types.
+export type RetirementProductType = "EPF" | "VPF" | "PPF" | "NPS";
+
+// ACTIVE is the only status returned by `List Retirement Accounts`' example
+// filter value; MATURED/CLOSED/TRANSFERRED_OUT are the close-endpoint's
+// target statuses. Treated as the full status enum pending live-API
+// confirmation of any additional values.
+export type RetirementAccountStatus = "ACTIVE" | "MATURED" | "CLOSED" | "TRANSFERRED_OUT";
+
+export type RetirementTransactionType =
+  | "OPENING_BALANCE"
+  | "EMPLOYEE_CONTRIBUTION"
+  | "EMPLOYER_CONTRIBUTION"
+  | "CONTRIBUTION"
+  | "INTEREST"
+  | "VALUATION_ADJUSTMENT"
+  | "WITHDRAWAL"
+  | "ADJUSTMENT";
+
+// Matches RetirementAccountResponseDto exactly (retirement-account.mapper.ts).
+export interface RetirementAccount {
+  id: string;
+  productType: RetirementProductType;
+  name: string;
+  institutionId: string | null;
+  accountNumber: string | null;
+  linkedAccountId: string | null;
+  status: RetirementAccountStatus;
+  openedDate: string | null;
+  maturityDate: string | null;
+  interestRate: string | null;
+  employerName: string | null;
+  currentBalance: Money;
+  totalContributions: Money;
+  totalInterestEarned: Money;
+  totalWithdrawals: Money;
+  lastValuedAt: string;
+  notes: string | null;
+  version?: number;
+}
+
+// Matches RetirementTransactionResponseDto exactly.
+export interface RetirementTransaction {
+  id: string;
+  retirementAccountId: string;
+  type: RetirementTransactionType;
+  amount: Money;
+  transactionDate: string;
+  description: string | null;
+  bankTransactionId: string | null;
+  notes: string | null;
+  version?: number;
+}
+
+// POST /finance/retirement/accounts body — openingBalance/openingBalanceDate
+// optionally seed an OPENING_BALANCE transaction atomically.
+export interface CreateRetirementAccountInput {
+  productType: RetirementProductType;
+  name: string;
+  currency: CurrencyCode;
+  linkedAccountId?: string;
+  openingBalance?: string;
+  openingBalanceDate?: string;
+}
+
+// PATCH /finance/retirement/accounts/:id — metadata only, never touches
+// balance columns (enforced server-side).
+export interface UpdateRetirementAccountInput {
+  name?: string;
+  institution?: string;
+  linkedAccountId?: string;
+  interestRate?: string;
+  employerName?: string;
+  notes?: string;
+}
+
+// POST /finance/retirement/accounts/:id/close
+export interface CloseRetirementAccountInput {
+  status: Extract<RetirementAccountStatus, "MATURED" | "CLOSED" | "TRANSFERRED_OUT">;
+}
+
+// POST /finance/retirement/transactions
+export interface RecordRetirementTransactionInput {
+  retirementAccountId: string;
+  type: RetirementTransactionType;
+  amount: string;
+  transactionDate: string;
+  idempotencyKey?: string;
+}
+
+// GET /finance/retirement/summary — "Cross-account corpus rollup, grouped by
+// product type and currency." Deliberately two arrays, no cross-currency
+// grand total (no FX conversion path exists on the backend).
+export interface RetirementProductSummary {
+  productType: RetirementProductType;
+  currency: CurrencyCode;
+  accountCount: number;
+  totalBalance: string;
+}
+
+export interface RetirementCurrencyTotal {
+  currency: CurrencyCode;
+  totalBalance: string;
+}
+
+export interface RetirementSummary {
+  byProductType: RetirementProductSummary[];
+  totalCorpus: RetirementCurrencyTotal[];
 }
 
 export interface CashFlowSnapshot {
