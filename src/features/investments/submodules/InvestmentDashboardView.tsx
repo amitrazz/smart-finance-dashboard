@@ -7,7 +7,8 @@ import { LotTable } from "../components/LotTable";
 import { GoalProgressCard } from "../components/GoalProgressCard";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
-import { formatCurrency, formatPercent } from "../../../utils/formatters";
+import { formatCurrency } from "../../../utils/formatters";
+import { describePortfolioReturn, describeRealizedGain } from "../utils/portfolioReturn";
 import { Holding } from "../../../types";
 import { Wallet, TrendingUp, Award, PieChart, Target } from "lucide-react";
 
@@ -53,7 +54,7 @@ export const InvestmentDashboardView: React.FC<InvestmentDashboardViewProps> = (
   }
 
   const snapshot = portfolio.latestSnapshot;
-  const xirrPercent = snapshot.xirr !== null ? parseFloat(snapshot.xirr) * 100 : null;
+  const portfolioReturn = describePortfolioReturn(snapshot);
 
   return (
     <div className="space-y-8">
@@ -74,16 +75,16 @@ export const InvestmentDashboardView: React.FC<InvestmentDashboardViewProps> = (
           accentColor={parseFloat(snapshot.totalUnrealizedGain.amount) >= 0 ? "emerald" : "rose"}
         />
         <MetricCard
-          title="XIRR"
-          value={xirrPercent !== null ? formatPercent(xirrPercent) : "—"}
-          subtitle="Cash-flow weighted return"
+          title={portfolioReturn.title}
+          value={portfolioReturn.value ?? "—"}
+          subtitle={portfolioReturn.subtitle}
           icon={<Award className="w-6 h-6 text-purple-400" />}
           accentColor="purple"
         />
         <MetricCard
           title="Realized Gain (Lifetime)"
           value={snapshot.totalRealizedGain}
-          subtitle={`${portfolio.holdings.length} open holdings`}
+          subtitle={describeRealizedGain(snapshot)}
           icon={<PieChart className="w-6 h-6 text-sky-400" />}
           accentColor="sky"
         />
@@ -122,16 +123,33 @@ export const InvestmentDashboardView: React.FC<InvestmentDashboardViewProps> = (
       {/* Recent Trades */}
       <div className="space-y-3">
         <h3 className="text-base font-bold text-slate-100">Recent Trades</h3>
+        {/*
+          Trade rows are a grid, not `justify-between`.
+
+          Flex distributes free space *within each row independently*, so a long
+          symbol pushed that row's "BUY" and unit count sideways while a short
+          one let them drift back — four columns that never lined up with the row
+          above. A shared grid template gives every row the same column edges,
+          and the numeric columns are right-aligned and `tabular-nums` so the
+          digits stack too.
+        */}
         {trades.length === 0 ? (
           <EmptyState title="No Trades Yet" message="Recorded trades will appear here." />
         ) : (
           <div className="space-y-2">
             {trades.map((t) => (
-              <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
-                <span className="font-bold text-slate-100">{t.security?.symbol || "—"}</span>
-                <span className="font-semibold text-slate-400">{t.type}</span>
-                <span className="font-mono text-slate-400">{t.quantity} units</span>
-                <span className="font-mono text-slate-500">{t.tradeDate}</span>
+              <div
+                key={t.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs sm:grid-cols-[minmax(0,2fr)_5rem_minmax(0,1fr)_6.5rem]"
+              >
+                <span className="truncate font-bold text-slate-100">{t.security?.symbol || "—"}</span>
+                <span className="text-right font-semibold text-slate-400 sm:text-left">{t.type}</span>
+                <span className="font-mono tabular-nums text-slate-400 sm:text-right">
+                  {t.quantity} units
+                </span>
+                <span className="text-right font-mono tabular-nums text-slate-500">
+                  {t.tradeDate}
+                </span>
               </div>
             ))}
           </div>

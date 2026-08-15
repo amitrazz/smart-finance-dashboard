@@ -797,3 +797,43 @@ describe("zero is not the same as unavailable", () => {
     expect(genuinelyZero!.totalValuation).toEqual(money("0.00"));
   });
 });
+
+describe("XIRR is a rate, not a number to average", () => {
+  const portfolio = (id: string, xirr: string | null, marketValue = "150000") => ({
+    portfolioId: id,
+    name: id,
+    xirr,
+    totalMarketValue: marketValue,
+    totalCostBasis: "120000",
+    totalUnrealizedGain: "30000",
+    holdings: [],
+  });
+
+  it("scales the wire fraction to whole percent, like every other consumer", () => {
+    // Regression: the wire sends a fraction ("0.125"). Five other screens
+    // multiply by 100; Insights did not, so a 12.5% return read "0.1%".
+    const result = mapInvestments([portfolio("p1", "0.125")], null);
+    expect(result!.xirrPercent).toBe(12.5);
+  });
+
+  it("refuses to blend two portfolios' XIRRs into one figure", () => {
+    // Internal rates of return are roots of different cash-flow polynomials.
+    // The old mapper averaged them, so a small portfolio at 40% beside a large
+    // one at 2% reported 21% — a number describing no actual portfolio.
+    const result = mapInvestments(
+      [portfolio("small", "0.40", "5000"), portfolio("large", "0.02", "500000")],
+      null,
+    );
+
+    expect(result!.xirrPercent).toBeNull();
+  });
+
+  it("still reports the real figure when only one portfolio publishes one", () => {
+    const result = mapInvestments(
+      [portfolio("p1", "0.083"), portfolio("p2", null)],
+      null,
+    );
+
+    expect(result!.xirrPercent).toBeCloseTo(8.3, 5);
+  });
+});

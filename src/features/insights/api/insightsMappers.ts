@@ -723,8 +723,31 @@ export function mapInvestments(
   const totalCost = sumReported((p) => num(p.totalCostBasis));
   const totalGain = sumReported((p) => num(p.totalUnrealizedGain));
 
-  // Only portfolios that actually report an XIRR contribute to the average.
-  const xirrs = list.map((p) => num(p.xirr)).filter((v): v is number => v !== null);
+  /**
+   * XIRR, and why there is usually no portfolio-wide one.
+   *
+   * Two defects lived here. The figure was read with `num(p.xirr)` and rendered
+   * as a percentage, but the wire value is a **fraction** — every other consumer
+   * in the app (`InvestmentDashboardView`, `PortfolioOverviewView`,
+   * `PerformanceView`, `InvestmentSummaryCard`, `AnalyticsView`) multiplies by
+   * 100, so Insights was reporting a 12.5% return as "0.1%".
+   *
+   * The second is worse and is why no aggregate is produced. The old code took
+   * the arithmetic mean of each portfolio's XIRR. Internal rates of return do
+   * not average — each is the root of a different cash-flow polynomial, so the
+   * mean of two IRRs is not the IRR of the combined flows, and no weighting
+   * fixes that because the timing of the flows is what the rate encodes. A
+   * ₹5,000 portfolio at 40% beside a ₹5,00,000 one at 2% reported 21%.
+   *
+   * A true blended XIRR needs every dated cash flow across all portfolios, and
+   * this endpoint publishes none. So: one portfolio reporting an XIRR gives a
+   * real money-weighted return; several give `null`, and the section says the
+   * figure is per portfolio rather than inventing a combined one.
+   */
+  const xirrs = list
+    .map((p) => num(p.xirr))
+    .filter((v): v is number => v !== null)
+    .map((fraction) => Math.round(fraction * 100 * 100) / 100);
 
   const holdings = list
     .flatMap((p) => p.holdings ?? [])
@@ -742,7 +765,7 @@ export function mapInvestments(
       totalCost !== null && totalCost > 0 && totalGain !== null
         ? (totalGain / totalCost) * 100
         : null,
-    xirrPercent: xirrs.length > 0 ? xirrs.reduce((s, v) => s + v, 0) / xirrs.length : null,
+    xirrPercent: xirrs.length === 1 ? xirrs[0] : null,
     bestHolding: toHolding(holdings[0]),
     worstHolding: holdings.length > 1 ? toHolding(holdings[holdings.length - 1]) : null,
     allocation: (allocationRes?.allocations ?? []).map((a) => ({

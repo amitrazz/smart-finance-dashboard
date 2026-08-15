@@ -6,7 +6,8 @@ import { PortfolioChart, PortfolioChartTimeframe } from "../components/Portfolio
 import { TransactionTable } from "../components/TransactionTable";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
-import { formatCurrency, formatPercent } from "../../../utils/formatters";
+import { formatCurrency } from "../../../utils/formatters";
+import { describePortfolioReturn, describeRealizedGain } from "../utils/portfolioReturn";
 import { Wallet, TrendingUp, Award, PieChart } from "lucide-react";
 
 const timeframeToDateFrom = (tf: PortfolioChartTimeframe): string | undefined => {
@@ -60,7 +61,7 @@ export const PortfolioOverviewView: React.FC = () => {
   }
 
   const snapshot = portfolio.latestSnapshot;
-  const xirrPercent = snapshot.xirr !== null ? parseFloat(snapshot.xirr) * 100 : null;
+  const portfolioReturn = describePortfolioReturn(snapshot);
 
   return (
     <div className="space-y-8">
@@ -96,15 +97,16 @@ export const PortfolioOverviewView: React.FC = () => {
           accentColor={parseFloat(snapshot.totalUnrealizedGain.amount) >= 0 ? "emerald" : "rose"}
         />
         <MetricCard
-          title="XIRR"
-          value={xirrPercent !== null ? formatPercent(xirrPercent) : "—"}
-          subtitle="Cash-flow weighted"
+          title={portfolioReturn.title}
+          value={portfolioReturn.value ?? "—"}
+          subtitle={portfolioReturn.subtitle}
           icon={<Award className="w-6 h-6 text-purple-400" />}
           accentColor="purple"
         />
         <MetricCard
           title="Realized Gain (Lifetime)"
           value={snapshot.totalRealizedGain}
+          subtitle={describeRealizedGain(snapshot)}
           icon={<PieChart className="w-6 h-6 text-sky-400" />}
           accentColor="sky"
         />

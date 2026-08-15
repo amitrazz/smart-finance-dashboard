@@ -66,7 +66,7 @@ export const PerformanceView: React.FC = () => {
           <p className="text-xl font-extrabold text-emerald-400 font-mono">
             {xirrPercent !== null ? formatPercent(xirrPercent) : "—"}
           </p>
-          <span className="text-[10px] text-slate-500">Cash-flow weighted return</span>
+          <span className="text-[10px] text-slate-500">Annualised, money-weighted</span>
         </div>
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl space-y-1">
           <span className="text-[10px] uppercase font-bold text-slate-400">Market Value</span>

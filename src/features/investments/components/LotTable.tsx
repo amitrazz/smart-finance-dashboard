@@ -44,7 +44,7 @@ const LotsSubTable: React.FC<{ holdingId: string; currency: string }> = ({ holdi
               </td>
               <td className="p-3 text-center">
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                  className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-0.5 text-[10px] font-bold ${
                     lot.status === "OPEN"
                       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                       : "bg-slate-800 text-slate-400 border-slate-700"
@@ -118,15 +118,24 @@ export const LotTable: React.FC<LotTableProps> = ({ holdings, onSelectAsset }) =
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs font-mono text-slate-400">{h.security?.symbol || "—"}</span>
                             {h.security?.sector && (
-                              <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                              <span className="inline-flex items-center whitespace-nowrap rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">
                                 {h.security.sector}
                               </span>
                             )}
                           </div>
                         </div>
                       </td>
+                      {/*
+                        `inline-flex` + `whitespace-nowrap`, not a bare `span`.
+                        A plain inline element fragments its background and
+                        border across line boxes, so a two-word class like
+                        "MUTUAL FUND" wrapped into two half-drawn pills with the
+                        padding applied only to the start of the first line and
+                        the end of the last. The chip is one box and stays on one
+                        line; the column takes the width it needs instead.
+                      */}
                       <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700">
+                        <span className="inline-flex items-center whitespace-nowrap rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300">
                           {h.security?.assetClass?.replace(/_/g, " ") || "—"}
                         </span>
                       </td>

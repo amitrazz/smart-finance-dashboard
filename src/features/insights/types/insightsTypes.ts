@@ -307,7 +307,13 @@ export interface InvestmentAnalyticsOverview {
   totalValuation: Money | null;
   totalGain: Money | null;
   totalGainPercent: number | null;
-  /** Average XIRR across portfolios that report one. `null` when none do. */
+  /**
+   * Money-weighted return, as whole percent, when exactly one portfolio reports
+   * an XIRR. `null` when none does — and also when several do, because internal
+   * rates of return cannot be combined without the underlying dated cash flows,
+   * which this endpoint does not publish. Averaging them is not an
+   * approximation, it is a different quantity.
+   */
   xirrPercent: number | null;
   bestHolding: { symbol: string; name: string; returnPercent: number } | null;
   worstHolding: { symbol: string; name: string; returnPercent: number } | null;

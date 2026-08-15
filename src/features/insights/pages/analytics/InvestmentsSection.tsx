@@ -43,7 +43,11 @@ export const InvestmentsSection: React.FC = () => {
               label="XIRR"
               value={data.xirrPercent}
               suffix="%"
-              caption="Average across portfolios reporting one"
+              caption={
+                data.xirrPercent === null
+                  ? "Not combinable across portfolios"
+                  : "Money-weighted return"
+              }
             />
             <AnalyticsKpi
               label="Asset classes"

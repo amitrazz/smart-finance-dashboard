@@ -939,6 +939,32 @@ export interface Portfolio {
 // Matches PortfolioSnapshotResponseDto — computed by
 // PortfolioSnapshotComputationService, refreshed on every trade plus a daily
 // cron sweep. xirr is null when it can't be computed (not fabricated).
+/**
+ * The snapshot's own guidance on which return figure to lead with.
+ *
+ * XIRR is annualised, so over a short holding period it extrapolates noise into
+ * a headline: this portfolio's real 12-day gain of 0.51% annualises to 16.79%.
+ * Rather than leave every client to invent its own threshold, the backend
+ * publishes the period it measured, whether that period is too short to
+ * annualise responsibly, and which metric it wants headlined.
+ *
+ * Optional because it post-dates earlier snapshots — treat its absence as "no
+ * guidance", not as `isShortPeriod: false`.
+ */
+export interface PortfolioPerformance {
+  gainLossAmount: Money;
+  /** The return actually realised over `periodDays`, as whole percent. */
+  actualPeriodReturnPercentage: string;
+  /** XIRR as whole percent — the same figure as `xirr`, pre-scaled. */
+  annualizedMoneyWeightedReturnPercentage: string;
+  periodStart: string;
+  periodEnd: string;
+  periodDays: number;
+  /** True when `periodDays` is too short for the annualised figure to be meaningful. */
+  isShortPeriod: boolean;
+  headlineMetric: "ACTUAL_PERIOD_RETURN" | "ANNUALIZED_MONEY_WEIGHTED_RETURN";
+}
+
 export interface PortfolioSnapshot {
   snapshotDate: string;
   totalMarketValue: Money;
@@ -946,7 +972,9 @@ export interface PortfolioSnapshot {
   totalUnrealizedGain: Money;
   totalRealizedGain: Money;
   allocationByAssetClass: Record<string, number>;
+  /** Money-weighted annualised return as a *fraction* ("0.1679" = 16.79%). */
   xirr: string | null;
+  performance?: PortfolioPerformance;
 }
 
 // Matches PortfolioDetailResponseDto (GET /finance/portfolio/:id).
