@@ -1575,7 +1575,14 @@ export interface CreateRetirementAccountInput {
   productType: RetirementProductType;
   name: string;
   currency: CurrencyCode;
+  institutionId?: string;
+  accountNumber?: string;
   linkedAccountId?: string;
+  openedDate?: string;
+  maturityDate?: string;
+  interestRate?: string;
+  employerName?: string;
+  notes?: string;
   openingBalance?: string;
   openingBalanceDate?: string;
 }
@@ -1584,8 +1591,11 @@ export interface CreateRetirementAccountInput {
 // balance columns (enforced server-side).
 export interface UpdateRetirementAccountInput {
   name?: string;
-  institution?: string;
+  institutionId?: string;
+  accountNumber?: string;
   linkedAccountId?: string;
+  openedDate?: string;
+  maturityDate?: string;
   interestRate?: string;
   employerName?: string;
   notes?: string;

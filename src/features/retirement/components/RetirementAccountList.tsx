@@ -6,6 +6,7 @@ import { Money as MoneyDisplay } from "../../../components/common/Money";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { PRODUCT_TYPE_CONFIG, PRODUCT_TYPE_LIST, STATUS_LABELS } from "../constants/productTypes";
 import { useRetirementAccounts } from "../hooks/useRetirementQueries";
+import { useInstitutions } from "../../../hooks/useFinanceQueries";
 
 interface RetirementAccountListProps {
   onSelectAccount: (account: RetirementAccount) => void;
@@ -22,6 +23,12 @@ export const RetirementAccountList: React.FC<RetirementAccountListProps> = ({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
+  const { data: institutions = [] } = useInstitutions({ limit: 100 });
+
+  const getInstitutionInfo = (id: string | null) => {
+    if (!id) return null;
+    return institutions.find((i) => i.id === id) || null;
+  };
 
   // Server-side cursor pagination — the shared page-number Pagination
   // component assumes a known total-page count, which a cursor API doesn't
@@ -175,7 +182,22 @@ export const RetirementAccountList: React.FC<RetirementAccountListProps> = ({
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="font-bold text-slate-100">{account.name}</p>
-                        {account.employerName && <p className="text-[11px] text-slate-500">{account.employerName}</p>}
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                          {account.employerName && <span>{account.employerName}</span>}
+                          {account.employerName && getInstitutionInfo(account.institutionId) && <span>•</span>}
+                          {(() => {
+                            const inst = getInstitutionInfo(account.institutionId);
+                            if (!inst) return null;
+                            return (
+                              <span className="inline-flex items-center gap-1">
+                                {inst.logoUrl && (
+                                  <img src={inst.logoUrl} alt="" className="w-3.5 h-3.5 rounded object-contain shrink-0" />
+                                )}
+                                <span>{inst.name}</span>
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-3.5">
                         <span
@@ -227,6 +249,22 @@ export const RetirementAccountList: React.FC<RetirementAccountListProps> = ({
                     </span>
                   </div>
                   <p className="font-bold text-slate-100 text-sm">{account.name}</p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                    {account.employerName && <span>{account.employerName}</span>}
+                    {account.employerName && getInstitutionInfo(account.institutionId) && <span>•</span>}
+                    {(() => {
+                      const inst = getInstitutionInfo(account.institutionId);
+                      if (!inst) return null;
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          {inst.logoUrl && (
+                            <img src={inst.logoUrl} alt="" className="w-3.5 h-3.5 rounded object-contain shrink-0" />
+                          )}
+                          <span>{inst.name}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">{formatDate(account.lastValuedAt)}</span>
                     <span className="font-bold text-slate-100">

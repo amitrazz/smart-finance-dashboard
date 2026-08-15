@@ -6,6 +6,7 @@ import { PRODUCT_TYPE_CONFIG, PRODUCT_TYPE_LIST } from "../constants/productType
 import { RetirementProductType } from "../../../types";
 import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
 import { formatCurrency } from "../../../utils/formatters";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 
 interface CreateRetirementAccountModalProps {
   isOpen: boolean;
@@ -21,6 +22,14 @@ export const CreateRetirementAccountModal: React.FC<CreateRetirementAccountModal
   const [productType, setProductType] = useState<RetirementProductType>("EPF");
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState("INR");
+  const [institutionId, setInstitutionId] = useState<string | undefined>(undefined);
+  const [institutionName, setInstitutionName] = useState<string | undefined>(undefined);
+  const [accountNumber, setAccountNumber] = useState("");
+  const [openedDate, setOpenedDate] = useState("");
+  const [maturityDate, setMaturityDate] = useState("");
+  const [interestRate, setInterestRate] = useState("");
+  const [employerName, setEmployerName] = useState("");
+  const [notes, setNotes] = useState("");
   const [linkedAccountId, setLinkedAccountId] = useState("");
   const [openingBalance, setOpeningBalance] = useState("");
   const [openingBalanceDate, setOpeningBalanceDate] = useState("");
@@ -37,6 +46,14 @@ export const CreateRetirementAccountModal: React.FC<CreateRetirementAccountModal
     setProductType("EPF");
     setName("");
     setCurrency("INR");
+    setInstitutionId(undefined);
+    setInstitutionName(undefined);
+    setAccountNumber("");
+    setOpenedDate("");
+    setMaturityDate("");
+    setInterestRate("");
+    setEmployerName("");
+    setNotes("");
     setLinkedAccountId("");
     setOpeningBalance("");
     setOpeningBalanceDate("");
@@ -54,6 +71,13 @@ export const CreateRetirementAccountModal: React.FC<CreateRetirementAccountModal
         productType,
         name,
         currency,
+        institutionId: institutionId || undefined,
+        accountNumber: accountNumber || undefined,
+        openedDate: openedDate || undefined,
+        maturityDate: maturityDate || undefined,
+        interestRate: interestRate || undefined,
+        employerName: PRODUCT_TYPE_CONFIG[productType].allowsEmployerContribution ? employerName || undefined : undefined,
+        notes: notes || undefined,
         linkedAccountId: linkedAccountId || undefined,
         // Both must be present together — an opening balance without a date
         // (or vice versa) is meaningless to the atomic OPENING_BALANCE seed.
@@ -138,6 +162,92 @@ export const CreateRetirementAccountModal: React.FC<CreateRetirementAccountModal
               placeholder={`e.g. ${PRODUCT_TYPE_CONFIG[productType].shortLabel} - Acme Corp`}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="create-retirement-institution" className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Institution (Optional)
+            </label>
+            <InstitutionPicker
+              id="create-retirement-institution"
+              value={institutionId}
+              valueLabel={institutionName}
+              onChange={(id, inst) => {
+                setInstitutionId(id);
+                setInstitutionName(inst?.name);
+              }}
+              placeholder="e.g. EPFO, ICICI Bank, HDFC Bank…"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Account Number (Optional)</label>
+              <input
+                type="text"
+                placeholder="UAN, PRAN, PPF No…"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Interest Rate (%) (Optional)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="8.15"
+                value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Opened Date (Optional)</label>
+              <input
+                type="date"
+                value={openedDate}
+                onChange={(e) => setOpenedDate(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Maturity Date (Optional)</label>
+              <input
+                type="date"
+                value={maturityDate}
+                onChange={(e) => setMaturityDate(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          {PRODUCT_TYPE_CONFIG[productType].allowsEmployerContribution && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Employer Name (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Acme Corp"
+                value={employerName}
+                onChange={(e) => setEmployerName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Notes (Optional)</label>
+            <textarea
+              rows={2}
+              placeholder="Any details or description…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
             />
           </div>

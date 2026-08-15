@@ -7,8 +7,9 @@ import { PRODUCT_TYPE_CONFIG, STATUS_LABELS, TRANSACTION_TYPE_LABELS } from "../
 import { TransactionTypeBadge } from "./TransactionTypeBadge";
 import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import { EmptyState } from "../../../components/common/EmptyState";
-import { useAccounts } from "../../../hooks/useFinanceQueries";
+import { useAccounts, useInstitution } from "../../../hooks/useFinanceQueries";
 import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
+import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 import {
   useCloseRetirementAccount,
   useRetirementTransactions,
@@ -35,7 +36,11 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
-  const [editInstitution, setEditInstitution] = useState("");
+  const [editInstitutionId, setEditInstitutionId] = useState<string | undefined>(undefined);
+  const [editInstitutionName, setEditInstitutionName] = useState<string | undefined>(undefined);
+  const [editAccountNumber, setEditAccountNumber] = useState("");
+  const [editOpenedDate, setEditOpenedDate] = useState("");
+  const [editMaturityDate, setEditMaturityDate] = useState("");
   const [editInterestRate, setEditInterestRate] = useState("");
   const [editEmployerName, setEditEmployerName] = useState("");
   const [editNotes, setEditNotes] = useState("");
@@ -57,11 +62,16 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
     search: linkedAccountSearch || undefined,
     limit: 20,
   });
+  const { data: institution } = useInstitution(account?.institutionId || "");
 
   useEffect(() => {
     if (account) {
       setEditName(account.name);
-      setEditInstitution("");
+      setEditInstitutionId(account.institutionId || undefined);
+      setEditInstitutionName(undefined);
+      setEditAccountNumber(account.accountNumber ?? "");
+      setEditOpenedDate(account.openedDate ?? "");
+      setEditMaturityDate(account.maturityDate ?? "");
       setEditInterestRate(account.interestRate ?? "");
       setEditEmployerName(account.employerName ?? "");
       setEditNotes(account.notes ?? "");
@@ -84,9 +94,12 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
         id: account.id,
         data: {
           name: editName,
-          institution: editInstitution || undefined,
+          institutionId: editInstitutionId || undefined,
+          accountNumber: editAccountNumber || undefined,
+          openedDate: editOpenedDate || undefined,
+          maturityDate: editMaturityDate || undefined,
           interestRate: editInterestRate || undefined,
-          employerName: editEmployerName || undefined,
+          employerName: config.allowsEmployerContribution ? editEmployerName || undefined : undefined,
           notes: editNotes || undefined,
           linkedAccountId: editLinkedAccountId || undefined,
         },
@@ -225,13 +238,26 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label htmlFor="edit-retirement-institution" className="block text-xs font-semibold text-slate-300 mb-1.5">Institution</label>
+                  <InstitutionPicker
+                    id="edit-retirement-institution"
+                    value={editInstitutionId}
+                    valueLabel={editInstitutionName || institution?.name || undefined}
+                    onChange={(id, inst) => {
+                      setEditInstitutionId(id);
+                      setEditInstitutionName(inst?.name);
+                    }}
+                    placeholder="e.g. EPFO, ICICI Bank, HDFC Bank…"
+                  />
+                </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Institution</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Account Number</label>
                   <input
                     type="text"
-                    placeholder="e.g. ICICI Bank"
-                    value={editInstitution}
-                    onChange={(e) => setEditInstitution(e.target.value)}
+                    placeholder="e.g. UAN / PRAN / PPF No"
+                    value={editAccountNumber}
+                    onChange={(e) => setEditAccountNumber(e.target.value)}
                     className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-teal-500"
                   />
                 </div>
@@ -242,6 +268,26 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
                     step="0.01"
                     value={editInterestRate}
                     onChange={(e) => setEditInterestRate(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Opened Date</label>
+                  <input
+                    type="date"
+                    value={editOpenedDate}
+                    onChange={(e) => setEditOpenedDate(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Maturity Date</label>
+                  <input
+                    type="date"
+                    value={editMaturityDate}
+                    onChange={(e) => setEditMaturityDate(e.target.value)}
                     className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-teal-500"
                   />
                 </div>
@@ -297,6 +343,15 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
 
           {/* Metadata */}
           <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 col-span-2">
+              <span className="text-slate-400 block">Institution</span>
+              <span className="font-semibold text-slate-200 flex items-center gap-2 mt-0.5">
+                {institution?.logoUrl && (
+                  <img src={institution.logoUrl} alt="" className="w-5 h-5 rounded object-contain shrink-0" />
+                )}
+                {account.institutionId ? (institution?.name || "Loading...") : "Independent / Cash"}
+              </span>
+            </div>
             <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
               <span className="text-slate-400 block">Account Number</span>
               <span className="font-semibold text-slate-200">{account.accountNumber || "—"}</span>
