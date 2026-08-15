@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, Transition, useReducedMotion } from "framer-motion";
 import { X, CheckCircle2, Clock, EyeOff } from "lucide-react";
 import { IntelligenceItem } from "../../api/intelligenceModel";
-import { Money } from "../../../../components/common/Money";
 import { Button } from "../../../../components/ui/Button";
 import { useUIStore } from "../../../../store/useUIStore";
 import { resolveActionRoute } from "../../utils/actionRoutes";
@@ -74,7 +73,11 @@ export const InsightDetail: React.FC<InsightDetailProps> = ({
 
   const badge = itemBadge(item);
   const due = formatDueIn(item.dueInDays);
-  const destination = resolveActionRoute(item.deepLink);
+  const destination = resolveActionRoute({
+    deepLink: item.deepLink,
+    component: item.component,
+    category: item.category,
+  });
 
   const isActionable = item.actionable !== false;
   const isDismissible = item.dismissible !== false;
@@ -89,8 +92,8 @@ export const InsightDetail: React.FC<InsightDetailProps> = ({
     setShowSnoozePresets(false);
   };
 
-  const backdropTransition = prefersReducedMotion ? { duration: 0 } : { duration: 0.2 };
-  const drawerTransition = prefersReducedMotion
+  const backdropTransition: Transition = prefersReducedMotion ? { duration: 0 } : { duration: 0.2 };
+  const drawerTransition: Transition = prefersReducedMotion
     ? { duration: 0 }
     : { type: "spring", damping: 30, stiffness: 300 };
 

@@ -3,7 +3,6 @@ import { ArrowRight } from "lucide-react";
 import { ForecastAnalytics } from "../../types/insightsTypes";
 import { MetricValue } from "../common/MetricValue";
 import { ProjectionBadge } from "../common/Badges";
-import { InsightsEmptyState } from "../primitives/States";
 import { useUIStore } from "../../../../store/useUIStore";
 
 /**

@@ -4,7 +4,6 @@ import { Calendar, ArrowRight, ShieldCheck, CheckCircle2, Clock, Zap, Loader2 } 
 import { useUpcomingEvents, useMarkEventAction } from "../../calendar/hooks/useFinancialCalendar";
 import { formatCurrency } from "../../../utils/formatters";
 import { useUIStore } from "../../../store/useUIStore";
-import { FinancialCalendarEvent } from "../../calendar/types";
 import type { Money as MoneyType } from "../../../types";
 
 interface UpcomingEventsTimelineProps {
@@ -41,7 +40,7 @@ export const UpcomingEventsTimeline: React.FC<UpcomingEventsTimelineProps> = ({ 
   const handlePayBill = (deepLink: string | null) => {
     if (deepLink) {
       if (deepLink.includes("intelligence")) {
-        setActiveTab("intelligence");
+        setActiveTab("insights", "intelligence");
       } else if (deepLink.includes("planning")) {
         setActiveTab("planning");
       } else if (deepLink.includes("actions")) {

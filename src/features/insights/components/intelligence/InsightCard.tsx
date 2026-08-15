@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronRight, CheckCircle2, Clock, EyeOff, Calendar } from "lucide-react";
+import { ChevronRight, CheckCircle2, Clock, EyeOff } from "lucide-react";
 import { IntelligenceItem } from "../../api/intelligenceModel";
 import { Money } from "../../../../components/common/Money";
 import { formatDueIn } from "../../utils/insightsFormat";

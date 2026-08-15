@@ -85,13 +85,6 @@ function amountOf(change: FinancialChange | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-const VERDICT_HEADLINE: Record<StoryVerdict, string> = {
-  improved: "Your financial position improved this period.",
-  weakened: "Your financial position weakened this period.",
-  mixed: "Your financial position moved in both directions this period.",
-  steady: "Your financial position held steady this period.",
-};
-
 /**
  * Reads the verdict off the movements themselves — all of them.
  *

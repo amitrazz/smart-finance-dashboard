@@ -37,6 +37,7 @@ import { InsightDetail } from "../components/intelligence/InsightDetail";
 import { dimensionStatus, healthStatus } from "../utils/insightsFormat";
 import { useUIStore } from "../../../store/useUIStore";
 import { Money } from "../../../components/common/Money";
+import type { Money as MoneyValue } from "../../../types";
 
 interface OverviewPageProps {
   onNavigate: (route: InsightsRoute) => void;
@@ -373,10 +374,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
  */
 const FinancialSnapshot: React.FC<{
   changes: FinancialChange[];
-  netWorth: Money | null;
-  netCashFlow: Money | null;
-  liquidity: Money | null;
-  totalDebt: Money | null;
+  netWorth: MoneyValue | null;
+  netCashFlow: MoneyValue | null;
+  liquidity: MoneyValue | null;
+  totalDebt: MoneyValue | null;
 }> = ({ changes, netWorth, netCashFlow, liquidity, totalDebt }) => {
   const byId = new Map(changes.map((change) => [change.id, change]));
   const netWorthChange = byId.get("net-worth");

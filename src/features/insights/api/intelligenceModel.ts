@@ -104,6 +104,10 @@ export interface IntelligenceItem {
   dismissible?: boolean;
   actionable?: boolean;
   expiresAt?: string | null;
+  /** When this item's underlying action was created/last touched. Absent for
+   *  health recommendations, which carry no lifecycle timestamps of their own. */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +294,8 @@ export function mapIntelligence(actions: SmartActionItem[]): IntelligenceItem[] 
         dismissible: action.dismissible,
         actionable: action.actionable,
         expiresAt: action.expiresAt ?? null,
+        createdAt: action.createdAt,
+        updatedAt: action.updatedAt,
       } satisfies Omit<IntelligenceItem, "rank">;
 
       return { ...base, rank: rankOf(base) };

@@ -999,7 +999,7 @@ export function mapChanges(
   }
 
   const history = cashFlow?.history ?? [];
-  if (history.length >= 2) {
+  if (cashFlow && history.length >= 2) {
     const latest = history[history.length - 1];
     const previous = history[history.length - 2];
     const currency = cashFlow?.totalIncome.currency ?? "INR";
@@ -1041,7 +1041,7 @@ export function mapChanges(
   }
 
   const nwHistory = netWorth?.history ?? [];
-  if (nwHistory.length >= 2) {
+  if (netWorth && nwHistory.length >= 2) {
     const latest = nwHistory[nwHistory.length - 1];
     const previous = nwHistory[nwHistory.length - 2];
     const currency = netWorth?.currentNetWorth.currency ?? "INR";
