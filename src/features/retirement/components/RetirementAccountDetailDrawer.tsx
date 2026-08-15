@@ -12,6 +12,7 @@ import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect"
 import { InstitutionPicker } from "../../../components/common/InstitutionPicker";
 import {
   useCloseRetirementAccount,
+  useRetirementAccount,
   useRetirementTransactions,
   useReverseRetirementTransaction,
   useUpdateRetirementAccount,
@@ -50,10 +51,13 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
   const [closeStatus, setCloseStatus] = useState<(typeof CLOSE_STATUS_OPTIONS)[number]["value"]>("MATURED");
   const [isCloseConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [pendingReverseId, setPendingReverseId] = useState<string | null>(null);
+  const [version, setVersion] = useState<number | undefined>(undefined);
 
   const updateMutation = useUpdateRetirementAccount();
   const closeMutation = useCloseRetirementAccount();
   const reverseMutation = useReverseRetirementTransaction();
+
+  const { data: fetchedAccount } = useRetirementAccount(account?.id || "");
 
   const { data: transactionsPage, isLoading: isTransactionsLoading } = useRetirementTransactions(
     account ? { retirementAccountId: account.id, limit: 25 } : undefined,
@@ -77,8 +81,15 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
       setEditNotes(account.notes ?? "");
       setEditLinkedAccountId(account.linkedAccountId ?? "");
       setIsEditing(false);
+      setVersion(account.version);
     }
   }, [account]);
+
+  useEffect(() => {
+    if (fetchedAccount) {
+      setVersion(fetchedAccount.version);
+    }
+  }, [fetchedAccount]);
 
   if (!account) return null;
 
@@ -103,7 +114,7 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
           notes: editNotes || undefined,
           linkedAccountId: editLinkedAccountId || undefined,
         },
-        version: account.version ?? 1,
+        version: version ?? account.version ?? 1,
       },
       { onSuccess: () => setIsEditing(false) },
     );
@@ -111,7 +122,7 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
 
   const handleConfirmClose = () => {
     closeMutation.mutate(
-      { id: account.id, data: { status: closeStatus }, version: account.version ?? 1 },
+      { id: account.id, data: { status: closeStatus }, version: version ?? account.version ?? 1 },
       { onSuccess: () => setCloseConfirmOpen(false) },
     );
   };

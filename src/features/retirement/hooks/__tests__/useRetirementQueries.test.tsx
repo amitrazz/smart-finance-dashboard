@@ -10,6 +10,7 @@ import {
   useCreateRetirementAccount,
   useRecordRetirementTransaction,
   useReverseRetirementTransaction,
+  useUpdateRetirementAccount,
 } from "../useRetirementQueries";
 
 vi.mock("../../../../services/api/endpoints", () => ({
@@ -166,5 +167,20 @@ describe("useCloseRetirementAccount", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(api.closeRetirementAccount).toHaveBeenCalledWith("ra_1", { status: "MATURED" }, 1);
+  });
+});
+
+describe("useUpdateRetirementAccount", () => {
+  it("calls updateRetirementAccount with custom version", async () => {
+    vi.mocked(api.updateRetirementAccount).mockResolvedValue({ id: "ra_1" } as never);
+    const { wrapper } = makeWrapper();
+    const { result } = renderHook(() => useUpdateRetirementAccount(), { wrapper });
+
+    await act(async () => {
+      result.current.mutate({ id: "ra_1", data: { name: "New Name" }, version: 5 });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.updateRetirementAccount).toHaveBeenCalledWith("ra_1", { name: "New Name" }, 5);
   });
 });
