@@ -167,6 +167,8 @@ export interface CashFlowAnalytics {
   history: CashFlowPoint[];
   largestExpenseCategory: { name: string; amount: Money } | null;
   largestIncomeSource: { name: string; amount: Money } | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
 }
 
 // ---------------------------------------------------------------------------

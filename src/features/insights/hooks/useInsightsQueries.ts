@@ -60,7 +60,8 @@ import {
   mapTrends,
   unwrapList,
 } from "../api/insightsMappers";
-import { IntelligenceItem, buildIntelligenceFeed } from "../api/intelligenceModel";
+import { api } from "../../../services/api/endpoints";
+import { IntelligenceItem, buildIntelligenceFeed, mapIntelligence } from "../api/intelligenceModel";
 import { useInsightsPeriodMonths } from "./useInsightsFilters";
 import {
   BudgetAnalytics,
@@ -298,5 +299,30 @@ export function useIntelligenceFeed(): InsightsQueryResult<IntelligenceItem[]> {
     return items.length > 0 ? items : null;
   }, [actions.data, recommendations.data]);
   return combine(value, [actions], [{ query: recommendations, value: recommendations.data }]);
+}
+
+export function useHistoricalInsights(): InsightsQueryResult<IntelligenceItem[]> {
+  const completed = useQuery({
+    queryKey: ["insights", "source", "historicalCompleted"],
+    queryFn: () => api.getSmartActions({ status: "COMPLETED", limit: 10 }),
+    staleTime: 60 * 1000,
+  });
+
+  const dismissed = useQuery({
+    queryKey: ["insights", "source", "historicalDismissed"],
+    queryFn: () => api.getSmartActions({ status: "DISMISSED", limit: 10 }),
+    staleTime: 60 * 1000,
+  });
+
+  const value = useMemo(() => {
+    const list = [
+      ...unwrapList(completed.data),
+      ...unwrapList(dismissed.data),
+    ];
+    const mapped = mapIntelligence(list);
+    return mapped.slice(0, 5);
+  }, [completed.data, dismissed.data]);
+
+  return combine(value, [completed], [{ query: dismissed, value: dismissed.data }]);
 }
 

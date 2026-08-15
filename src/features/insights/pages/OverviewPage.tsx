@@ -7,7 +7,13 @@ import {
   useForecastAnalytics,
   useIntelligenceFeed,
   useNetWorthAnalytics,
+  useHistoricalInsights,
 } from "../hooks/useInsightsQueries";
+import {
+  useDismissAction,
+  useCompleteAction,
+  useSnoozeAction,
+} from "../../actions/hooks/useSmartActions";
 import { FinancialChange, mapChanges } from "../api/insightsMappers";
 import { IntelligenceItem, attentionCount } from "../api/intelligenceModel";
 import { buildFinancialStory } from "../utils/financialStory";
@@ -28,9 +34,9 @@ import { MoneyFlow } from "../components/overview/MoneyFlow";
 import { TrajectoryStrip } from "../components/overview/TrajectoryStrip";
 import { InsightCard } from "../components/intelligence/InsightCard";
 import { InsightDetail } from "../components/intelligence/InsightDetail";
-import { healthStatus } from "../utils/insightsFormat";
+import { dimensionStatus, healthStatus } from "../utils/insightsFormat";
 import { useUIStore } from "../../../store/useUIStore";
-import { Money } from "../../../types";
+import { Money } from "../../../components/common/Money";
 
 interface OverviewPageProps {
   onNavigate: (route: InsightsRoute) => void;
@@ -68,6 +74,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   const forecast = useForecastAnalytics();
   const navigateToRoute = useUIStore((s) => s.navigateToRoute);
 
+  const dismissMutation = useDismissAction();
+  const completeMutation = useCompleteAction();
+  const snoozeMutation = useSnoozeAction();
+
   const [openItem, setOpenItem] = useState<IntelligenceItem | null>(null);
 
   const changes = useMemo(
@@ -75,15 +85,22 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
     [netWorth.data, cashFlow.data],
   );
 
-  const story = useMemo(
-    () => buildFinancialStory({ netWorth: netWorth.data, cashFlow: cashFlow.data, changes }),
-    [netWorth.data, cashFlow.data, changes],
-  );
-
   const positionLoading = netWorth.isLoading || cashFlow.isLoading;
   const positionFailed = netWorth.isError && cashFlow.isError;
   const nextAction = feed.data?.[0] ?? null;
   const needsAttention = feed.data ? attentionCount(feed.data) : 0;
+
+  const story = useMemo(
+    () =>
+      buildFinancialStory({
+        netWorth: netWorth.data,
+        cashFlow: cashFlow.data,
+        changes,
+        attentionCount: needsAttention,
+        healthRating: health.data?.rating,
+      }),
+    [netWorth.data, cashFlow.data, changes, needsAttention, health.data?.rating],
+  );
 
   return (
     <div className="space-y-6">
@@ -118,7 +135,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 changes={changes}
                 netWorth={netWorth.data?.currentNetWorth ?? null}
                 netCashFlow={cashFlow.data?.netCashFlow ?? null}
-                savingsRate={cashFlow.data?.savingsRatePercent ?? null}
+                liquidity={
+                  netWorth.data?.assetBreakdown.find((a) => a.category === "Cash & savings")?.value ??
+                  null
+                }
                 totalDebt={debt.data?.totalDebt ?? null}
               />
             )}
@@ -147,7 +167,18 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
         }}
       >
         {() =>
-          nextAction ? <InsightCard item={nextAction} onOpen={setOpenItem} featured /> : null
+          nextAction ? (
+            <InsightCard
+              item={nextAction}
+              onOpen={setOpenItem}
+              featured
+              onComplete={(id, version) => completeMutation.mutate({ id, version })}
+              onDismiss={(id, version) => dismissMutation.mutate({ id, version })}
+              onSnooze={(id, version, snoozedUntil) =>
+                snoozeMutation.mutate({ id, version, snoozedUntil })
+              }
+            />
+          ) : null
         }
       </InsightsSection>
 
@@ -159,6 +190,55 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
             description="Movement between two recorded snapshots, sorted by whether it went your way."
           />
           {positionLoading ? <MetricRowSkeleton columns={2} /> : <WhatChanged changes={changes} />}
+        </section>
+      </Surface>
+
+      {/* ---- Why it changed ---- */}
+      <Surface>
+        <section className="space-y-4 p-4 sm:p-5" aria-label="Why it changed">
+          <SectionHeader
+            title="Why it changed"
+            description="Contributing factors and primary drivers of your cash flow and spending this period."
+          />
+          {positionLoading ? (
+            <MetricRowSkeleton columns={2} />
+          ) : cashFlow.data ? (
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Income Drivers</span>
+                {cashFlow.data.largestIncomeSource ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-300">
+                      Primary driver: <span className="font-semibold text-slate-200">{cashFlow.data.largestIncomeSource.name}</span>
+                    </p>
+                    <p className="text-sm font-extrabold text-slate-100">
+                      <Money value={cashFlow.data.largestIncomeSource.amount} fractionDigits={0} />
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No income source details available for this period.</p>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Spending Drivers</span>
+                {cashFlow.data.largestExpenseCategory ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-300">
+                      Primary driver: <span className="font-semibold text-slate-200">{cashFlow.data.largestExpenseCategory.name}</span>
+                    </p>
+                    <p className="text-sm font-extrabold text-slate-100">
+                      <Money value={cashFlow.data.largestExpenseCategory.amount} fractionDigits={0} />
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No spending category details available for this period.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">Detailed drivers aren't available for this period.</p>
+          )}
         </section>
       </Surface>
 
@@ -214,35 +294,70 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
             "The engine hasn't scored this account. Add accounts and transactions, then recalculate from Settings.",
         }}
       >
-        {(data) => (
-          <MetricRow columns={3}>
-            <FinancialMetric
-              label="Health score"
-              value={data.overallScore}
-              suffix=" / 100"
-              precision={0}
-              change={
-                data.monthlyTrend !== null
-                  ? { points: data.monthlyTrend, upIsGood: true, caption: "vs previous snapshot" }
-                  : null
-              }
-            />
-            <FinancialMetric
-              label="Rating"
-              value={healthStatus(data.rating).label}
-              caption="The engine's own band for this score"
-            />
-            <FinancialMetric
-              label="Dimensions scored"
-              value={data.dimensions.filter((d) => d.score !== null).length}
-              precision={0}
-              caption={`of ${data.dimensions.length} measured`}
-            />
-          </MetricRow>
-        )}
+        {(data) => {
+          const status = healthStatus(data.rating);
+          return (
+            <div className="grid gap-6 md:grid-cols-5 items-stretch">
+              {/* Score section (2/5 cols on desktop) */}
+              <div className="md:col-span-2 flex flex-col justify-center p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Overall score</p>
+                <div className="space-y-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-4xl font-extrabold tracking-tight ${status.text}`}>
+                      {data.overallScore}
+                    </span>
+                    <span className="text-slate-500 text-sm">/ 100</span>
+                  </div>
+                  <p className={`text-sm font-bold uppercase tracking-wider ${status.text}`}>
+                    {status.label}
+                  </p>
+                </div>
+                {data.monthlyTrend !== null && data.monthlyTrend !== 0 && (
+                  <p className="text-xs text-slate-400 font-medium">
+                    Trend:{" "}
+                    <span className={data.monthlyTrend > 0 ? "text-emerald-400" : "text-rose-400"}>
+                      {data.monthlyTrend > 0 ? "+" : "−"}
+                      {Math.abs(data.monthlyTrend)} pts
+                    </span>{" "}
+                    vs last snapshot
+                  </p>
+                )}
+              </div>
+
+              {/* Dimensions list (3/5 cols on desktop) */}
+              <div className="md:col-span-3 p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dimension Breakdown</p>
+                <ul className="divide-y divide-slate-850 text-xs">
+                  {data.dimensions.map((d) => {
+                    const dimStat = dimensionStatus(d.score);
+                    return (
+                      <li key={d.code} className="flex justify-between items-center py-2">
+                        <span className="text-slate-300 font-medium">{d.label}</span>
+                        <span className={`font-bold ${dimStat.text}`}>
+                          {d.score !== null ? `${d.score} (${dimStat.label})` : "Unscored"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          );
+        }}
       </InsightsSection>
 
-      <InsightDetail item={openItem} onClose={() => setOpenItem(null)} />
+      <InsightDetail
+        item={openItem}
+        onClose={() => setOpenItem(null)}
+        onComplete={(id, version) => completeMutation.mutate({ id, version })}
+        onDismiss={(id, version) => dismissMutation.mutate({ id, version })}
+        onSnooze={(id, version, snoozedUntil) =>
+          snoozeMutation.mutate({ id, version, snoozedUntil })
+        }
+      />
+
+      {/* ---- 7. Recent insights history -------------------------------- */}
+      <HistoricalInsightsList />
     </div>
   );
 };
@@ -260,12 +375,11 @@ const FinancialSnapshot: React.FC<{
   changes: FinancialChange[];
   netWorth: Money | null;
   netCashFlow: Money | null;
-  savingsRate: number | null;
+  liquidity: Money | null;
   totalDebt: Money | null;
-}> = ({ changes, netWorth, netCashFlow, savingsRate, totalDebt }) => {
+}> = ({ changes, netWorth, netCashFlow, liquidity, totalDebt }) => {
   const byId = new Map(changes.map((change) => [change.id, change]));
   const netWorthChange = byId.get("net-worth");
-  const savingsChange = byId.get("savings-rate");
   const debtChange = byId.get("debt");
 
   return (
@@ -293,14 +407,10 @@ const FinancialSnapshot: React.FC<{
         caption="What this period produced"
       />
       <FinancialMetric
-        label="Savings rate"
-        value={savingsRate}
-        suffix="%"
-        tone={savingsRate !== null && savingsRate < 0 ? "negative" : undefined}
-        change={
-          savingsChange ? { points: savingsChange.points, upIsGood: true } : null
-        }
-        caption="Share of income kept"
+        label="Liquidity"
+        value={liquidity}
+        money
+        caption="Liquid cash & savings"
       />
       <FinancialMetric
         label="Debt"
@@ -314,5 +424,76 @@ const FinancialSnapshot: React.FC<{
         caption="Outstanding balance"
       />
     </MetricRow>
+  );
+};
+
+const HistoricalInsightsList: React.FC = () => {
+  const history = useHistoricalInsights();
+
+  if (history.isLoading) {
+    return <MetricRowSkeleton columns={1} />;
+  }
+
+  if (history.isError || !history.data || history.data.length === 0) {
+    return null;
+  }
+
+  return (
+    <Surface>
+      <section className="space-y-4 p-4 sm:p-5" aria-label="Recent insights history">
+        <SectionHeader
+          title="Recent Insights & Actions History"
+          description="A record of recent actions you completed or dismissed."
+        />
+        <ul className="divide-y divide-slate-800/40">
+          {history.data.map((item) => {
+            const dateLabel = item.updatedAt
+              ? new Date(item.updatedAt).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                })
+              : item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                  })
+                : "";
+
+            const dateStr = item.dueInDays !== null ? `Due in ${item.dueInDays}d` : "";
+            const impactStr = item.financialImpact
+              ? ` · ₹${Math.abs(Number(item.financialImpact.amount)).toLocaleString("en-IN")}`
+              : "";
+            const statusLabel = item.status === "COMPLETED" ? "🟢 Completed" : "⚪ Dismissed";
+
+            return (
+              <li key={item.id} className="py-3 flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {dateLabel && (
+                      <span className="text-[10px] uppercase font-bold text-slate-500">
+                        {dateLabel}:
+                      </span>
+                    )}
+                    <span className="text-xs font-bold text-slate-200">{item.title}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">{item.observed}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                    {statusLabel}
+                  </span>
+                  {(dateStr || impactStr) && (
+                    <p className="text-[9px] text-slate-500 mt-1">
+                      {dateStr}
+                      {impactStr}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </Surface>
   );
 };

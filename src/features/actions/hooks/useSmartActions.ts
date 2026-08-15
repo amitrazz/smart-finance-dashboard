@@ -92,6 +92,7 @@ export function useUpdateActionPreferences() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actionPreferences"] });
       queryClient.invalidateQueries({ queryKey: ["smartActions"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
       useUIStore.getState().showToast("Action preferences saved successfully", "success");
     },
     onError: (err: MutationError) => {
@@ -136,6 +137,7 @@ export function useDismissAction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["smartActions"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
       useUIStore.getState().showToast("Action dismissed", "info");
     },
     onError: (err, _variables, context) => {
@@ -163,6 +165,7 @@ export function useCompleteAction() {
       queryClient.invalidateQueries({ queryKey: ["smartActions"] });
       queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
       useUIStore.getState().showToast("Action completed! Financial health updated.", "success");
     },
     onError: (err, _variables, context) => {
@@ -196,6 +199,7 @@ export function useSnoozeAction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["smartActions"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
       useUIStore.getState().showToast("Action snoozed", "info");
     },
     onError: (err, _variables, context) => {
@@ -215,6 +219,7 @@ export function useRefreshActions() {
       queryClient.invalidateQueries({ queryKey: ["smartActions"] });
       queryClient.invalidateQueries({ queryKey: ["financialHealth"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
       useUIStore.getState().showToast("Smart Action Center refreshed", "success");
     },
     onError: (err: MutationError) => {

@@ -24,7 +24,7 @@
  * The only client-side additions are *ordering* and *presentation grouping*,
  * neither of which changes what exists.
  */
-import { ActionEvidence, Money, SmartActionItem } from "../../../types";
+import type { ActionEvidence, Money, SmartActionItem } from "../../../types";
 import { RiskSeverity, SmartRecommendation } from "../types/insightsTypes";
 import { asMoney, num, riskConfidencePercent, riskSubject } from "./insightsMappers";
 
@@ -97,6 +97,13 @@ export interface IntelligenceItem {
   component: string | null;
   /** Ranking score. Exposed so the ordering can be asserted in tests. */
   rank: number;
+  // Smart Action Center metadata
+  version?: number;
+  status?: string;
+  snoozedUntil?: string | null;
+  dismissible?: boolean;
+  actionable?: boolean;
+  expiresAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,8 +252,12 @@ export function mapIntelligence(actions: SmartActionItem[]): IntelligenceItem[] 
     .filter((action) => {
       // Backend lifecycle decides visibility. Anything not ACTIVE has been
       // dismissed, completed or expired, and re-showing it here would undo a
-      // decision the user already made.
-      if (action.status && action.status !== "ACTIVE") return false;
+      // decision the user already made. However, if we are explicitly mapping
+      // historical actions, we bypass this ACTIVE filter.
+      const isHistoryMapping = actions.some(
+        (a) => a.status === "COMPLETED" || a.status === "DISMISSED"
+      );
+      if (!isHistoryMapping && action.status && action.status !== "ACTIVE") return false;
       if (seen.has(action.id)) return false;
       seen.add(action.id);
       return true;
@@ -273,6 +284,12 @@ export function mapIntelligence(actions: SmartActionItem[]): IntelligenceItem[] 
         affectedEntity: riskSubject(action),
         deepLink: action.deepLink ?? null,
         component: null,
+        version: action.version,
+        status: action.status,
+        snoozedUntil: action.snoozedUntil ?? null,
+        dismissible: action.dismissible,
+        actionable: action.actionable,
+        expiresAt: action.expiresAt ?? null,
       } satisfies Omit<IntelligenceItem, "rank">;
 
       return { ...base, rank: rankOf(base) };

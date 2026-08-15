@@ -151,7 +151,7 @@ export const DashboardView: React.FC = () => {
           <TransactionFeed />
         </div>
         <div className="flex">
-          <UpcomingEventsTimeline />
+          <UpcomingEventsTimeline upcomingBills={dashboard.upcomingBills} />
         </div>
       </div>
 

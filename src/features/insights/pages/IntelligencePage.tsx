@@ -2,6 +2,11 @@ import React, { useMemo, useState } from "react";
 import { InsightsRoute } from "../insightsNav";
 import { useIntelligenceFeed } from "../hooks/useInsightsQueries";
 import {
+  useCompleteAction,
+  useDismissAction,
+  useSnoozeAction,
+} from "../../actions/hooks/useSmartActions";
+import {
   FEED_FILTERS,
   FeedFilter,
   IntelligenceItem,
@@ -88,6 +93,10 @@ const IntelligenceFeed: React.FC = () => {
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [openItem, setOpenItem] = useState<IntelligenceItem | null>(null);
 
+  const dismissMutation = useDismissAction();
+  const completeMutation = useCompleteAction();
+  const snoozeMutation = useSnoozeAction();
+
   // Memoised so the empty-list fallback doesn't create a new array identity on
   // every render and invalidate the two derivations below with it.
   const items = useMemo(() => feed.data ?? [], [feed.data]);
@@ -121,7 +130,7 @@ const IntelligenceFeed: React.FC = () => {
             feed.isLoading
               ? "Financial intelligence"
               : attention > 0
-                ? `${attention} thing${attention === 1 ? "" : "s"} deserve${attention === 1 ? "s" : ""} your attention`
+                ? `${attention} thing${attention === 1 ? "" : "s"} deserve${attention === 1 ? "" : "s"} your attention`
                 : "Financial intelligence"
           }
           description="Everything detected against your accounts and everything the health engine suggests, in one list, highest priority first."
@@ -166,15 +175,23 @@ const IntelligenceFeed: React.FC = () => {
             </div>
 
             {visible.length === 0 ? (
-              <InsightsEmptyState
-                reason="no-match"
-                action={{ label: "Clear filter", onClick: () => setFilter("all") }}
-              />
+               <InsightsEmptyState
+                 reason="no-match"
+                 action={{ label: "Clear filter", onClick: () => setFilter("all") }}
+               />
             ) : (
               <ul className="space-y-2">
                 {visible.map((item) => (
                   <li key={item.id}>
-                    <InsightCard item={item} onOpen={setOpenItem} />
+                    <InsightCard
+                      item={item}
+                      onOpen={setOpenItem}
+                      onComplete={(id, version) => completeMutation.mutate({ id, version })}
+                      onDismiss={(id, version) => dismissMutation.mutate({ id, version })}
+                      onSnooze={(id, version, snoozedUntil) =>
+                        snoozeMutation.mutate({ id, version, snoozedUntil })
+                      }
+                    />
                   </li>
                 ))}
               </ul>
@@ -182,7 +199,15 @@ const IntelligenceFeed: React.FC = () => {
           </>
         )}
 
-        <InsightDetail item={openItem} onClose={() => setOpenItem(null)} />
+        <InsightDetail
+          item={openItem}
+          onClose={() => setOpenItem(null)}
+          onComplete={(id, version) => completeMutation.mutate({ id, version })}
+          onDismiss={(id, version) => dismissMutation.mutate({ id, version })}
+          onSnooze={(id, version, snoozedUntil) =>
+            snoozeMutation.mutate({ id, version, snoozedUntil })
+          }
+        />
       </section>
     </Surface>
   );

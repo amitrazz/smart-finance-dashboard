@@ -245,6 +245,21 @@ export function shortPeriodLabel(period: string | null | undefined): string {
   return date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
 }
 
+/** Formats a start and end date explicitly, e.g. "1 Aug 2026 to 31 Aug 2026". */
+export function formatExplicitPeriod(start: string | null | undefined, end: string | null | undefined): string | null {
+  if (!start || !end) return null;
+  const parseDate = (d: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+    if (!match) return d;
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+  };
+  return `${parseDate(start)} to ${parseDate(end)}`;
+}
+
 /**
  * Short day label for day-resolution axes: `2026-08-14` → `14 Aug`.
  *

@@ -28,7 +28,7 @@
 import { Money } from "../../../types";
 import { FinancialChange } from "../api/insightsMappers";
 import { CashFlowAnalytics, NetWorthAnalytics } from "../types/insightsTypes";
-import { shortPeriodLabel } from "./insightsFormat";
+import { formatExplicitPeriod, shortPeriodLabel } from "./insightsFormat";
 
 export type StorySegment =
   | { kind: "text"; text: string }
@@ -57,6 +57,11 @@ export interface FinancialStory {
   detail: StorySentence[];
   /** What the comparison is against. Always shown — a change with no baseline is not a change. */
   basis: string;
+  // Supporting context counts
+  urgentActionsCount?: number;
+  areasWorseningCount?: number;
+  positiveChangesCount?: number;
+  healthRating?: string;
 }
 
 const text = (t: string): StorySegment => ({ kind: "text", text: t });
@@ -126,8 +131,10 @@ export function buildFinancialStory(input: {
   netWorth: NetWorthAnalytics | null;
   cashFlow: CashFlowAnalytics | null;
   changes: FinancialChange[];
+  attentionCount?: number;
+  healthRating?: string;
 }): FinancialStory | null {
-  const { cashFlow, changes } = input;
+  const { cashFlow, changes, attentionCount, healthRating } = input;
 
   // A story is a comparison. With nothing to compare against there is no story,
   // and the caller renders "not enough history" instead of a paragraph of
@@ -136,6 +143,33 @@ export function buildFinancialStory(input: {
 
   const byId = new Map(changes.map((c) => [c.id, c]));
   const verdict = verdictOf(byId);
+
+  // Compute counts
+  const movements = [...byId.values()]
+    .map((change) => {
+      const value = change.points ?? amountOf(change);
+      if (value === null || value === 0) return null;
+      return value > 0 === change.upIsGood;
+    })
+    .filter((favourable): favourable is boolean => favourable !== null);
+
+  const positiveChangesCount = movements.filter(Boolean).length;
+  const areasWorseningCount = movements.filter((x) => !x).length;
+  const urgentActionsCount = attentionCount ?? 0;
+
+  // Build the headline dynamically
+  let headlineText = "";
+  if (urgentActionsCount > 0) {
+    headlineText = "Your finances need attention.";
+  } else if (verdict === "weakened" || healthRating === "CRITICAL" || healthRating === "POOR") {
+    headlineText = "Your financial position is under pressure.";
+  } else if (verdict === "improved") {
+    headlineText = "Your finances are improving.";
+  } else if (verdict === "steady") {
+    headlineText = "Your financial position held steady this period.";
+  } else {
+    headlineText = "Your financial position is mixed.";
+  }
 
   const detail: StorySentence[] = [];
 
@@ -247,11 +281,17 @@ export function buildFinancialStory(input: {
 
   return {
     verdict,
-    headline: { id: "headline", segments: [text(VERDICT_HEADLINE[verdict])] },
+    headline: { id: "headline", segments: [text(headlineText)] },
     detail: detail.slice(0, 4),
     basis:
-      previousPeriod && currentPeriod
-        ? `Measured between two recorded periods, ${previousPeriod} and ${currentPeriod}.`
-        : "Measured between the two most recent recorded snapshots.",
+      cashFlow?.periodStart && cashFlow?.periodEnd
+        ? `Measured for the period ${formatExplicitPeriod(cashFlow.periodStart, cashFlow.periodEnd)} compared to the previous period.`
+        : previousPeriod && currentPeriod
+          ? `Measured between two recorded periods, ${previousPeriod} and ${currentPeriod}.`
+          : "Measured between the two most recent recorded snapshots.",
+    urgentActionsCount,
+    areasWorseningCount,
+    positiveChangesCount,
+    healthRating,
   };
 }

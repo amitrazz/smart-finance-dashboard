@@ -458,6 +458,8 @@ export function mapCashFlow(
     largestIncomeSource: largestIncome
       ? { name: largestIncome.name, amount: largestIncome.expectedAmount }
       : null,
+    periodStart: latest.periodStart ?? null,
+    periodEnd: latest.periodEnd ?? null,
   };
 }
 
@@ -962,6 +964,7 @@ export interface FinancialChange {
   /** Whether an increase is a good outcome for this measure. */
   upIsGood: boolean;
   caption: string | null;
+  currentValue?: Money | number | null;
 }
 
 /**
@@ -991,6 +994,7 @@ export function mapChanges(
       points: null,
       upIsGood: true,
       caption: "vs previous snapshot",
+      currentValue: netWorth.currentNetWorth,
     });
   }
 
@@ -1008,6 +1012,7 @@ export function mapChanges(
       points: null,
       upIsGood: true,
       caption: "vs previous period",
+      currentValue: cashFlow.totalIncome,
     });
 
     changes.push({
@@ -1018,6 +1023,7 @@ export function mapChanges(
       points: null,
       upIsGood: false,
       caption: "vs previous period",
+      currentValue: cashFlow.totalExpenses,
     });
   }
 
@@ -1030,6 +1036,7 @@ export function mapChanges(
       points: cashFlow.savingsRateChangePoints,
       upIsGood: true,
       caption: "vs previous period",
+      currentValue: cashFlow.savingsRatePercent,
     });
   }
 
@@ -1049,6 +1056,7 @@ export function mapChanges(
       points: null,
       upIsGood: false,
       caption: "total liabilities",
+      currentValue: netWorth.totalLiabilities,
     });
   }
 

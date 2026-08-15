@@ -66,15 +66,57 @@ const Sentence: React.FC<{ segments: StorySegment[] }> = ({ segments }) => (
  * the only element that answers the question people actually arrive with.
  */
 export const FinancialStory: React.FC<{ story: Story }> = ({ story }) => {
-  const tone = VERDICT_TONE[story.verdict];
+  // Determine badge label and tone dynamically
+  let tone = VERDICT_TONE[story.verdict];
+  let label = VERDICT_LABEL[story.verdict];
+
+  if (story.urgentActionsCount && story.urgentActionsCount > 0) {
+    tone = "negative";
+    label = "Action Required";
+  } else if (
+    story.verdict === "weakened" ||
+    story.healthRating === "CRITICAL" ||
+    story.healthRating === "POOR"
+  ) {
+    tone = "negative";
+    label = "Under Pressure";
+  } else if (story.verdict === "improved") {
+    tone = "positive";
+    label = "Improving";
+  }
 
   return (
-    <div className="space-y-3">
-      <span
-        className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TONE_CHIP[tone]}`}
-      >
-        {VERDICT_LABEL[story.verdict]}
-      </span>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TONE_CHIP[tone]}`}
+        >
+          {label}
+        </span>
+
+        {/* Dynamic count status chips */}
+        {(story.urgentActionsCount !== undefined ||
+          story.areasWorseningCount !== undefined ||
+          story.positiveChangesCount !== undefined) && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+            {story.urgentActionsCount !== undefined && story.urgentActionsCount > 0 ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                {story.urgentActionsCount} urgent action{story.urgentActionsCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+            {story.areasWorseningCount !== undefined && story.areasWorseningCount > 0 ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                {story.areasWorseningCount} area{story.areasWorseningCount === 1 ? "" : "s"} worsening
+              </span>
+            ) : null}
+            {story.positiveChangesCount !== undefined && story.positiveChangesCount > 0 ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                {story.positiveChangesCount} positive change{story.positiveChangesCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       <p className="text-lg font-semibold leading-snug tracking-tight text-slate-50 sm:text-xl">
         <Sentence segments={story.headline.segments} />

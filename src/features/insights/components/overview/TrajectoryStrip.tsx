@@ -4,6 +4,7 @@ import { ForecastAnalytics } from "../../types/insightsTypes";
 import { MetricValue } from "../common/MetricValue";
 import { ProjectionBadge } from "../common/Badges";
 import { InsightsEmptyState } from "../primitives/States";
+import { useUIStore } from "../../../../store/useUIStore";
 
 /**
  * "Where is this heading?" — the fifth question Overview answers, in one line.
@@ -30,13 +31,28 @@ import { InsightsEmptyState } from "../primitives/States";
  * produced.
  */
 export const TrajectoryStrip: React.FC<{ forecast: ForecastAnalytics }> = ({ forecast }) => {
-  if (!forecast.projectedCorpus && !forecast.currentNetWorth) {
+  const navigateToRoute = useUIStore((s) => s.navigateToRoute);
+
+  const projectedCorpusVal = forecast.projectedCorpus ? parseFloat(forecast.projectedCorpus.amount) : null;
+  const isValidProjection = projectedCorpusVal !== null && projectedCorpusVal > 0;
+
+  if (!isValidProjection || (!forecast.projectedCorpus && !forecast.currentNetWorth)) {
     return (
-      <InsightsEmptyState
-        reason="insufficient-history"
-        title="No trajectory yet"
-        message="A projection needs recorded net worth and a retirement forecast; neither is available."
-      />
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-400">Projection unavailable</p>
+          <p className="text-sm text-slate-350">
+            Your current financial data isn't sufficient for a reliable long-term projection.
+          </p>
+        </div>
+        <button
+          onClick={() => navigateToRoute("planning")}
+          className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg"
+        >
+          <span>Review financial plan</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
     );
   }
 

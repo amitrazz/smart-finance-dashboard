@@ -111,18 +111,18 @@ export const MoneyFlow: React.FC<{ cashFlow: CashFlowAnalytics }> = ({ cashFlow 
       : []),
   ];
 
+  const ratioText = (expenses / income).toFixed(2);
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-300">
         {overspend > 0 ? (
           <>
-            Spending was <span className="font-semibold tabular-nums text-rose-300">{percentOfIncome}%</span> of
-            income this period.
+            You spent <span className="font-semibold tabular-nums text-rose-400">₹{ratioText}</span> for every <span className="font-semibold">₹1</span> earned this period (spending was <span className="font-semibold tabular-nums text-rose-300">{percentOfIncome}%</span> of income).
           </>
         ) : (
           <>
-            Spending took <span className="font-semibold tabular-nums text-slate-100">{percentOfIncome}%</span> of
-            income; the rest stayed.
+            You spent <span className="font-semibold tabular-nums text-slate-100">₹{ratioText}</span> for every <span className="font-semibold font-sans">₹1</span> earned this period (spending took <span className="font-semibold text-slate-100">{percentOfIncome}%</span> of income; the rest stayed).
           </>
         )}
       </p>
