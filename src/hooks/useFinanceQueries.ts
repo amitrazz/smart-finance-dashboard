@@ -192,7 +192,7 @@ export {
 } from "../features/health/hooks/useFinancialHealth";
 
 // Accounts
-export function useAccounts(params?: { limit?: number; search?: string; type?: string }) {
+export function useAccounts(params?: { limit?: number; search?: string; type?: string; status?: string }) {
   return useQuery({
     queryKey: QUERY_KEYS.accounts(params),
     queryFn: () => api.getAccounts(params),

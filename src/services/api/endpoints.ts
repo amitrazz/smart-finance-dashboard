@@ -99,6 +99,9 @@ import {
   RecordRetirementTransactionInput,
   ResolveCreditCardDisputeInput,
   ResolveReviewClusterInput,
+  RecurringContributionRule,
+  CreateRecurringContributionRuleInput,
+  RecurringContributionExecution,
   RetirementAccount,
   RetirementForecastResponse,
   RetirementSummary,
@@ -384,7 +387,7 @@ export const api = {
     }),
 
   // Accounts
-  getAccounts: (params?: { limit?: number; search?: string; type?: string }) =>
+  getAccounts: (params?: { limit?: number; search?: string; type?: string; status?: string }) =>
     fetchWithAuth<PaginatedResponse<Account>>(`/finance/accounts${buildQuery(params)}`),
   createAccount: (data: Partial<Account>) =>
     fetchWithAuth<Account>('/finance/accounts', {
@@ -768,6 +771,40 @@ export const api = {
       { method: 'POST' },
     ),
   getRetirementSummary: () => fetchWithAuth<RetirementSummary>('/finance/retirement/summary'),
+
+  // Recurring Contributions (currently: RETIREMENT_CONTRIBUTION only)
+  createRecurringContributionRule: (data: CreateRecurringContributionRuleInput) =>
+    fetchWithAuth<RecurringContributionRule>('/finance/recurring', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getRecurringContributionRules: (params?: {
+    retirementAccountId?: string;
+    status?: string;
+    cursor?: string;
+    limit?: number;
+  }) => fetchWithAuth<PaginatedResponse<RecurringContributionRule>>(`/finance/recurring${buildQuery(params)}`),
+  getRecurringContributionRule: (id: string) =>
+    fetchWithAuth<RecurringContributionRule>(`/finance/recurring/${encodeURIComponent(id)}`),
+  pauseRecurringContributionRule: (id: string, version = 1) =>
+    fetchWithAuth<RecurringContributionRule>(
+      `/finance/recurring/${encodeURIComponent(id)}/pause${buildQuery({ version })}`,
+      { method: 'PATCH' },
+    ),
+  resumeRecurringContributionRule: (id: string, version = 1) =>
+    fetchWithAuth<RecurringContributionRule>(
+      `/finance/recurring/${encodeURIComponent(id)}/resume${buildQuery({ version })}`,
+      { method: 'PATCH' },
+    ),
+  cancelRecurringContributionRule: (id: string, version = 1) =>
+    fetchWithAuth<RecurringContributionRule>(
+      `/finance/recurring/${encodeURIComponent(id)}/cancel${buildQuery({ version })}`,
+      { method: 'PATCH' },
+    ),
+  getRecurringContributionExecutions: (ruleId: string, params?: { cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<RecurringContributionExecution>>(
+      `/finance/recurring/${encodeURIComponent(ruleId)}/executions${buildQuery(params)}`,
+    ),
 
   // Loans
   getLoans: (params?: {

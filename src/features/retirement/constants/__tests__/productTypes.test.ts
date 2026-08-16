@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXECUTION_STATUS_LABELS,
   PRODUCT_TYPE_CONFIG,
   PRODUCT_TYPE_LIST,
+  RECURRING_RULE_STATUS_LABELS,
   STATUS_LABELS,
   TRANSACTION_TYPE_LABELS,
   getAllowedTransactionTypes,
+  getSchedulableContributionTypes,
 } from "../productTypes";
 
 describe("PRODUCT_TYPE_CONFIG — employer contribution policy", () => {
@@ -72,5 +75,48 @@ describe("STATUS_LABELS", () => {
     expect(Object.keys(STATUS_LABELS).sort()).toEqual(
       ["ACTIVE", "CLOSED", "MATURED", "TRANSFERRED_OUT"].sort(),
     );
+  });
+});
+
+describe("getSchedulableContributionTypes — recurring-contribution product policy", () => {
+  it("EPF can schedule both employee and employer contributions", () => {
+    expect(getSchedulableContributionTypes("EPF").sort()).toEqual(
+      ["EMPLOYEE_CONTRIBUTION", "EMPLOYER_CONTRIBUTION"].sort(),
+    );
+  });
+
+  it("VPF can only schedule an employee contribution — never an employer one", () => {
+    expect(getSchedulableContributionTypes("VPF")).toEqual(["EMPLOYEE_CONTRIBUTION"]);
+  });
+
+  it("PPF can only schedule a (single-party) contribution — never an employer one", () => {
+    expect(getSchedulableContributionTypes("PPF")).toEqual(["CONTRIBUTION"]);
+  });
+
+  it("NPS can schedule both contribution and employer contribution", () => {
+    expect(getSchedulableContributionTypes("NPS").sort()).toEqual(["CONTRIBUTION", "EMPLOYER_CONTRIBUTION"].sort());
+  });
+
+  it("never includes a non-schedulable type like INTEREST or WITHDRAWAL for any product", () => {
+    PRODUCT_TYPE_LIST.forEach((pt) => {
+      const schedulable = getSchedulableContributionTypes(pt);
+      expect(schedulable).not.toContain("INTEREST");
+      expect(schedulable).not.toContain("WITHDRAWAL");
+      expect(schedulable).not.toContain("OPENING_BALANCE");
+      expect(schedulable).not.toContain("VALUATION_ADJUSTMENT");
+      expect(schedulable).not.toContain("ADJUSTMENT");
+    });
+  });
+});
+
+describe("RECURRING_RULE_STATUS_LABELS / EXECUTION_STATUS_LABELS", () => {
+  it("covers exactly the backend's RecurringContributionRuleStatus enum", () => {
+    expect(Object.keys(RECURRING_RULE_STATUS_LABELS).sort()).toEqual(
+      ["ACTIVE", "PAUSED", "CANCELLED", "COMPLETED"].sort(),
+    );
+  });
+
+  it("covers exactly the backend's RecurringContributionExecutionStatus enum", () => {
+    expect(Object.keys(EXECUTION_STATUS_LABELS).sort()).toEqual(["SUCCEEDED", "SKIPPED", "FAILED"].sort());
   });
 });

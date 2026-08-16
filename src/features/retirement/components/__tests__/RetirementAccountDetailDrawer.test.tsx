@@ -18,6 +18,14 @@ vi.mock("../../hooks/useRetirementQueries", () => ({
   useCloseRetirementAccount: () => mockUseCloseRetirementAccount(),
   useReverseRetirementTransaction: () => mockUseReverseRetirementTransaction(),
   useRetirementTransactions: () => mockUseRetirementTransactions(),
+  // RecurringContributionsSection (rendered inside this drawer) — not the
+  // focus of this test, so these just need stable, inert defaults.
+  useRecurringContributionRules: () => ({ data: { data: [], hasMore: false, totalCount: 0 }, isLoading: false, isError: false }),
+  useRecurringContributionExecutions: () => ({ data: { data: [], hasMore: false, totalCount: 0 }, isLoading: false, isError: false }),
+  useCreateRecurringContributionRule: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  usePauseRecurringContributionRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useResumeRecurringContributionRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelRecurringContributionRule: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("../../../hooks/useFinanceQueries", () => ({

@@ -17,6 +17,7 @@ import {
   useReverseRetirementTransaction,
   useUpdateRetirementAccount,
 } from "../hooks/useRetirementQueries";
+import { RecurringContributionsSection } from "./RecurringContributionsSection";
 
 interface RetirementAccountDetailDrawerProps {
   account: RetirementAccount | null;
@@ -230,6 +231,9 @@ export const RetirementAccountDetailDrawer: React.FC<RetirementAccountDetailDraw
               </button>
             </div>
           )}
+
+          {/* Recurring Contributions */}
+          <RecurringContributionsSection account={account} />
 
           {/* Edit form */}
           {isEditing && (

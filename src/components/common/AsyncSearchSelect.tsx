@@ -77,10 +77,12 @@ export function AsyncSearchSelect<T>({
   return (
     <div className="relative" ref={containerRef}>
       <div
+        id={id}
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-controls={id ? `${id}-listbox` : undefined}
+        aria-labelledby={id ? `${id}-label` : undefined}
         className={`flex items-center gap-2 w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border text-sm transition-colors cursor-text ${
           isOpen ? "border-emerald-500" : "border-slate-800"
         } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}

@@ -1,4 +1,10 @@
-import { RetirementAccountStatus, RetirementProductType, RetirementTransactionType } from "../../../types";
+import {
+  RecurringContributionExecutionStatus,
+  RecurringContributionRuleStatus,
+  RetirementAccountStatus,
+  RetirementProductType,
+  RetirementTransactionType,
+} from "../../../types";
 
 // Centralized frontend configuration derived from the backend's
 // RetirementProductType enum (EPF | VPF | PPF | NPS). The backend transaction
@@ -128,3 +134,35 @@ export const STATUS_LABELS: Record<RetirementAccountStatus, string> = {
 export function getAllowedTransactionTypes(productType: RetirementProductType): RetirementTransactionType[] {
   return PRODUCT_TYPE_CONFIG[productType].allowedTransactionTypes;
 }
+
+// Only these three transaction types can ever be scheduled as a recurring
+// contribution (enforced authoritatively by the backend's
+// RecurringContributionRuleValidationService). Intersecting with each
+// product's own allowedTransactionTypes above — rather than hardcoding a
+// second per-product policy here — keeps this in lockstep with the backend's
+// RETIREMENT_PRODUCT_CATALOG (e.g. VPF/PPF never offer EMPLOYER_CONTRIBUTION)
+// without duplicating that decision.
+const SCHEDULABLE_TRANSACTION_TYPES: RetirementTransactionType[] = [
+  "EMPLOYEE_CONTRIBUTION",
+  "EMPLOYER_CONTRIBUTION",
+  "CONTRIBUTION",
+];
+
+export function getSchedulableContributionTypes(productType: RetirementProductType): RetirementTransactionType[] {
+  return PRODUCT_TYPE_CONFIG[productType].allowedTransactionTypes.filter((t) =>
+    SCHEDULABLE_TRANSACTION_TYPES.includes(t),
+  );
+}
+
+export const RECURRING_RULE_STATUS_LABELS: Record<RecurringContributionRuleStatus, string> = {
+  ACTIVE: "Active",
+  PAUSED: "Paused",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+};
+
+export const EXECUTION_STATUS_LABELS: Record<RecurringContributionExecutionStatus, string> = {
+  SUCCEEDED: "Succeeded",
+  SKIPPED: "Skipped",
+  FAILED: "Failed",
+};

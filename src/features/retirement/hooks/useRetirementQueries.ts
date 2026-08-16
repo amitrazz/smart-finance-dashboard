@@ -4,8 +4,11 @@ import { useAuthStore } from "../../../store/useAuthStore";
 import { useUIStore } from "../../../store/useUIStore";
 import {
   CloseRetirementAccountInput,
+  CreateRecurringContributionRuleInput,
   CreateRetirementAccountInput,
   RecordRetirementTransactionInput,
+  RecurringContributionExecution,
+  RecurringContributionRule,
   RetirementAccount,
   RetirementSummary,
   RetirementTransaction,
@@ -38,6 +41,10 @@ export const RETIREMENT_QUERY_KEYS = {
   account: (id: string) => ["retirement", "accounts", "detail", id] as const,
   transactions: (params?: Record<string, unknown>) => ["retirement", "transactions", params] as const,
   summary: ["retirement", "summary"] as const,
+  recurringRules: (params?: Record<string, unknown>) => ["retirement", "recurring", params] as const,
+  recurringRule: (id: string) => ["retirement", "recurring", "detail", id] as const,
+  recurringExecutions: (ruleId: string, params?: Record<string, unknown>) =>
+    ["retirement", "recurring", ruleId, "executions", params] as const,
 };
 
 // Every mutation below invalidates the retirement account/transaction/summary
@@ -210,5 +217,144 @@ export function useRetirementSummary() {
     queryKey: RETIREMENT_QUERY_KEYS.summary,
     queryFn: async (): Promise<RetirementSummary> => api.getRetirementSummary(),
     enabled: isAuth(),
+  });
+}
+
+// Recurring Contributions
+//
+// Unlike invalidateRetirementSideEffects above, creating/pausing/resuming/
+// cancelling a rule never touches the retirement account's balance — only
+// RecurringContributionExecutionService (server-side, on the daily sweep)
+// writes balance-affecting state. So these mutations only invalidate the
+// recurring-rule queries themselves, not netWorth/dashboard/goals.
+function invalidateRecurringSideEffects(
+  queryClient: ReturnType<typeof useQueryClient>,
+  accountId?: string,
+  ruleId?: string,
+) {
+  queryClient.invalidateQueries({ queryKey: RETIREMENT_QUERY_KEYS.recurringRules() });
+  if (accountId) {
+    queryClient.invalidateQueries({
+      queryKey: RETIREMENT_QUERY_KEYS.recurringRules({ retirementAccountId: accountId }),
+    });
+  }
+  if (ruleId) {
+    queryClient.invalidateQueries({ queryKey: RETIREMENT_QUERY_KEYS.recurringRule(ruleId) });
+  }
+}
+
+export function useRecurringContributionRules(params?: {
+  retirementAccountId?: string;
+  status?: string;
+  cursor?: string;
+  limit?: number;
+}) {
+  return useQuery({
+    queryKey: RETIREMENT_QUERY_KEYS.recurringRules(params),
+    queryFn: async () => {
+      const res = await api.getRecurringContributionRules(params);
+      return {
+        data: unwrapList<RecurringContributionRule>(res),
+        nextCursor: (res as { nextCursor?: string })?.nextCursor,
+        hasMore: (res as { hasMore?: boolean })?.hasMore ?? false,
+        totalCount: (res as { totalCount?: number })?.totalCount,
+      };
+    },
+    enabled: isAuth() && Boolean(params?.retirementAccountId),
+  });
+}
+
+export function useRecurringContributionRule(id: string) {
+  return useQuery({
+    queryKey: RETIREMENT_QUERY_KEYS.recurringRule(id),
+    queryFn: async (): Promise<RecurringContributionRule> => api.getRecurringContributionRule(id),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+export function useRecurringContributionExecutions(ruleId: string, params?: { cursor?: string; limit?: number }) {
+  return useQuery({
+    queryKey: RETIREMENT_QUERY_KEYS.recurringExecutions(ruleId, params),
+    queryFn: async () => {
+      const res = await api.getRecurringContributionExecutions(ruleId, params);
+      return {
+        data: unwrapList<RecurringContributionExecution>(res),
+        nextCursor: (res as { nextCursor?: string })?.nextCursor,
+        hasMore: (res as { hasMore?: boolean })?.hasMore ?? false,
+        totalCount: (res as { totalCount?: number })?.totalCount,
+      };
+    },
+    enabled: isAuth() && Boolean(ruleId),
+  });
+}
+
+export function useCreateRecurringContributionRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateRecurringContributionRuleInput) => api.createRecurringContributionRule(data),
+    onSuccess: (_, variables) => {
+      invalidateRecurringSideEffects(queryClient, variables.retirementAccountId);
+      useUIStore.getState().showToast("Recurring contribution set up", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function usePauseRecurringContributionRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      version = 1,
+    }: {
+      id: string;
+      version?: number;
+      // Not sent to the API — carried through so onSuccess can invalidate
+      // this account's recurring list without a second round trip.
+      retirementAccountId: string;
+    }) => api.pauseRecurringContributionRule(id, version),
+    onSuccess: (_, variables) => {
+      invalidateRecurringSideEffects(queryClient, variables.retirementAccountId, variables.id);
+      useUIStore.getState().showToast("Recurring contribution paused", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useResumeRecurringContributionRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      version = 1,
+    }: {
+      id: string;
+      version?: number;
+      retirementAccountId: string;
+    }) => api.resumeRecurringContributionRule(id, version),
+    onSuccess: (_, variables) => {
+      invalidateRecurringSideEffects(queryClient, variables.retirementAccountId, variables.id);
+      useUIStore.getState().showToast("Recurring contribution resumed", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useCancelRecurringContributionRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      version = 1,
+    }: {
+      id: string;
+      version?: number;
+      retirementAccountId: string;
+    }) => api.cancelRecurringContributionRule(id, version),
+    onSuccess: (_, variables) => {
+      invalidateRecurringSideEffects(queryClient, variables.retirementAccountId, variables.id);
+      useUIStore.getState().showToast("Recurring contribution cancelled", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });
 }

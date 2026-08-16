@@ -1635,6 +1635,60 @@ export interface RetirementSummary {
   totalCorpus: RetirementCurrencyTotal[];
 }
 
+export type RecurringContributionRuleStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
+export type RecurringContributionExecutionStatus = "SUCCEEDED" | "SKIPPED" | "FAILED";
+
+// Matches RecurringContributionRuleResponseDto exactly (recurring-contribution-rule.mapper.ts).
+export interface RecurringContributionRule {
+  id: string;
+  type: "RETIREMENT_CONTRIBUTION";
+  retirementAccountId: string;
+  transactionType: Extract<RetirementTransactionType, "EMPLOYEE_CONTRIBUTION" | "EMPLOYER_CONTRIBUTION" | "CONTRIBUTION">;
+  sourceAccountId: string | null;
+  amount: Money;
+  frequency: "MONTHLY";
+  dayOfMonth: number;
+  startDate: string;
+  endDate: string | null;
+  status: RecurringContributionRuleStatus;
+  nextExecutionDate: string;
+  lastExecutedDate: string | null;
+  consecutiveFailureCount: number;
+  description: string | null;
+  version: number;
+}
+
+// POST /finance/recurring body — matches CreateRecurringContributionRuleDto.
+// sourceAccountId is required for EMPLOYEE_CONTRIBUTION/CONTRIBUTION and must
+// be omitted for EMPLOYER_CONTRIBUTION (no personal bank movement).
+export interface CreateRecurringContributionRuleInput {
+  type: "RETIREMENT_CONTRIBUTION";
+  retirementAccountId: string;
+  transactionType: RecurringContributionRule["transactionType"];
+  sourceAccountId?: string;
+  amount: string;
+  frequency: "MONTHLY";
+  dayOfMonth: number;
+  startDate: string;
+  endDate?: string;
+  description?: string;
+}
+
+// Matches RecurringContributionExecutionResponseDto exactly
+// (recurring-contribution-execution.mapper.ts). No `amount` field — every
+// execution of a rule shares that rule's fixed amount by construction.
+export interface RecurringContributionExecution {
+  id: string;
+  ruleId: string;
+  occurrenceDate: string;
+  status: RecurringContributionExecutionStatus;
+  retirementTransactionId: string | null;
+  reason: string | null;
+  reversed: boolean;
+  reversedAt: string | null;
+  executedAt: string;
+}
+
 export interface CashFlowSnapshot {
   period: string;
   totalIncome: Money;
