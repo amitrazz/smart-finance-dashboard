@@ -1,16 +1,25 @@
 import React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { RecurringContributionExecutionHistoryModal } from "../RecurringContributionExecutionHistoryModal";
 import { RecurringContributionExecution, RecurringContributionRule } from "../../../../types";
 
 const mockUseRecurringContributionExecutions = vi.fn();
+const mockUseAccounts = vi.fn();
 
 vi.mock("../../hooks/useRetirementQueries", () => ({
   useRecurringContributionExecutions: (ruleId: string) => mockUseRecurringContributionExecutions(ruleId),
 }));
 
+vi.mock("../../../../hooks/useFinanceQueries", () => ({
+  useAccounts: () => mockUseAccounts(),
+}));
+
 afterEach(cleanup);
+
+beforeEach(() => {
+  mockUseAccounts.mockReturnValue({ data: [{ id: "acc_1", name: "ICICI Salary" }], isFetching: false });
+});
 
 const rule: RecurringContributionRule = {
   id: "rule_1",
@@ -46,16 +55,22 @@ function makeExecution(overrides: Partial<RecurringContributionExecution> = {}):
   };
 }
 
+function renderModal(r: RecurringContributionRule | null, productType: RetirementProductType = "EPF") {
+  return render(
+    <RecurringContributionExecutionHistoryModal rule={r} productType={productType} onClose={vi.fn()} />,
+  );
+}
+
 describe("RecurringContributionExecutionHistoryModal", () => {
   it("renders nothing when no rule is given", () => {
     mockUseRecurringContributionExecutions.mockReturnValue({ data: undefined, isLoading: false, isError: false });
-    const { container } = render(<RecurringContributionExecutionHistoryModal rule={null} onClose={vi.fn()} />);
+    const { container } = renderModal(null);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the empty state when there are no executions yet", () => {
     mockUseRecurringContributionExecutions.mockReturnValue({ data: { data: [] }, isLoading: false, isError: false });
-    render(<RecurringContributionExecutionHistoryModal rule={rule} onClose={vi.fn()} />);
+    renderModal(rule);
     expect(screen.getByText("No executions yet")).toBeInTheDocument();
   });
 
@@ -65,7 +80,7 @@ describe("RecurringContributionExecutionHistoryModal", () => {
       isLoading: false,
       isError: false,
     });
-    render(<RecurringContributionExecutionHistoryModal rule={rule} onClose={vi.fn()} />);
+    renderModal(rule);
     expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByText("EMPLOYEE_CONTRIBUTION requires a sourceAccountId")).toBeInTheDocument();
     expect(screen.queryByText(/FinanceDomainException/)).not.toBeInTheDocument();
@@ -78,7 +93,7 @@ describe("RecurringContributionExecutionHistoryModal", () => {
       isLoading: false,
       isError: false,
     });
-    render(<RecurringContributionExecutionHistoryModal rule={rule} onClose={vi.fn()} />);
+    renderModal(rule);
     expect(screen.getByText("Skipped")).toBeInTheDocument();
     expect(screen.getByText("Retirement account is CLOSED")).toBeInTheDocument();
   });
@@ -89,7 +104,7 @@ describe("RecurringContributionExecutionHistoryModal", () => {
       isLoading: false,
       isError: false,
     });
-    render(<RecurringContributionExecutionHistoryModal rule={rule} onClose={vi.fn()} />);
+    renderModal(rule);
     expect(screen.getByText("Succeeded")).toBeInTheDocument();
     expect(screen.getByText("Reversed")).toBeInTheDocument();
   });
@@ -100,7 +115,28 @@ describe("RecurringContributionExecutionHistoryModal", () => {
       isLoading: false,
       isError: false,
     });
-    render(<RecurringContributionExecutionHistoryModal rule={rule} onClose={vi.fn()} />);
+    renderModal(rule);
     expect(screen.queryByText("Reversed")).not.toBeInTheDocument();
+  });
+
+  it("renders 'Payroll Deduction' funding description for EPF employee rule execution", () => {
+    mockUseRecurringContributionExecutions.mockReturnValue({
+      data: { data: [makeExecution()] },
+      isLoading: false,
+      isError: false,
+    });
+    renderModal(rule, "EPF");
+    expect(screen.getByText(/payroll deduction/i)).toBeInTheDocument();
+  });
+
+  it("renders resolved bank account name for direct contribution execution", () => {
+    mockUseRecurringContributionExecutions.mockReturnValue({
+      data: { data: [makeExecution()] },
+      isLoading: false,
+      isError: false,
+    });
+    const ppfRule = { ...rule, transactionType: "CONTRIBUTION" as const };
+    renderModal(ppfRule, "PPF");
+    expect(screen.getByText(/from: icici salary/i)).toBeInTheDocument();
   });
 });

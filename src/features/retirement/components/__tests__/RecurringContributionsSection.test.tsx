@@ -33,7 +33,7 @@ beforeEach(() => {
   mockUseCancelRecurringContributionRule.mockReturnValue({ mutate: vi.fn(), isPending: false });
   mockUseCreateRecurringContributionRule.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
   mockUseRecurringContributionExecutions.mockReturnValue({ data: { data: [], hasMore: false }, isLoading: false, isError: false });
-  mockUseAccounts.mockReturnValue({ data: [], isFetching: false });
+  mockUseAccounts.mockReturnValue({ data: [{ id: "acc_1", name: "ICICI Salary" }], isFetching: false });
 });
 
 const account: RetirementAccount = {
@@ -188,5 +188,51 @@ describe("RecurringContributionsSection", () => {
     render(<RecurringContributionsSection account={account} />);
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it("renders correct funding labels for different rules and resolves direct bank account names", () => {
+    mockUseAccounts.mockReturnValue({
+      data: [{ id: "acc_1", name: "ICICI Salary" }],
+      isFetching: false,
+    });
+    mockUseRecurringContributionRules.mockReturnValue({
+      data: {
+        data: [
+          makeRule({ id: "rule_1", transactionType: "EMPLOYEE_CONTRIBUTION", sourceAccountId: null }),
+          makeRule({ id: "rule_2", transactionType: "EMPLOYER_CONTRIBUTION", sourceAccountId: null }),
+        ],
+        hasMore: false,
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<RecurringContributionsSection account={account} />);
+    expect(screen.getByText(/payroll deduction · monthly on day 30/i)).toBeInTheDocument();
+    expect(screen.getByText(/employer funded · monthly on day 30/i)).toBeInTheDocument();
+  });
+
+  it("renders bank account name for direct-funded PPF rule", () => {
+    mockUseAccounts.mockReturnValue({
+      data: [{ id: "acc_1", name: "HDFC Savings" }],
+      isFetching: false,
+    });
+    mockUseRecurringContributionRules.mockReturnValue({
+      data: {
+        data: [
+          makeRule({
+            id: "rule_3",
+            transactionType: "CONTRIBUTION",
+            sourceAccountId: "acc_1",
+          }),
+        ],
+        hasMore: false,
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<RecurringContributionsSection account={{ ...account, productType: "PPF" }} />);
+    expect(screen.getByText(/from: hdfc savings · monthly on day 30/i)).toBeInTheDocument();
   });
 });

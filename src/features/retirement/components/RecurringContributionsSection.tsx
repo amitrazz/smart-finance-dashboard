@@ -5,7 +5,8 @@ import { Money as MoneyDisplay } from "../../../components/common/Money";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ConfirmModal } from "../../../components/common/ConfirmModal";
 import { formatDate } from "../../../utils/formatters";
-import { TRANSACTION_TYPE_LABELS } from "../constants/productTypes";
+import { TRANSACTION_TYPE_LABELS, getFundingSource } from "../constants/productTypes";
+import { useAccounts } from "../../../hooks/useFinanceQueries";
 import {
   useCancelRecurringContributionRule,
   usePauseRecurringContributionRule,
@@ -43,8 +44,20 @@ export const RecurringContributionsSection: React.FC<RecurringContributionsSecti
   const actionMutation =
     pendingAction?.kind === "pause" ? pauseMutation : pendingAction?.kind === "resume" ? resumeMutation : cancelMutation;
 
-  const sourceLabel = (rule: RecurringContributionRule): string =>
-    rule.transactionType === "EMPLOYER_CONTRIBUTION" ? "Employer" : "Linked account";
+  const { data: bankAccounts = [] } = useAccounts({ limit: 100 });
+
+  const sourceLabel = (rule: RecurringContributionRule): string => {
+    const funding = getFundingSource(account.productType, rule.transactionType);
+    if (funding === "PAYROLL_DEDUCTION") {
+      return "Payroll Deduction";
+    }
+    if (funding === "EMPLOYER") {
+      return "Employer Funded";
+    }
+    // DIRECT_ACCOUNT
+    const bankAcc = bankAccounts.find((a) => a.id === rule.sourceAccountId);
+    return bankAcc ? `From: ${bankAcc.name}` : "Linked Bank Account";
+  };
 
   const handleConfirmAction = () => {
     if (!pendingAction) return;
@@ -213,7 +226,7 @@ export const RecurringContributionsSection: React.FC<RecurringContributionsSecti
       )}
 
       <RecurringContributionFormModal account={isFormOpen ? account : null} onClose={() => setFormOpen(false)} />
-      <RecurringContributionExecutionHistoryModal rule={historyRule} onClose={() => setHistoryRule(null)} />
+      <RecurringContributionExecutionHistoryModal rule={historyRule} productType={account.productType} onClose={() => setHistoryRule(null)} />
 
       <ConfirmModal
         isOpen={pendingAction !== null}

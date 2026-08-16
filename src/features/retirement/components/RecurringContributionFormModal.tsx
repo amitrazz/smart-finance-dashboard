@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { X, Repeat, Info, Wallet } from "lucide-react";
-import { RetirementAccount, RetirementTransactionType } from "../../../types";
-import { PRODUCT_TYPE_CONFIG, TRANSACTION_TYPE_LABELS, getSchedulableContributionTypes } from "../constants/productTypes";
+import { RetirementAccount, RetirementTransactionType, RetirementFundingSource } from "../../../types";
+import {
+  PRODUCT_TYPE_CONFIG,
+  TRANSACTION_TYPE_LABELS,
+  getSchedulableContributionTypes,
+  getFundingSource,
+  requiresSourceAccount,
+} from "../constants/productTypes";
 import { useCreateRecurringContributionRule } from "../hooks/useRetirementQueries";
 import { useAccounts } from "../../../hooks/useFinanceQueries";
 import { AsyncSearchSelect } from "../../../components/common/AsyncSearchSelect";
@@ -61,9 +67,25 @@ export const RecurringContributionFormModal: React.FC<RecurringContributionFormM
 
   if (!account) return null;
 
-  const isEmployerFunded = transactionType === "EMPLOYER_CONTRIBUTION";
+  const isSourceAccountRequired = requiresSourceAccount(account.productType, transactionType);
+  const fundingSource = getFundingSource(account.productType, transactionType);
   const typeConfig = TRANSACTION_TYPE_LABELS[transactionType];
   const selectedSourceAccount = sourceAccounts.find((a) => a.id === sourceAccountId);
+
+  const FUNDING_SOURCE_INFO: Record<RetirementFundingSource, { label: string; helperText: string }> = {
+    PAYROLL_DEDUCTION: {
+      label: "Payroll Deduction",
+      helperText: "Employee EPF contributions are deducted from salary before your net salary is deposited into your bank account.",
+    },
+    EMPLOYER: {
+      label: "Employer",
+      helperText: "Employer contributions increase your EPF balance without debiting your personal bank account.",
+    },
+    DIRECT_ACCOUNT: {
+      label: "Bank Account",
+      helperText: "Your bank account will be debited when the contribution executes.",
+    },
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +94,7 @@ export const RecurringContributionFormModal: React.FC<RecurringContributionFormM
         type: "RETIREMENT_CONTRIBUTION",
         retirementAccountId: account.id,
         transactionType: transactionType as "EMPLOYEE_CONTRIBUTION" | "EMPLOYER_CONTRIBUTION" | "CONTRIBUTION",
-        sourceAccountId: isEmployerFunded ? undefined : sourceAccountId || undefined,
+        sourceAccountId: isSourceAccountRequired ? (sourceAccountId || undefined) : undefined,
         amount,
         frequency: "MONTHLY",
         dayOfMonth,
@@ -148,10 +170,18 @@ export const RecurringContributionFormModal: React.FC<RecurringContributionFormM
             )}
           </div>
 
-          {isEmployerFunded ? (
-            <div className="p-3.5 rounded-2xl bg-violet-500/5 border border-violet-500/20 text-xs text-violet-300">
-              This increases your retirement corpus without debiting your personal bank account. No source account is
-              needed.
+          {!isSourceAccountRequired ? (
+            <div>
+              <span className="block text-xs font-semibold text-slate-300 mb-1.5">Funding</span>
+              <div className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-sm text-slate-400">
+                {fundingSource ? FUNDING_SOURCE_INFO[fundingSource].label : ""}
+              </div>
+              {fundingSource && (
+                <p className="flex items-start gap-1.5 text-[11px] text-slate-500 mt-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-sky-400" aria-hidden="true" />
+                  <span>{FUNDING_SOURCE_INFO[fundingSource].helperText}</span>
+                </p>
+              )}
             </div>
           ) : (
             <div>
@@ -177,9 +207,12 @@ export const RecurringContributionFormModal: React.FC<RecurringContributionFormM
                 emptyMessage="No matching active accounts"
                 renderOption={(acc) => <span className="truncate">{acc.name}</span>}
               />
-              <p className="text-[11px] text-slate-500 mt-1.5">
-                Your bank account will be debited when the contribution executes.
-              </p>
+              {fundingSource && (
+                <p className="flex items-start gap-1.5 text-[11px] text-slate-500 mt-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-sky-400" aria-hidden="true" />
+                  <span>{FUNDING_SOURCE_INFO[fundingSource].helperText}</span>
+                </p>
+              )}
             </div>
           )}
 
@@ -288,7 +321,7 @@ export const RecurringContributionFormModal: React.FC<RecurringContributionFormM
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending || !amount || (!isEmployerFunded && !sourceAccountId)}
+              disabled={createMutation.isPending || !amount || (isSourceAccountRequired && !sourceAccountId)}
               className="px-5 py-2 rounded-xl bg-violet-500 hover:bg-violet-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-50"
             >
               {createMutation.isPending ? "Setting up..." : "Add Recurring Contribution"}

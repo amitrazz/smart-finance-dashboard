@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RecurringContributionFormModal } from "../RecurringContributionFormModal";
 import { RetirementAccount } from "../../../../types";
@@ -57,21 +57,22 @@ function renderModal(account: RetirementAccount) {
 }
 
 describe("RecurringContributionFormModal — product policy", () => {
-  it("EPF: offers both Employee and Employer Contribution, and hides the source-account field for Employer Contribution", () => {
+  it("EPF: offers both Employee and Employer Contribution, and hides the source-account field for both", () => {
     renderModal(baseAccount({ productType: "EPF" }));
 
     const typeSelect = screen.getByLabelText(/contribution type/i) as HTMLSelectElement;
     const optionLabels = Array.from(typeSelect.options).map((o) => o.text);
     expect(optionLabels).toEqual(["Employee Contribution", "Employer Contribution"]);
 
-    // Default is Employee Contribution — source account field is required.
-    expect(screen.getByLabelText(/source account/i)).toBeInTheDocument();
+    // Default is Employee Contribution — source account field is hidden.
+    expect(screen.queryByLabelText(/source account/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/deducted from salary before your net salary is deposited/i)).toBeInTheDocument();
 
     // Switch to Employer Contribution — no source account field, explanatory copy instead.
     Object.defineProperty(typeSelect, "value", { writable: true, value: "EMPLOYER_CONTRIBUTION" });
     typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
     expect(screen.queryByLabelText(/source account/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/without debiting your personal bank account/i)).toBeInTheDocument();
+    expect(screen.getByText(/increase your EPF balance without debiting your personal bank account/i)).toBeInTheDocument();
   });
 
   it("VPF: never offers Employer Contribution as an option", () => {
@@ -115,5 +116,28 @@ describe("RecurringContributionFormModal — product policy", () => {
     mockUseCreateRecurringContributionRule.mockReturnValue({ mutate: vi.fn(), isPending: true, isError: false });
     renderModal(baseAccount());
     expect(screen.getByRole("button", { name: /setting up/i })).toBeDisabled();
+  });
+
+  it("omits sourceAccountId in mutation payload for EPF Employee Contribution", () => {
+    const mutate = vi.fn();
+    mockUseCreateRecurringContributionRule.mockReturnValue({ mutate, isPending: false, isError: false });
+    renderModal(baseAccount({ productType: "EPF" }));
+
+    // Form should submit successfully with just amount filled
+    const amountInput = screen.getByLabelText(/amount/i) as HTMLInputElement;
+    fireEvent.change(amountInput, { target: { value: "12000.00" } });
+
+    const form = screen.getByRole("button", { name: /add recurring contribution/i }).closest("form")!;
+    fireEvent.submit(form);
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retirementAccountId: "ra_1",
+        transactionType: "EMPLOYEE_CONTRIBUTION",
+        amount: "12000.00",
+        sourceAccountId: undefined,
+      }),
+      expect.any(Object),
+    );
   });
 });

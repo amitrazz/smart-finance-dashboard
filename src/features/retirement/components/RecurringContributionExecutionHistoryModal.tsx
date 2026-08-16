@@ -3,18 +3,22 @@ import { X, History, RotateCcw } from "lucide-react";
 import { Money as MoneyDisplay } from "../../../components/common/Money";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { formatDate } from "../../../utils/formatters";
-import { RecurringContributionRule } from "../../../types";
+import { RecurringContributionRule, RetirementProductType } from "../../../types";
 import { useRecurringContributionExecutions } from "../hooks/useRetirementQueries";
 import { ExecutionStatusBadge } from "./ExecutionStatusBadge";
+import { getFundingSource } from "../constants/productTypes";
+import { useAccounts } from "../../../hooks/useFinanceQueries";
 
 interface RecurringContributionExecutionHistoryModalProps {
   rule: RecurringContributionRule | null;
+  productType: RetirementProductType;
   onClose: () => void;
 }
 
 export const RecurringContributionExecutionHistoryModal: React.FC<
   RecurringContributionExecutionHistoryModalProps
-> = ({ rule, onClose }) => {
+> = ({ rule, productType, onClose }) => {
+  const { data: bankAccounts = [] } = useAccounts({ limit: 100 });
   const { data, isLoading, isError, refetch } = useRecurringContributionExecutions(
     rule?.id ?? "",
     rule ? { limit: 25 } : undefined,
@@ -93,7 +97,21 @@ export const RecurringContributionExecutionHistoryModal: React.FC<
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500">{formatDate(execution.occurrenceDate)}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {formatDate(execution.occurrenceDate)}
+                    {(() => {
+                      const funding = getFundingSource(productType, rule.transactionType);
+                      if (funding === "PAYROLL_DEDUCTION") {
+                        return " · Payroll Deduction";
+                      }
+                      if (funding === "EMPLOYER") {
+                        return " · Employer Funded";
+                      }
+                      // DIRECT_ACCOUNT
+                      const bankAcc = bankAccounts.find((a) => a.id === rule.sourceAccountId);
+                      return ` · ${bankAcc ? `From: ${bankAcc.name}` : "Bank Transfer"}`;
+                    })()}
+                  </p>
                   {execution.reason && (execution.status === "FAILED" || execution.status === "SKIPPED") && (
                     <p className="text-[11px] text-slate-400">{execution.reason}</p>
                   )}

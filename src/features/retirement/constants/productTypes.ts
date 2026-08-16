@@ -4,6 +4,7 @@ import {
   RetirementAccountStatus,
   RetirementProductType,
   RetirementTransactionType,
+  RetirementFundingSource,
 } from "../../../types";
 
 // Centralized frontend configuration derived from the backend's
@@ -21,6 +22,7 @@ export interface ProductTypeConfig {
   color: string;
   allowsEmployerContribution: boolean;
   allowedTransactionTypes: RetirementTransactionType[];
+  fundingSources: Partial<Record<RetirementTransactionType, RetirementFundingSource>>;
 }
 
 export const PRODUCT_TYPE_CONFIG: Record<RetirementProductType, ProductTypeConfig> = {
@@ -39,6 +41,10 @@ export const PRODUCT_TYPE_CONFIG: Record<RetirementProductType, ProductTypeConfi
       "OPENING_BALANCE",
       "ADJUSTMENT",
     ],
+    fundingSources: {
+      EMPLOYEE_CONTRIBUTION: "PAYROLL_DEDUCTION",
+      EMPLOYER_CONTRIBUTION: "EMPLOYER",
+    },
   },
   VPF: {
     productType: "VPF",
@@ -48,6 +54,9 @@ export const PRODUCT_TYPE_CONFIG: Record<RetirementProductType, ProductTypeConfi
     color: "#a78bfa",
     allowsEmployerContribution: false,
     allowedTransactionTypes: ["EMPLOYEE_CONTRIBUTION", "INTEREST", "WITHDRAWAL", "OPENING_BALANCE", "ADJUSTMENT"],
+    fundingSources: {
+      EMPLOYEE_CONTRIBUTION: "DIRECT_ACCOUNT",
+    },
   },
   PPF: {
     productType: "PPF",
@@ -57,6 +66,9 @@ export const PRODUCT_TYPE_CONFIG: Record<RetirementProductType, ProductTypeConfi
     color: "#6366f1",
     allowsEmployerContribution: false,
     allowedTransactionTypes: ["CONTRIBUTION", "INTEREST", "WITHDRAWAL", "OPENING_BALANCE", "ADJUSTMENT"],
+    fundingSources: {
+      CONTRIBUTION: "DIRECT_ACCOUNT",
+    },
   },
   NPS: {
     productType: "NPS",
@@ -73,6 +85,10 @@ export const PRODUCT_TYPE_CONFIG: Record<RetirementProductType, ProductTypeConfi
       "OPENING_BALANCE",
       "ADJUSTMENT",
     ],
+    fundingSources: {
+      CONTRIBUTION: "DIRECT_ACCOUNT",
+      EMPLOYER_CONTRIBUTION: "EMPLOYER",
+    },
   },
 };
 
@@ -133,6 +149,20 @@ export const STATUS_LABELS: Record<RetirementAccountStatus, string> = {
 
 export function getAllowedTransactionTypes(productType: RetirementProductType): RetirementTransactionType[] {
   return PRODUCT_TYPE_CONFIG[productType].allowedTransactionTypes;
+}
+
+export function getFundingSource(
+  productType: RetirementProductType,
+  transactionType: RetirementTransactionType,
+): RetirementFundingSource | null {
+  return PRODUCT_TYPE_CONFIG[productType]?.fundingSources[transactionType] ?? null;
+}
+
+export function requiresSourceAccount(
+  productType: RetirementProductType,
+  transactionType: RetirementTransactionType,
+): boolean {
+  return getFundingSource(productType, transactionType) === "DIRECT_ACCOUNT";
 }
 
 // Only these three transaction types can ever be scheduled as a recurring

@@ -1566,6 +1566,7 @@ export interface RetirementTransaction {
   description: string | null;
   bankTransactionId: string | null;
   notes: string | null;
+  fundingSource?: RetirementFundingSource | null;
   version?: number;
 }
 
@@ -1637,6 +1638,7 @@ export interface RetirementSummary {
 
 export type RecurringContributionRuleStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
 export type RecurringContributionExecutionStatus = "SUCCEEDED" | "SKIPPED" | "FAILED";
+export type RetirementFundingSource = "PAYROLL_DEDUCTION" | "EMPLOYER" | "DIRECT_ACCOUNT";
 
 // Matches RecurringContributionRuleResponseDto exactly (recurring-contribution-rule.mapper.ts).
 export interface RecurringContributionRule {
@@ -1655,6 +1657,7 @@ export interface RecurringContributionRule {
   lastExecutedDate: string | null;
   consecutiveFailureCount: number;
   description: string | null;
+  fundingSource?: RetirementFundingSource | null;
   version: number;
 }
 
