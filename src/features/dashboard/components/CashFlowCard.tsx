@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowDownLeft, ArrowUpRight, PiggyBank, Scale } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Clock, PiggyBank, Scale } from "lucide-react";
 import { formatCurrency, formatPercent } from "../../../utils/formatters";
 import { Money } from "../../../types";
 
@@ -7,17 +7,32 @@ interface CashFlowCardProps {
   monthlyIncome?: Money;
   monthlySpend?: Money;
   savingsRate?: number;
+  // This period is still in progress — monthlyIncome is a running-so-far
+  // figure, not a settled monthly total. See CashFlowSnapshot's own doc
+  // comment in types/index.ts.
+  isCurrentPeriod?: boolean;
+  // Outstanding recurring income not yet posted this period — derived
+  // analytics, never a real transaction, never folded into monthlyIncome.
+  // Only meaningful when isCurrentPeriod is true.
+  expectedIncome?: Money;
+  // monthlyIncome + expectedIncome. Only meaningful when isCurrentPeriod is true.
+  projectedIncome?: Money;
 }
 
 export const CashFlowCard: React.FC<CashFlowCardProps> = ({
   monthlyIncome,
   monthlySpend,
   savingsRate = 0,
+  isCurrentPeriod = false,
+  expectedIncome,
+  projectedIncome,
 }) => {
   const incomeVal = parseFloat(monthlyIncome?.amount || "0");
   const spendVal = parseFloat(monthlySpend?.amount || "0");
   const surplusVal = Math.max(0, incomeVal - spendVal);
   const currency = monthlyIncome?.currency || "INR";
+  const expectedIncomeVal = parseFloat(expectedIncome?.amount || "0");
+  const showExpectedIncome = isCurrentPeriod && expectedIncomeVal > 0;
 
   const spendPercent = incomeVal > 0 ? Math.min(100, (spendVal / incomeVal) * 100) : 0;
   const surplusPercent = incomeVal > 0 ? Math.max(0, 100 - spendPercent) : 0;
@@ -56,7 +71,13 @@ export const CashFlowCard: React.FC<CashFlowCardProps> = ({
           <p className="text-base sm:text-lg font-extrabold text-emerald-400 font-sans truncate">
             +{formatCurrency({ amount: String(incomeVal), currency })}
           </p>
-          <span className="text-[10px] text-slate-500 block truncate">100% Inflow Base</span>
+          {showExpectedIncome ? (
+            <span className="text-[10px] text-amber-400 block truncate">
+              +{formatCurrency(expectedIncome)} expected
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-500 block truncate">100% Inflow Base</span>
+          )}
         </div>
 
         {/* Expenses */}
@@ -95,6 +116,27 @@ export const CashFlowCard: React.FC<CashFlowCardProps> = ({
           <span className="text-[10px] text-slate-500 block truncate">Available for Goals</span>
         </div>
       </div>
+
+      {/* Projected Income Banner — only while this month is still in progress and a
+          recurring income source hasn't posted yet. Never implies the money has arrived. */}
+      {showExpectedIncome && (
+        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+          <div className="p-2 rounded-xl bg-amber-500/15 text-amber-300 shrink-0">
+            <Clock className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-amber-300">
+              {formatCurrency(expectedIncome)} in recurring income still expected this month
+            </p>
+            <p className="text-[11px] text-slate-400 truncate">
+              Projected total once it lands:{" "}
+              <span className="font-semibold text-slate-200">
+                {formatCurrency(projectedIncome ?? { amount: String(incomeVal + expectedIncomeVal), currency })}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Visual Stacked Cash Flow Bar */}
       <div className="space-y-2 pt-1">

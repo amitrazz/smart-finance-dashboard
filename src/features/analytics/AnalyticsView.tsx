@@ -198,6 +198,18 @@ export const AnalyticsView: React.FC = () => {
                 : "This month is still in progress — not a confirmed final total."}
             </p>
           )}
+          {cfSnapshot.isCurrentPeriod &&
+            cfSnapshot.expectedIncome &&
+            parseFloat(cfSnapshot.expectedIncome.amount) > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-0.5">
+                <p className="text-[11px] text-amber-300">
+                  + {formatCurrency(cfSnapshot.expectedIncome)} expected (recurring, not yet posted)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Projected total: <span className="font-semibold text-slate-200">{formatCurrency(cfSnapshot.projectedIncome)}</span>
+                </p>
+              </div>
+            )}
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Total Expenses</p>

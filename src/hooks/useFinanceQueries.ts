@@ -1503,6 +1503,19 @@ interface RawCashFlowSnapshot {
   // CashFlowSnapshot's own doc comment in types/index.ts.
   isCurrentPeriod?: boolean;
   incomeStillExpected?: boolean | null;
+  // Only sent alongside isCurrentPeriod: true. Already Money-shaped on the
+  // wire, unlike totalIncome's sibling category-breakdown lines, so no
+  // amount-string/currency reassembly is needed here.
+  expectedIncome?: Money;
+  projectedIncome?: Money;
+  expectedIncomeItems?: Array<{
+    categoryId: string | null;
+    categoryName: string;
+    amount: Money;
+    expectedDateStart: string;
+    expectedDateEnd: string;
+    confidence: number;
+  }>;
 }
 
 function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
@@ -1530,6 +1543,9 @@ function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
     // AnalyticsView's "in progress" badge silently never had data to render.
     isCurrentPeriod: raw.isCurrentPeriod,
     incomeStillExpected: raw.incomeStillExpected,
+    expectedIncome: raw.expectedIncome,
+    projectedIncome: raw.projectedIncome,
+    expectedIncomeItems: raw.expectedIncomeItems,
   };
 }
 

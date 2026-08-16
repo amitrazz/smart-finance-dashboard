@@ -138,6 +138,9 @@ export const DashboardView: React.FC = () => {
             monthlyIncome={monthlyIncome}
             monthlySpend={dashboard.thisMonthSpend}
             savingsRate={savingsRate}
+            isCurrentPeriod={currentCashFlow?.isCurrentPeriod}
+            expectedIncome={currentCashFlow?.expectedIncome}
+            projectedIncome={currentCashFlow?.projectedIncome}
           />
         </div>
         <div className="flex">

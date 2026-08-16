@@ -63,6 +63,84 @@ describe("useCashFlow — API/FE contract", () => {
     expect(snapshot?.incomeStillExpected).toBe(true);
   });
 
+  it("passes expectedIncome/projectedIncome/expectedIncomeItems through untouched on a current-period row", async () => {
+    vi.mocked(api.getCashFlow).mockResolvedValue({
+      data: [
+        {
+          periodStart: "2026-08-01",
+          periodEnd: "2026-08-31",
+          totalIncome: { amount: "1570", currency: "INR" },
+          totalExpense: { amount: "246737.56", currency: "INR" },
+          netCashFlow: { amount: "-245167.56", currency: "INR" },
+          savingsRate: "-156.1577",
+          categoryBreakdown: [],
+          isCurrentPeriod: true,
+          incomeStillExpected: true,
+          expectedIncome: { amount: "243524.6667", currency: "INR" },
+          projectedIncome: { amount: "245094.6667", currency: "INR" },
+          expectedIncomeItems: [
+            {
+              categoryId: "cat-salary",
+              categoryName: "Salary",
+              amount: { amount: "243524.6667", currency: "INR" },
+              expectedDateStart: "2026-08-24",
+              expectedDateEnd: "2026-08-31",
+              confidence: 1,
+            },
+          ],
+        },
+      ],
+      totalCount: 1,
+      limit: 20,
+      hasMore: false,
+    } as never);
+
+    const { result } = renderHook(() => useCashFlow(), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const snapshot = result.current.data?.[0];
+    expect(snapshot?.expectedIncome).toEqual({ amount: "243524.6667", currency: "INR" });
+    expect(snapshot?.projectedIncome).toEqual({ amount: "245094.6667", currency: "INR" });
+    expect(snapshot?.expectedIncomeItems).toEqual([
+      {
+        categoryId: "cat-salary",
+        categoryName: "Salary",
+        amount: { amount: "243524.6667", currency: "INR" },
+        expectedDateStart: "2026-08-24",
+        expectedDateEnd: "2026-08-31",
+        confidence: 1,
+      },
+    ]);
+  });
+
+  it("omits expectedIncome/projectedIncome/expectedIncomeItems for a completed period", async () => {
+    vi.mocked(api.getCashFlow).mockResolvedValue({
+      data: [
+        {
+          periodStart: "2026-07-01",
+          periodEnd: "2026-07-31",
+          totalIncome: { amount: "293217", currency: "INR" },
+          totalExpense: { amount: "725041.89", currency: "INR" },
+          netCashFlow: { amount: "-431824.89", currency: "INR" },
+          savingsRate: "-1.4727",
+          categoryBreakdown: [],
+          isCurrentPeriod: false,
+        },
+      ],
+      totalCount: 1,
+      limit: 20,
+      hasMore: false,
+    } as never);
+
+    const { result } = renderHook(() => useCashFlow(), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const snapshot = result.current.data?.[0];
+    expect(snapshot?.expectedIncome).toBeUndefined();
+    expect(snapshot?.projectedIncome).toBeUndefined();
+    expect(snapshot?.expectedIncomeItems).toBeUndefined();
+  });
+
   it("omits incomeStillExpected for a completed period, rather than defaulting it to false", async () => {
     vi.mocked(api.getCashFlow).mockResolvedValue({
       data: [

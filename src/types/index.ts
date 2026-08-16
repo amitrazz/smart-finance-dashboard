@@ -1730,6 +1730,22 @@ export interface CashFlowSnapshot {
   // its usual arrival date has already passed within this period; null/
   // undefined = not enough history for a pattern to exist yet.
   incomeStillExpected?: boolean | null;
+  // Only present when isCurrentPeriod is true. Sum of outstanding recurring
+  // income not yet posted this period — derived analytics, never a real
+  // transaction, never folded into totalIncome.
+  expectedIncome?: Money;
+  // Only present when isCurrentPeriod is true. totalIncome + expectedIncome.
+  projectedIncome?: Money;
+  // Only present when isCurrentPeriod is true. Per-source breakdown backing
+  // expectedIncome.
+  expectedIncomeItems?: Array<{
+    categoryId: string | null;
+    categoryName: string;
+    amount: Money;
+    expectedDateStart: string;
+    expectedDateEnd: string;
+    confidence: number;
+  }>;
 }
 
 export interface UserSettings {
