@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, QueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput, AssetRefreshResult, AssetRefreshStatus, RefreshPricesResponse } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput, AssetRefreshResult, AssetRefreshStatus, RefreshPricesResponse, UserSelfIdentifier, CreateUserSelfIdentifierInput, AnalyticsTrendPoint } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -49,6 +49,7 @@ export const QUERY_KEYS = {
   merchants: (params?: Record<string, unknown>) => ["merchants", params],
   reviewClusters: (params?: Record<string, unknown>) => ["reviewClusters", params],
   reviewCluster: (id: string) => ["reviewClusters", id],
+  selfIdentifiers: (params?: Record<string, unknown>) => ["selfIdentifiers", params],
   documents: (params?: Record<string, unknown>) => ["documents", params],
   document: (id: string) => ["documents", id],
   holdings: (params?: Record<string, unknown>) => ["holdings", params],
@@ -956,6 +957,45 @@ export function useResolveReviewCluster() {
   });
 }
 
+// Self-transfer identifiers — the user's own registered UPI VPAs. Not
+// paginated in the UI (a user realistically has a handful of these), so the
+// list is unwrapped the same way useMerchants unwraps its response shape.
+export function useSelfIdentifiers(params?: { enabled?: boolean; limit?: number }) {
+  return useQuery({
+    queryKey: QUERY_KEYS.selfIdentifiers(params),
+    queryFn: () => api.getSelfIdentifiers(params),
+    enabled: isAuth(),
+    select: (res) => unwrapList<UserSelfIdentifier>(res),
+  });
+}
+
+export function useCreateSelfIdentifier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateUserSelfIdentifierInput) => api.createSelfIdentifier(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["selfIdentifiers"] });
+      useUIStore.getState().showToast("Self-transfer VPA registered", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useToggleSelfIdentifier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api.toggleSelfIdentifier(id, enabled),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["selfIdentifiers"] });
+      useUIStore
+        .getState()
+        .showToast(variables.enabled ? "Identifier re-enabled" : "Identifier disabled", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
 // Statuses a job can settle into after upload without an explicit user
 // action (commit/rollback). Anything else (UPLOADED, VALIDATING, PARSING,
 // OCR_PROCESSING, AI_EXTRACTING, NORMALIZING, DETECTING_DUPLICATES) is
@@ -1459,6 +1499,10 @@ interface RawCashFlowSnapshot {
   netCashFlow: Money;
   savingsRate: string;
   categoryBreakdown: Array<{ categoryId: string | null; categoryName: string; amount: string }>;
+  // Still in progress (same calendar month as "now") — see
+  // CashFlowSnapshot's own doc comment in types/index.ts.
+  isCurrentPeriod?: boolean;
+  incomeStillExpected?: boolean | null;
 }
 
 function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
@@ -1481,6 +1525,11 @@ function mapCashFlowSnapshot(raw: RawCashFlowSnapshot): CashFlowSnapshot {
         percentage: totalExpenseVal > 0 ? Math.round((amountVal / totalExpenseVal) * 100) : 0,
       };
     }),
+    // Previously dropped here — the raw API field was correct, but this
+    // mapper constructs a brand-new object and never copied it through, so
+    // AnalyticsView's "in progress" badge silently never had data to render.
+    isCurrentPeriod: raw.isCurrentPeriod,
+    incomeStillExpected: raw.incomeStillExpected,
   };
 }
 
@@ -1519,11 +1568,15 @@ export function useDebtBreakdown() {
   });
 }
 
+// Both trend endpoints share the backend's TrendPointDto shape — `periodStart`
+// (not `date`/`month`), `amount` as a plain decimal string (not Money). See
+// AnalyticsTrendPoint's own doc comment in types/index.ts.
 export function useIncomeTrend(params?: { limit?: number; dateFrom?: string; dateTo?: string }) {
   return useQuery({
     queryKey: QUERY_KEYS.incomeTrend(params),
     queryFn: () => api.getIncomeTrend(params),
     enabled: isAuth(),
+    select: (res) => unwrapList<AnalyticsTrendPoint>(res),
   });
 }
 
@@ -1532,7 +1585,7 @@ export function useExpenseTrendAnalytics(params?: { limit?: number; dateFrom?: s
     queryKey: QUERY_KEYS.expenseTrendAnalytics(params),
     queryFn: () => api.getExpenseTrendAnalytics(params),
     enabled: isAuth(),
-    select: (res) => unwrapList<{ month: string; amount: Money }>(res),
+    select: (res) => unwrapList<AnalyticsTrendPoint>(res),
   });
 }
 

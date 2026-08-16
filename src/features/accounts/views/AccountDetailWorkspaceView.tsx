@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 
-import { useAccount, useAccountBalanceHistory, useTransactions } from "../../../hooks/useFinanceQueries";
+import { useAccount, useAccountBalanceHistory, useCategories, useTransactions } from "../../../hooks/useFinanceQueries";
 import { AccountHeader } from "../components/AccountHeader";
 import { Account } from "../../../types";
 import { formatCurrency, formatDate } from "../../../utils/formatters";
@@ -24,17 +24,31 @@ export const AccountDetailWorkspaceView: React.FC<AccountDetailWorkspaceViewProp
   const { data: historyData } = useAccountBalanceHistory(account.id, { limit: 30 });
   // Fetched wide enough to compute a real 30-day inflow/outflow total below, not just for the list.
   const { data: txns = [] } = useTransactions({ accountId: account.id, limit: 100 });
+  const { data: categories = [] } = useCategories();
 
   const displayAccount = fullAccount || account;
+
+  // A raw INFLOW total counts self-transfers, refunds, and investment
+  // redemptions as if they were income — the same mistake the backend's
+  // cash-flow aggregation used to make. Excluding Transfer-kind categories
+  // here mirrors that fix (see PrismaTransactionRepository.sumByDirectionInRange).
+  const transferCategoryIds = useMemo(
+    () => new Set(categories.filter((c) => (c.kind ?? c.type) === "TRANSFER").map((c) => c.id)),
+    [categories],
+  );
+  const isTransfer = (txn: (typeof txns)[number]) =>
+    txn.direction === "TRANSFER_IN" ||
+    txn.direction === "TRANSFER_OUT" ||
+    (txn.categoryId ? transferCategoryIds.has(txn.categoryId) : false);
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const recentTxns = txns.filter((txn) => new Date(txn.date) >= thirtyDaysAgo);
   const income30d = recentTxns
-    .filter((txn) => txn.direction === "INFLOW")
+    .filter((txn) => txn.direction === "INFLOW" && !isTransfer(txn))
     .reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount?.amount || "0")), 0);
   const expenses30d = recentTxns
-    .filter((txn) => txn.direction !== "INFLOW")
+    .filter((txn) => txn.direction !== "INFLOW" && !isTransfer(txn))
     .reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount?.amount || "0")), 0);
 
   return (

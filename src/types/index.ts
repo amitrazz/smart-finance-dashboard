@@ -424,6 +424,23 @@ export interface Merchant {
   defaultCategoryId?: string;
 }
 
+// A user's own registered UPI VPA (GET/POST /finance/self-identifiers). An
+// imported transaction whose counterparty VPA matches one of these is
+// auto-categorized "Transfer" instead of being counted as income/expense —
+// catches a self-transfer even when the other account was never imported
+// into pFOS.
+export interface UserSelfIdentifier {
+  id: string;
+  vpa: string;
+  label: string | null;
+  enabled: boolean;
+}
+
+export interface CreateUserSelfIdentifierInput {
+  vpa: string;
+  label?: string;
+}
+
 // Counterparty Intelligence — merchant-intelligence's Unknown Counterparty
 // Workflow. Mirrors packages/finance/src/merchant-intelligence's
 // FuzzyScoreBreakdown/ReviewClusterResponseDto exactly.
@@ -1704,6 +1721,15 @@ export interface CashFlowSnapshot {
     amount: Money;
     percentage: number;
   }>;
+  // This period is still in progress (same calendar month as "now") — its
+  // totals are running-so-far, not a settled monthly result. A low/zero
+  // totalIncome here must not be read as a confirmed "no income this month".
+  isCurrentPeriod?: boolean;
+  // Only meaningful when isCurrentPeriod is true. true = a recurring
+  // income pattern is still expected before this period closes; false =
+  // its usual arrival date has already passed within this period; null/
+  // undefined = not enough history for a pattern to exist yet.
+  incomeStillExpected?: boolean | null;
 }
 
 export interface UserSettings {
@@ -1924,8 +1950,15 @@ export interface DebtBreakdownResponse {
   items?: Array<{ id: string; name: string; type: string; amount: Money; interestRate?: number }>;
 }
 
-export interface IncomeTrendResponse {
-  points?: Array<{ date: string; amount: Money }>;
+// Matches the backend's TrendPointDto exactly (GET /finance/analytics/income-trend,
+// GET /finance/analytics/expense-trend) — `periodStart` (not `date`/`month`), `amount`
+// as a plain decimal string (not Money — these endpoints carry no currency of their
+// own), `isCurrentPeriod` for the still-in-progress period (see CashFlowSnapshot's
+// own doc comment for the same meaning).
+export interface AnalyticsTrendPoint {
+  periodStart: string;
+  amount: string;
+  isCurrentPeriod: boolean;
 }
 
 export interface RetirementForecastResponse {

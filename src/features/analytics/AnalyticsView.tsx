@@ -6,6 +6,7 @@ import {
   useInvestmentReturns,
   useAssetAllocation,
   useDebtBreakdown,
+  useIncomeTrend,
   useExpenseTrendAnalytics,
   useRetirementForecast,
 } from "../../hooks/useFinanceQueries";
@@ -21,6 +22,7 @@ export const AnalyticsView: React.FC = () => {
   const { data: investmentReturns } = useInvestmentReturns();
   const { data: assetAllocation } = useAssetAllocation();
   const { data: debtBreakdown } = useDebtBreakdown();
+  const { data: incomeTrend } = useIncomeTrend();
   const { data: expenseTrend } = useExpenseTrendAnalytics();
 
   const [currentAgeInput, setCurrentAgeInput] = useState<number>(30);
@@ -123,6 +125,36 @@ export const AnalyticsView: React.FC = () => {
         },
       ];
 
+  const incomeExpenseTrendData = useMemo(() => {
+    if (!incomeTrend?.length && !expenseTrend?.length) return null;
+
+    const byPeriod = new Map<string, { month: string; Income: number; Expense: number }>();
+    const getEntry = (periodStart: string) => {
+      const key = periodStart.slice(0, 7);
+      let entry = byPeriod.get(key);
+      if (!entry) {
+        entry = {
+          month: new Date(periodStart).toLocaleDateString("en-IN", { month: "short" }),
+          Income: 0,
+          Expense: 0,
+        };
+        byPeriod.set(key, entry);
+      }
+      return entry;
+    };
+
+    (incomeTrend || []).forEach((p) => {
+      getEntry(p.periodStart).Income = parseFloat(p.amount || "0");
+    });
+    (expenseTrend || []).forEach((p) => {
+      getEntry(p.periodStart).Expense = parseFloat(p.amount || "0");
+    });
+
+    return Array.from(byPeriod.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, entry]) => ({ ...entry, Savings: entry.Income - entry.Expense }));
+  }, [incomeTrend, expenseTrend]);
+
   const categoryBreakdown = Array.isArray(cfSnapshot.categoryBreakdown) ? cfSnapshot.categoryBreakdown : [];
 
   const pieData = categoryBreakdown.map((c, idx) => ({
@@ -150,8 +182,22 @@ export const AnalyticsView: React.FC = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Total Income</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-slate-400">Total Income</p>
+            {cfSnapshot.isCurrentPeriod && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                In progress
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-extrabold text-emerald-400 mt-1">{formatCurrency(cfSnapshot.totalIncome)}</p>
+          {cfSnapshot.isCurrentPeriod && (
+            <p className="text-[11px] text-slate-500 mt-1">
+              {cfSnapshot.incomeStillExpected === true
+                ? "This month isn't over yet — expected income hasn't landed."
+                : "This month is still in progress — not a confirmed final total."}
+            </p>
+          )}
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Total Expenses</p>
@@ -255,7 +301,7 @@ export const AnalyticsView: React.FC = () => {
         <h3 className="font-bold text-base text-slate-100">Income vs Expense Trend</h3>
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={expenseTrend && expenseTrend.length > 0 ? expenseTrend.map(e => ({ month: e.month, Expense: parseFloat(e.amount?.amount || "0") })) : monthlyTrendData}>
+            <BarChart data={incomeExpenseTrendData && incomeExpenseTrendData.length > 0 ? incomeExpenseTrendData : monthlyTrendData}>
               <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} />
               <YAxis
                 stroke="#64748b"

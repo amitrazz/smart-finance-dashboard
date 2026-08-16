@@ -37,7 +37,7 @@ import {
   InvestmentReturnsPortfolio,
   AssetAllocationResponse,
   DebtBreakdownResponse,
-  IncomeTrendResponse,
+  AnalyticsTrendPoint,
   RetirementForecastResponse,
   Loan,
   Transaction,
@@ -550,19 +550,18 @@ export function mapSpending(
 
 export function mapIncome(
   sourcesRes: IncomeSourceWire[] | PaginatedResponse<IncomeSourceWire> | null | undefined,
-  trendRes: IncomeTrendResponse | PaginatedResponse<{ date: string; amount: Money }> | null | undefined,
+  trendRes: PaginatedResponse<AnalyticsTrendPoint> | null | undefined,
   cashFlow: CashFlowAnalytics | null,
 ): IncomeAnalytics | null {
   const sourcesRaw = unwrapList(sourcesRes);
-  const trendPoints =
-    trendRes && typeof trendRes === "object" && "points" in trendRes && trendRes.points
-      ? trendRes.points
-      : unwrapList(trendRes as PaginatedResponse<{ date: string; amount: Money }> | null);
+  const trendPoints = unwrapList(trendRes);
 
   if (sourcesRaw.length === 0 && trendPoints.length === 0) return null;
 
+  // Real API field is `periodStart` (TrendPointDto) — `date` was never a
+  // field either trend endpoint actually returns.
   const history = [...trendPoints]
-    .map((p) => ({ date: p.date, amount: moneyValue(p.amount) }))
+    .map((p) => ({ date: p.periodStart, amount: moneyValue(p.amount) }))
     .filter((p): p is { date: string; amount: number } => p.amount !== null && Boolean(p.date))
     .sort(byAscending((p) => p.date));
 
@@ -898,13 +897,10 @@ export function mapSubscriptions(
 // ---------------------------------------------------------------------------
 
 export function mapTrends(
-  incomeTrendRes: IncomeTrendResponse | PaginatedResponse<{ date: string; amount: Money }> | null | undefined,
-  expenseTrendRes: PaginatedResponse<{ month: string; amount: Money }> | null | undefined,
+  incomeTrendRes: PaginatedResponse<AnalyticsTrendPoint> | null | undefined,
+  expenseTrendRes: PaginatedResponse<AnalyticsTrendPoint> | null | undefined,
 ): TrendAnalytics | null {
-  const incomePoints =
-    incomeTrendRes && typeof incomeTrendRes === "object" && "points" in incomeTrendRes && incomeTrendRes.points
-      ? incomeTrendRes.points
-      : unwrapList(incomeTrendRes as PaginatedResponse<{ date: string; amount: Money }> | null);
+  const incomePoints = unwrapList(incomeTrendRes);
   const expensePoints = unwrapList(expenseTrendRes);
 
   if (incomePoints.length === 0 && expensePoints.length === 0) return null;
@@ -913,11 +909,13 @@ export function mapTrends(
   const touch = (k: string) => byMonth.get(k) ?? { income: null, expense: null };
 
   for (const p of incomePoints) {
-    const k = (p.date ?? "").slice(0, 7);
+    // Real API field is `periodStart` (TrendPointDto) — `date` was never a
+    // field either endpoint actually returns.
+    const k = (p.periodStart ?? "").slice(0, 7);
     if (k) byMonth.set(k, { ...touch(k), income: moneyValue(p.amount) });
   }
   for (const p of expensePoints) {
-    const k = (p.month ?? "").slice(0, 7);
+    const k = (p.periodStart ?? "").slice(0, 7);
     if (k) byMonth.set(k, { ...touch(k), expense: moneyValue(p.amount) });
   }
 

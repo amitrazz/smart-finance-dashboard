@@ -5,6 +5,7 @@ import { useUIStore } from "../../store/useUIStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { ActionPriority } from "../../types";
 import { User, Globe, Save, RefreshCw, AlertTriangle, Zap, Bell, Moon, Shield, Download, Database } from "lucide-react";
+import { SelfIdentifiersCard } from "./SelfIdentifiersCard";
 
 export const SettingsView: React.FC = () => {
   const { activeSubTab } = useUIStore();
@@ -324,6 +325,11 @@ export const SettingsView: React.FC = () => {
           Save All Preferences
         </button>
       </form>
+
+      {/* Self-transfer identifiers — a standalone section, not part of the
+          form above: each add/toggle saves immediately via its own mutation
+          rather than waiting on "Save All Preferences". */}
+      <SelfIdentifiersCard />
     </div>
   );
 };

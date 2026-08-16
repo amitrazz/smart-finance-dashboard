@@ -59,7 +59,6 @@ import {
   ImportJob,
   ImportRowStaging,
   UpdateImportRowInput,
-  IncomeTrendResponse,
   InvestmentReturnsPortfolio,
   Loan,
   LoanDashboardData,
@@ -125,7 +124,10 @@ import {
   UpdateLoanInput,
   UpdateRetirementAccountInput,
   UpdateTransactionInput,
+  UserSelfIdentifier,
+  CreateUserSelfIdentifierInput,
   UserSettings,
+  AnalyticsTrendPoint,
 } from '../../types';
 import { fetchWithAuth } from './client';
 
@@ -641,6 +643,28 @@ export const api = {
       {
         method: 'POST',
         body: JSON.stringify(data),
+      },
+    ),
+
+  // Self-transfer identifiers — the user's own UPI VPAs. An imported
+  // transaction whose counterparty VPA matches one of these is
+  // auto-categorized Transfer during CSV/PDF import, so it's excluded from
+  // cash-flow income/expense the same way any other transfer is.
+  getSelfIdentifiers: (params?: { enabled?: boolean; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<UserSelfIdentifier>>(
+      `/finance/self-identifiers${buildQuery(params)}`,
+    ),
+  createSelfIdentifier: (data: CreateUserSelfIdentifierInput) =>
+    fetchWithAuth<UserSelfIdentifier>('/finance/self-identifiers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  toggleSelfIdentifier: (id: string, enabled: boolean) =>
+    fetchWithAuth<UserSelfIdentifier>(
+      `/finance/self-identifiers/${encodeURIComponent(id)}/toggle`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
       },
     ),
 
@@ -1233,11 +1257,11 @@ export const api = {
     fetchWithAuth<AssetAllocationResponse>('/finance/analytics/asset-allocation'),
   getDebtBreakdown: () => fetchWithAuth<DebtBreakdownResponse>('/finance/analytics/debt-breakdown'),
   getIncomeTrend: (params?: { limit?: number; dateFrom?: string; dateTo?: string }) =>
-    fetchWithAuth<IncomeTrendResponse | PaginatedResponse<{ date: string; amount: Money }>>(
+    fetchWithAuth<PaginatedResponse<AnalyticsTrendPoint>>(
       `/finance/analytics/income-trend${buildQuery(params)}`,
     ),
   getExpenseTrendAnalytics: (params?: { limit?: number; dateFrom?: string; dateTo?: string }) =>
-    fetchWithAuth<PaginatedResponse<{ month: string; amount: Money }>>(
+    fetchWithAuth<PaginatedResponse<AnalyticsTrendPoint>>(
       `/finance/analytics/expense-trend${buildQuery(params)}`,
     ),
   getRetirementForecast: (params?: {
