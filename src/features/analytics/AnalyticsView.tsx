@@ -79,6 +79,36 @@ export const AnalyticsView: React.FC = () => {
     };
   }, [cashFlow, txnsResponse]);
 
+  const incomeExpenseTrendData = useMemo(() => {
+    if (!incomeTrend?.length && !expenseTrend?.length) return null;
+
+    const byPeriod = new Map<string, { month: string; Income: number; Expense: number }>();
+    const getEntry = (periodStart: string) => {
+      const key = periodStart.slice(0, 7);
+      let entry = byPeriod.get(key);
+      if (!entry) {
+        entry = {
+          month: new Date(periodStart).toLocaleDateString("en-IN", { month: "short" }),
+          Income: 0,
+          Expense: 0,
+        };
+        byPeriod.set(key, entry);
+      }
+      return entry;
+    };
+
+    (incomeTrend || []).forEach((p) => {
+      getEntry(p.periodStart).Income = parseFloat(p.amount || "0");
+    });
+    (expenseTrend || []).forEach((p) => {
+      getEntry(p.periodStart).Expense = parseFloat(p.amount || "0");
+    });
+
+    return Array.from(byPeriod.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, entry]) => ({ ...entry, Savings: entry.Income - entry.Expense }));
+  }, [incomeTrend, expenseTrend]);
+
   if (loadingCashFlow) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -124,36 +154,6 @@ export const AnalyticsView: React.FC = () => {
           Savings: parseFloat(cfSnapshot.netSavings?.amount || "0"),
         },
       ];
-
-  const incomeExpenseTrendData = useMemo(() => {
-    if (!incomeTrend?.length && !expenseTrend?.length) return null;
-
-    const byPeriod = new Map<string, { month: string; Income: number; Expense: number }>();
-    const getEntry = (periodStart: string) => {
-      const key = periodStart.slice(0, 7);
-      let entry = byPeriod.get(key);
-      if (!entry) {
-        entry = {
-          month: new Date(periodStart).toLocaleDateString("en-IN", { month: "short" }),
-          Income: 0,
-          Expense: 0,
-        };
-        byPeriod.set(key, entry);
-      }
-      return entry;
-    };
-
-    (incomeTrend || []).forEach((p) => {
-      getEntry(p.periodStart).Income = parseFloat(p.amount || "0");
-    });
-    (expenseTrend || []).forEach((p) => {
-      getEntry(p.periodStart).Expense = parseFloat(p.amount || "0");
-    });
-
-    return Array.from(byPeriod.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, entry]) => ({ ...entry, Savings: entry.Income - entry.Expense }));
-  }, [incomeTrend, expenseTrend]);
 
   const categoryBreakdown = Array.isArray(cfSnapshot.categoryBreakdown) ? cfSnapshot.categoryBreakdown : [];
 
