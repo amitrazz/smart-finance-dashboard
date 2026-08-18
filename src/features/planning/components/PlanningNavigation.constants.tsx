@@ -1,7 +1,7 @@
 import React from "react";
-import { LayoutDashboard, Target, Wallet, Lightbulb, FileBarChart } from "lucide-react";
+import { LayoutDashboard, Target, Wallet, Lightbulb, FileBarChart, Sparkles } from "lucide-react";
 
-export type PlanningSection = "overview" | "goals" | "budgets" | "insights" | "reports";
+export type PlanningSection = "overview" | "goals" | "budgets" | "ai-plans" | "insights" | "reports";
 
 export interface SecondaryTab {
   id: string;
@@ -43,6 +43,12 @@ export const PLANNING_TABS: PrimaryTab[] = [
       { id: "forecast", label: "Forecast" },
       { id: "history", label: "History" },
     ],
+  },
+  {
+    id: "ai-plans",
+    label: "AI Plans",
+    icon: <Sparkles className="w-3.5 h-3.5" />,
+    defaultSub: null,
   },
   {
     id: "insights",

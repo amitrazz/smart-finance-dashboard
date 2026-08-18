@@ -22,8 +22,9 @@ import {
   InsightsErrorState,
 } from "../components/primitives/States";
 import { AskSection } from "./intelligence/AskSection";
+import { AssistantPage } from "../../finance-ai/pages/AssistantPage";
 
-type IntelligenceTab = "feed" | "ask";
+type IntelligenceTab = "feed" | "ask" | "assistant";
 
 /**
  * Intelligence: one ranked feed, and a way to ask a question of your own.
@@ -49,7 +50,7 @@ export const IntelligencePage: React.FC<{
 }> = ({ view, onNavigate }) => {
   // The tab is the route, not local state: Ask stays linkable and the browser's
   // back button steps out of it the way it does everywhere else in the app.
-  const tab: IntelligenceTab = view === "ask" ? "ask" : "feed";
+  const tab: IntelligenceTab = view === "ask" ? "ask" : view === "assistant" ? "assistant" : "feed";
 
   return (
     <div className="space-y-5">
@@ -62,6 +63,7 @@ export const IntelligencePage: React.FC<{
           [
             { id: "feed", label: "What needs attention" },
             { id: "ask", label: "Ask" },
+            { id: "assistant", label: "Assistant" },
           ] as const
         ).map((option) => (
           <button
@@ -81,7 +83,7 @@ export const IntelligencePage: React.FC<{
         ))}
       </div>
 
-      {tab === "ask" ? <AskSection /> : <IntelligenceFeed />}
+      {tab === "ask" ? <AskSection /> : tab === "assistant" ? <AssistantPage /> : <IntelligenceFeed />}
     </div>
   );
 };

@@ -2333,8 +2333,20 @@ export interface SmartActionItem {
  *                  fabricated claim.
  * - `UNAVAILABLE`— no financial context to ground against, or every provider
  *                  failed. In the former case no provider was called at all.
+ * - `PARTIAL`, `INSUFFICIENT_DATA`, `UNSUPPORTED_QUERY`, `INVALID_QUERY`,
+ *   `ERROR` — the remaining backend-documented outcomes (backend-platform
+ *   docs/21-frontend-finance-ai-agent-integration.md: "worth a real switch
+ *   in the UI ... rather than only happy-pathing ANSWERED").
  */
-export type AnswerStatus = "ANSWERED" | "UNGROUNDED" | "UNAVAILABLE";
+export type AnswerStatus =
+  | "ANSWERED"
+  | "UNGROUNDED"
+  | "UNAVAILABLE"
+  | "PARTIAL"
+  | "INSUFFICIENT_DATA"
+  | "UNSUPPORTED_QUERY"
+  | "INVALID_QUERY"
+  | "ERROR";
 
 export interface UsedMetric {
   metric: string;
@@ -2353,6 +2365,226 @@ export interface FinancialAnswer {
   confidence: number;
   /** Snapshot date the figures describe — answers never implicitly mean "now". */
   asOf: string;
+  /** Only present when the answer resolves to a single quantity over a period — treat all three as optional. */
+  value?: number;
+  currency?: string;
+  period?: { start: string; end: string };
+}
+
+// ---------------------------------------------------------------------------
+// Finance AI Agent — conversational Q&A (finance/ai/conversations, phase 1,
+// read-only). Mirrors backend-platform docs/19-finance-agent.md exactly.
+// ---------------------------------------------------------------------------
+
+/** `ACT` is a documented-but-unimplemented 4th mode — the backend rejects it. */
+export type AiMessageMode = "ASK" | "EXPLAIN" | "RECOMMEND";
+
+/**
+ * Free-text on the backend (`AiMessage.role`, not a Prisma enum), so this is
+ * intentionally a wider union than what the UI renders distinctly. Only
+ * `USER`/`ASSISTANT` come back from the conversation endpoints today; the
+ * others are modeled for forward compatibility rather than left as `string`.
+ */
+export type AiMessageRole = "USER" | "ASSISTANT" | "SYSTEM" | "TOOL" | "TOOL_RESULT";
+
+export type AiToolCallStatus = "SUCCEEDED" | "FAILED";
+
+/**
+ * Raw `{toolName, input, output}` triple. `output` is deliberately `unknown`
+ * — every one of the 21 registered tools has its own output shape, and this
+ * is rendered behind a collapsed disclosure, never parsed for display logic.
+ */
+export interface AiToolCall {
+  toolName: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  status: AiToolCallStatus;
+  errorMessage: string | null;
+}
+
+export interface AiMessage {
+  id: string;
+  role: AiMessageRole;
+  content: string;
+  /** Absent on some historical/system rows; present on every ASK/EXPLAIN/RECOMMEND turn. */
+  mode?: AiMessageMode;
+  createdAt: string;
+  /** Empty on user messages; the assistant's turn's tool calls otherwise. */
+  toolCalls: AiToolCall[];
+}
+
+export interface AiConversation {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiConversationDetail extends AiConversation {
+  messages: AiMessage[];
+}
+
+export interface PostAiMessageInput {
+  mode: AiMessageMode;
+  question: string;
+}
+
+// ---------------------------------------------------------------------------
+// Finance Plans — propose → review → accept/decline, the only AI-triggered
+// mutation path in the app. Mirrors backend-platform docs/20-finance-plans.md.
+// ---------------------------------------------------------------------------
+
+/** Only these two are generation-supported today — don't offer others in a picker. */
+export type FinancePlanObjective = "SAVE_FOR_GOAL" | "BUILD_EMERGENCY_FUND";
+
+export type FinancePlanConstraintType =
+  | "CATEGORY_MINIMUM"
+  | "CATEGORY_MAXIMUM"
+  | "ACCOUNT_MINIMUM_BALANCE";
+
+export interface FinancePlanConstraint {
+  type: FinancePlanConstraintType;
+  targetId: string;
+  value: string;
+}
+
+/**
+ * `DRAFT`/`EXPIRED`/`COMPLETED` are schema-declared but no code path sets
+ * them today (see docs §"Status values that exist but aren't reachable
+ * yet") — included so the type is complete and a future value renders
+ * gracefully rather than falling through a switch, but no UI should assume
+ * they're reachable from a user action.
+ */
+export type FinancePlanStatus =
+  | "DRAFT"
+  | "READY_FOR_REVIEW"
+  | "ACCEPTED"
+  | "DECLINED"
+  | "MODIFICATION_REQUESTED"
+  | "REVALIDATING"
+  | "STALE"
+  | "EXECUTING"
+  | "ACTIVE"
+  | "EXECUTION_PARTIAL"
+  | "FAILED"
+  | "CANCELLED"
+  | "EXPIRED"
+  | "COMPLETED";
+
+export type FinancePlanActionType =
+  | "CREATE_GOAL"
+  | "UPDATE_GOAL"
+  | "CREATE_BUDGET"
+  | "UPDATE_BUDGET"
+  | "CATEGORIZE_TRANSACTION";
+
+/** `REJECTED`/`CANCELLED`/`EXPIRED` are schema-declared, not reachable in practice yet — see docs. */
+export type FinancePlanActionStatus =
+  | "PROPOSED"
+  | "APPROVED"
+  | "EXECUTING"
+  | "VERIFIED"
+  | "FAILED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "EXPIRED";
+
+/** Only `READ_ONLY` is used by the read-only agent; the other two are forward-compat for a later ACT-mode phase. */
+export type ToolRiskLevel = "READ_ONLY" | "MUTATING_LOW" | "MUTATING_HIGH";
+
+export interface FinancePlanAction {
+  id: string;
+  sequence: number;
+  type: FinancePlanActionType;
+  riskLevel: ToolRiskLevel;
+  parameters: Record<string, unknown>;
+  status: FinancePlanActionStatus;
+  executedEntityType: string | null;
+  executedEntityId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  executedAt: string | null;
+}
+
+export interface FinancePlanCandidate {
+  id: string;
+  label: string;
+  monthsRemaining: number;
+  requiredMonthlyContribution: Money;
+  projectedCompletionMonths: number;
+  bufferMonthsAfterImpact: string;
+  /** Pre-computed — never re-derive by comparing contribution to surplus client-side. */
+  meetsMinimumBuffer: boolean;
+  /** Pre-computed — a non-empty `constraintViolations` is why a feasible-looking candidate isn't the recommended pick. */
+  feasible: boolean;
+  surplusAfterContribution: Money;
+  constraintViolations: string[];
+  score: number;
+}
+
+export interface FinancePlanBaseline {
+  currency: string;
+  monthlyIncome: string;
+  monthlyExpenses: string;
+  monthlySurplus: string;
+  savingsRate: string;
+  cashPosition: string;
+  totalExistingDebt: string;
+  debtToIncomeRatio: string;
+  relevantGoals: string[];
+  relevantBudgets: string[];
+  generatedAt: string;
+}
+
+export interface FinancePlanNarrative {
+  objectiveFraming: string;
+  /** May be AI prose or a generic fallback when grounding fails — never assume rich text. */
+  riskNarrative: string;
+  tradeoffSummaries: Array<{ candidateId: string; summary: string }>;
+}
+
+export interface GenerateFinancePlanInput {
+  objective: FinancePlanObjective;
+  targetAmount: string;
+  goalName?: string;
+  constraints?: FinancePlanConstraint[];
+}
+
+export interface FinancePlan {
+  id: string;
+  parentPlanId: string | null;
+  version: number;
+  objective: FinancePlanObjective;
+  status: FinancePlanStatus;
+  title: string;
+  narrative: FinancePlanNarrative | null;
+  baseline: FinancePlanBaseline;
+  assumptions: Record<string, unknown> | null;
+  constraints: FinancePlanConstraint[];
+  /** Always the top-ranked candidate — same shape as, and a member of, `alternatives`. */
+  projections: FinancePlanCandidate;
+  /** All ranked candidates including `projections` itself; match by `id`, don't assume index 0. */
+  alternatives: FinancePlanCandidate[];
+  risks: Record<string, unknown> | null;
+  /** Raw grounding input, not meant for direct display — build UI from the other fields. */
+  evidence?: unknown;
+  basedOnDataAt: string;
+  expiresAt: string;
+  declineReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  actions: FinancePlanAction[];
+}
+
+export interface FinancePlanProgress {
+  status: FinancePlanStatus;
+  /** Every field but `status` is `null` unless the plan has a VERIFIED CREATE_GOAL action — `null` means "not tracked yet", not "0%". */
+  targetAmount: string | null;
+  currentAmount: string | null;
+  progressPercent: string | null;
+  expectedProgressPercent: string | null;
+  variancePercent: string | null;
+  onTrack: boolean | null;
 }
 
 export interface ActionCategoryCount {

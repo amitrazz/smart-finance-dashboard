@@ -21,13 +21,16 @@ import { GoalsSection } from "./views/GoalsSection";
 import { BudgetsSection } from "./views/BudgetsSection";
 import { InsightsSection } from "./views/InsightsSection";
 import { ReportsSection } from "./views/ReportsSection";
+import { PlansSection } from "../finance-ai/pages/PlansSection";
 
 import { GoalCreationWizardModal } from "../goals/components/GoalCreationWizardModal";
 import { BudgetWizardModal } from "../budgets/components/BudgetWizardModal";
 
 function parseSubTab(subTab: string | null): { section: PlanningSection; subsection: string | null; detailId: string | null } {
   const parts = (subTab ?? "").split("/").filter(Boolean);
-  const section = (["overview", "goals", "budgets", "insights", "reports"].includes(parts[0]) ? parts[0] : "overview") as PlanningSection;
+  const section = (
+    ["overview", "goals", "budgets", "ai-plans", "insights", "reports"].includes(parts[0]) ? parts[0] : "overview"
+  ) as PlanningSection;
 
   if (parts[1] === "detail" && parts[2]) {
     return { section, subsection: null, detailId: parts[2] };
@@ -80,6 +83,12 @@ export const PlanningView: React.FC = () => {
   );
   const handleBackFromBudgetDetail = useCallback(() => navigate("budgets", "active"), [navigate]);
 
+  const handleSelectPlan = useCallback(
+    (planId: string) => setActiveSubTab(`ai-plans/detail/${planId}`),
+    [setActiveSubTab]
+  );
+  const handleBackFromPlanDetail = useCallback(() => navigate("ai-plans"), [navigate]);
+
   const handleRefresh = () => {
     refetchGoals();
     refetchBudgets();
@@ -107,6 +116,14 @@ export const PlanningView: React.FC = () => {
             onSelectBudget={handleSelectBudget}
             onBackFromDetail={handleBackFromBudgetDetail}
             onOpenCreateWizard={() => setBudgetWizardOpen(true)}
+          />
+        );
+      case "ai-plans":
+        return (
+          <PlansSection
+            detailId={detailId}
+            onSelectPlan={handleSelectPlan}
+            onBackFromDetail={handleBackFromPlanDetail}
           />
         );
       case "insights":

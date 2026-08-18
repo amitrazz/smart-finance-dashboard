@@ -2,6 +2,9 @@ import {
   Account,
   ActionCategoryCount,
   ActionPreferences,
+  AiConversation,
+  AiConversationDetail,
+  AiMessage,
   AssetAllocationResponse,
   AssetRefreshResult,
   Budget,
@@ -38,10 +41,15 @@ import {
   CloseRetirementAccountInput,
   CreateRetirementAccountInput,
   DebtBreakdownResponse,
+  FinancePlan,
+  FinancePlanAction,
+  FinancePlanProgress,
+  FinancePlanStatus,
   FinancialHealthHistoryPoint,
   FinancialAnswer,
   FinancialHealthScore,
   FinancialInstitution,
+  GenerateFinancePlanInput,
   Goal,
   GoalAnalytics,
   GoalBeneficiary,
@@ -85,6 +93,7 @@ import {
   Portfolio,
   PortfolioDetail,
   PortfolioSnapshot,
+  PostAiMessageInput,
   PrepayBalanceTransferInput,
   PriceRefreshStatus,
   RaiseCreditCardDisputeInput,
@@ -164,6 +173,14 @@ export interface DashboardResponse {
   upcomingBills?: Array<{ title: string; dueDate: string; amount: Money; deepLink: string | null }>;
   topActions?: SmartActionItem[];
 }
+
+// `AI_AGENT_TURN_TIMEOUT_MS` bounds the backend's own agent loop at 45s by
+// default (docs/19-finance-agent.md) — every endpoint that runs that loop
+// (or the plan-generation/revision equivalent) needs a client timeout
+// comfortably above that, or the frontend aborts a request the backend was
+// still on track to answer. `fetchWithAuth`'s 15s default (tuned for
+// ordinary CRUD calls) is too short for any of these.
+const AI_REQUEST_TIMEOUT_MS = 55000;
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined>): string {
   if (!params) return '';
@@ -1365,6 +1382,70 @@ export const api = {
     fetchWithAuth<FinancialAnswer>('/finance/ai/query', {
       method: 'POST',
       body: JSON.stringify({ question }),
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    }),
+
+  // Finance Agent — persisted multi-turn conversations (finance/ai/conversations).
+  // Phase 1 is read-only: ASK/EXPLAIN/RECOMMEND only, no AI-triggered mutation.
+  createAiConversation: (title?: string) =>
+    fetchWithAuth<AiConversation>('/finance/ai/conversations', {
+      method: 'POST',
+      body: JSON.stringify(title ? { title } : {}),
+    }),
+  getAiConversations: (params?: { cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<AiConversation>>(
+      `/finance/ai/conversations${buildQuery(params)}`,
+    ),
+  getAiConversation: (id: string) =>
+    fetchWithAuth<AiConversationDetail>(`/finance/ai/conversations/${encodeURIComponent(id)}`),
+  // 10/min on the backend — surface 429s as "slow down", never a generic error.
+  postAiMessage: (conversationId: string, data: PostAiMessageInput) =>
+    fetchWithAuth<AiMessage>(
+      `/finance/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+      { method: 'POST', body: JSON.stringify(data), timeoutMs: AI_REQUEST_TIMEOUT_MS },
+    ),
+
+  // Finance Plans — propose → review → accept/decline, the only AI-triggered
+  // mutation path. `generate` only ever produces a proposal; only `accept`
+  // can touch a real Goal/Budget, and its response is authoritative final
+  // state (synchronous execution), never a "started" acknowledgment.
+  generateFinancePlan: (data: GenerateFinancePlanInput) =>
+    fetchWithAuth<FinancePlan>('/finance/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    }),
+  getFinancePlans: (params?: { cursor?: string; limit?: number; status?: FinancePlanStatus }) =>
+    fetchWithAuth<PaginatedResponse<FinancePlan>>(`/finance/plans${buildQuery(params)}`),
+  getFinancePlan: (id: string) =>
+    fetchWithAuth<FinancePlan>(`/finance/plans/${encodeURIComponent(id)}`),
+  getFinancePlanActions: (id: string) =>
+    fetchWithAuth<FinancePlanAction[]>(`/finance/plans/${encodeURIComponent(id)}/actions`),
+  getFinancePlanProgress: (id: string) =>
+    fetchWithAuth<FinancePlanProgress>(`/finance/plans/${encodeURIComponent(id)}/progress`),
+  // 409 CONCURRENCY_CONFLICT on a lost race — callers must re-fetch, never blindly retry.
+  // Revalidation + sequential per-action execution, not an AI call, but still
+  // several dependent round-trips server-side — the 15s default is tight.
+  acceptFinancePlan: (id: string) =>
+    fetchWithAuth<FinancePlan>(`/finance/plans/${encodeURIComponent(id)}/accept`, {
+      method: 'POST',
+      timeoutMs: 30000,
+    }),
+  declineFinancePlan: (id: string, reason?: string) =>
+    fetchWithAuth<FinancePlan>(`/finance/plans/${encodeURIComponent(id)}/decline`, {
+      method: 'POST',
+      body: JSON.stringify(reason ? { reason } : {}),
+    }),
+  cancelFinancePlan: (id: string) =>
+    fetchWithAuth<FinancePlan>(`/finance/plans/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    }),
+  // Only succeeds from READY_FOR_REVIEW — produces a new plan row (parentPlanId set), never mutates this one.
+  reviseFinancePlan: (id: string, data?: Partial<GenerateFinancePlanInput>) =>
+    fetchWithAuth<FinancePlan>(`/finance/plans/${encodeURIComponent(id)}/revise`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
     }),
 
   // Expenses

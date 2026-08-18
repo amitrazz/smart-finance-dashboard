@@ -88,7 +88,8 @@ export const INSIGHTS_SECTIONS: InsightsSection[] = [
     // any of the four land on the feed, which contains all of their content.
     views: [
       { id: "feed", label: "What needs attention", hint: "Everything detected, highest priority first" },
-      { id: "ask", label: "Ask", hint: "Questions answered from your own data" },
+      { id: "ask", label: "Ask", hint: "A single question, answered from your own data" },
+      { id: "assistant", label: "Assistant", hint: "A conversation with the finance agent, with history" },
     ],
   },
   {

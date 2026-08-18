@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { CloudOff, Send, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  CloudOff,
+  HelpCircle,
+  Send,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+  Sparkles,
+} from "lucide-react";
 import { api } from "../../../../services/api/endpoints";
 import { FinancialAnswer } from "../../../../types";
 
@@ -25,12 +34,23 @@ const SUGGESTIONS = [
   "How is my financial health score?",
 ];
 
+// Every status the backend documents for this endpoint (backend-platform
+// docs/21-frontend-finance-ai-agent-integration.md's own checklist: "Handle
+// all 8 status values ... not just ANSWERED"). `INSUFFICIENT_DATA` and
+// `UNSUPPORTED_QUERY` get distinct, actionable copy per that doc's guidance
+// rather than folding into a generic failure state.
 const STATUS_STYLES = {
   ANSWERED: {
     Icon: ShieldCheck,
     tone: "text-emerald-400",
     panel: "border-emerald-500/30 bg-emerald-500/5",
     label: "Verified against your data",
+  },
+  PARTIAL: {
+    Icon: ShieldAlert,
+    tone: "text-amber-400",
+    panel: "border-amber-500/30 bg-amber-500/5",
+    label: "Partially answered",
   },
   UNGROUNDED: {
     Icon: ShieldAlert,
@@ -43,6 +63,30 @@ const STATUS_STYLES = {
     tone: "text-slate-400",
     panel: "border-slate-700 bg-slate-900/40",
     label: "No data to answer from",
+  },
+  INSUFFICIENT_DATA: {
+    Icon: AlertCircle,
+    tone: "text-sky-400",
+    panel: "border-sky-500/30 bg-sky-500/5",
+    label: "Not enough connected data to answer this",
+  },
+  UNSUPPORTED_QUERY: {
+    Icon: HelpCircle,
+    tone: "text-slate-400",
+    panel: "border-slate-700 bg-slate-900/40",
+    label: "Try rephrasing the question",
+  },
+  INVALID_QUERY: {
+    Icon: HelpCircle,
+    tone: "text-slate-400",
+    panel: "border-slate-700 bg-slate-900/40",
+    label: "Couldn't understand that question",
+  },
+  ERROR: {
+    Icon: ShieldX,
+    tone: "text-rose-400",
+    panel: "border-rose-500/30 bg-rose-500/5",
+    label: "Something went wrong answering that",
   },
 } as const;
 
