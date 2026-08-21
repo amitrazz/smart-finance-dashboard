@@ -5,6 +5,33 @@ import { Money } from "../../../../components/common/Money";
 import { formatDate } from "../../../../utils/formatters";
 import { PlanStatusBadge } from "./PlanStatusBadge";
 
+/** Goal candidates show a monthly-contribution/timeline summary; the two CREATE_BUDGET objectives show their own headline figure instead. */
+function SummaryLine({ plan }: { plan: FinancePlan }): React.ReactElement {
+  const candidate = plan.projections;
+  if ("monthsRemaining" in candidate) {
+    return (
+      <>
+        <span>
+          <Money value={candidate.requiredMonthlyContribution} className="font-medium text-slate-400" /> / month
+        </span>
+        <span>{candidate.monthsRemaining} months</span>
+      </>
+    );
+  }
+  if ("categoryReductions" in candidate) {
+    return (
+      <span>
+        <Money value={candidate.totalMonthlySavings} className="font-medium text-slate-400" /> saved / month
+      </span>
+    );
+  }
+  return (
+    <span>
+      <Money value={candidate.totalBudget} className="font-medium text-slate-400" /> total budget
+    </span>
+  );
+}
+
 export const PlanCard: React.FC<{ plan: FinancePlan; onOpen: () => void }> = ({ plan, onOpen }) => {
   return (
     <button
@@ -19,11 +46,7 @@ export const PlanCard: React.FC<{ plan: FinancePlan; onOpen: () => void }> = ({ 
         </div>
         <p className="truncate text-sm font-semibold text-slate-100">{plan.title}</p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-          <span>
-            <Money value={plan.projections.requiredMonthlyContribution} className="font-medium text-slate-400" />{" "}
-            / month
-          </span>
-          <span>{plan.projections.monthsRemaining} months</span>
+          <SummaryLine plan={plan} />
           <span>Created {formatDate(plan.createdAt)}</span>
         </div>
       </div>

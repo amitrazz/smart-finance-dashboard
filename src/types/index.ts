@@ -2434,8 +2434,18 @@ export interface PostAiMessageInput {
 // mutation path in the app. Mirrors backend-platform docs/20-finance-plans.md.
 // ---------------------------------------------------------------------------
 
-/** Only these two are generation-supported today — don't offer others in a picker. */
-export type FinancePlanObjective = "SAVE_FOR_GOAL" | "BUILD_EMERGENCY_FUND";
+/**
+ * All 4 are generation-supported. SAVE_FOR_GOAL/BUILD_EMERGENCY_FUND
+ * produce a CREATE_GOAL action and require `targetAmount`.
+ * REDUCE_DISCRETIONARY_SPENDING/ORGANIZE_BUDGET produce a CREATE_BUDGET
+ * action instead — see `SpendingReductionPlanCandidate`/
+ * `BudgetOrganizationPlanCandidate`.
+ */
+export type FinancePlanObjective =
+  | "SAVE_FOR_GOAL"
+  | "BUILD_EMERGENCY_FUND"
+  | "REDUCE_DISCRETIONARY_SPENDING"
+  | "ORGANIZE_BUDGET";
 
 export type FinancePlanConstraintType =
   | "CATEGORY_MINIMUM"
@@ -2506,7 +2516,7 @@ export interface FinancePlanAction {
   executedAt: string | null;
 }
 
-export interface FinancePlanCandidate {
+export interface GoalPlanCandidate {
   id: string;
   label: string;
   monthsRemaining: number;
@@ -2521,6 +2531,46 @@ export interface FinancePlanCandidate {
   constraintViolations: string[];
   score: number;
 }
+
+export interface CategorySpendReduction {
+  categoryId: string;
+  currentSpend: Money;
+  targetSpend: Money;
+  monthlySavings: Money;
+}
+
+/** REDUCE_DISCRETIONARY_SPENDING candidate — 3 fixed cuts: aggressive 30%, balanced 20%, conservative 10%. */
+export interface SpendingReductionPlanCandidate {
+  id: string;
+  label: string;
+  reductionPercentage: number;
+  categoryReductions: CategorySpendReduction[];
+  totalMonthlySavings: Money;
+  constraintViolations: string[];
+  score: number;
+}
+
+export interface CategoryAllocationProposal {
+  categoryId: string;
+  currentSpend: Money;
+  proposedAllocation: Money;
+}
+
+/** ORGANIZE_BUDGET candidate — allocations at 110%/100%/90% of current spend per category, conservative/balanced/aggressive. */
+export interface BudgetOrganizationPlanCandidate {
+  id: string;
+  label: string;
+  allocations: CategoryAllocationProposal[];
+  totalBudget: Money;
+  constraintViolations: string[];
+  score: number;
+}
+
+/** Discriminate by objective (or by checking for a field unique to one shape, e.g. `"monthsRemaining" in candidate`) — the backend sends no explicit `type` tag on the candidate itself. */
+export type FinancePlanCandidate =
+  | GoalPlanCandidate
+  | SpendingReductionPlanCandidate
+  | BudgetOrganizationPlanCandidate;
 
 export interface FinancePlanBaseline {
   currency: string;
@@ -2545,9 +2595,14 @@ export interface FinancePlanNarrative {
 
 export interface GenerateFinancePlanInput {
   objective: FinancePlanObjective;
-  targetAmount: string;
+  /** Required for SAVE_FOR_GOAL/BUILD_EMERGENCY_FUND, ignored otherwise. */
+  targetAmount?: string;
   goalName?: string;
   constraints?: FinancePlanConstraint[];
+  /** Required (non-empty) for REDUCE_DISCRETIONARY_SPENDING — real category ids, never inferred as "discretionary". Ignored for other objectives. */
+  targetCategoryIds?: string[];
+  /** Optional name for the proposed budget. Only meaningful for REDUCE_DISCRETIONARY_SPENDING/ORGANIZE_BUDGET. */
+  budgetName?: string;
 }
 
 export interface FinancePlan {

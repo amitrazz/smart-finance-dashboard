@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { FinancePlan } from "../../../../types";
+import type { FinancePlan, FinancePlanCandidate } from "../../../../types";
 import { Button } from "../../../../components/ui/Button";
 import { ConfirmModal } from "../../../../components/common/ConfirmModal";
 import { Money } from "../../../../components/common/Money";
@@ -27,6 +27,17 @@ import { PlanProgressWidget } from "./PlanProgressWidget";
 import { AiErrorState } from "../conversation/AiErrorState";
 
 const PROGRESS_ELIGIBLE_STATUSES = new Set(["ACTIVE", "EXECUTION_PARTIAL", "COMPLETED"]);
+
+/** Goal candidates describe a timeline/contribution; the two CREATE_BUDGET objectives describe a savings cut or a total budget instead. */
+function acceptImpactSummary(candidate: FinancePlanCandidate): string {
+  if ("monthsRemaining" in candidate) {
+    return `${candidate.label.toLowerCase()} timeline — ${candidate.monthsRemaining} months at ${Number(candidate.requiredMonthlyContribution.amount).toLocaleString("en-IN")} ${candidate.requiredMonthlyContribution.currency}/month`;
+  }
+  if ("categoryReductions" in candidate) {
+    return `${candidate.label.toLowerCase()} cut — saving ${Number(candidate.totalMonthlySavings.amount).toLocaleString("en-IN")} ${candidate.totalMonthlySavings.currency}/month across ${candidate.categoryReductions.length} categor${candidate.categoryReductions.length === 1 ? "y" : "ies"}`;
+  }
+  return `${candidate.label.toLowerCase()} allocation — a ${Number(candidate.totalBudget.amount).toLocaleString("en-IN")} ${candidate.totalBudget.currency} budget across ${candidate.allocations.length} categories`;
+}
 
 export const PlanDetailView: React.FC<{ planId: string; onBack: () => void }> = ({ planId, onBack }) => {
   const planQuery = useFinancePlan(planId);
@@ -93,7 +104,9 @@ export const PlanDetailView: React.FC<{ planId: string; onBack: () => void }> = 
       </div>
 
       <div className="space-y-2.5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline options</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {plan.objective === "SAVE_FOR_GOAL" || plan.objective === "BUILD_EMERGENCY_FUND" ? "Timeline options" : "Options"}
+        </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {plan.alternatives.map((candidate) => (
             <PlanCandidateCard
@@ -181,7 +194,7 @@ export const PlanDetailView: React.FC<{ planId: string; onBack: () => void }> = 
       <ConfirmModal
         isOpen={confirmOpen}
         title="Accept this plan?"
-        message={`This will create/update real goals or budgets in your account based on ${selectedCandidate.label.toLowerCase()} timeline — ${selectedCandidate.monthsRemaining} months at ${Number(selectedCandidate.requiredMonthlyContribution.amount).toLocaleString("en-IN")} ${selectedCandidate.requiredMonthlyContribution.currency}/month.`}
+        message={`This will create/update real goals or budgets in your account based on ${acceptImpactSummary(selectedCandidate)}.`}
         impactDetails="Your data will be re-checked first — if anything material changed since this plan was generated, it will stop and nothing will execute. Otherwise this cannot be undone automatically; you would need to edit the created goal/budget by hand."
         confirmText="Accept and apply"
         variant="warning"

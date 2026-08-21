@@ -1,17 +1,36 @@
 import React from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PlanActionPreview } from "../PlanActionPreview";
 import { useUIStore } from "../../../../../store/useUIStore";
+import { setAccessToken } from "../../../../../services/api/client";
 import type { FinancePlanAction } from "../../../../../types";
+
+vi.mock("../../../../../services/api/endpoints", () => ({
+  api: {
+    getCategories: vi.fn().mockResolvedValue({ data: [{ id: "cat_dining", name: "Dining Out", kind: "EXPENSE" }] }),
+  },
+}));
 
 beforeEach(() => {
   // Money is masked by default (privacy mode) — reveal it so amount
   // assertions below check the real formatted figure, not the mask.
   useUIStore.setState({ moneyVisible: true });
+  // useCategories (used to resolve CREATE_BUDGET's initialAllocations
+  // category ids to names) is gated on a real access token being set.
+  setAccessToken("test-token");
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setAccessToken(null);
+});
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 const baseAction: FinancePlanAction = {
   id: "act_1",
@@ -29,7 +48,7 @@ const baseAction: FinancePlanAction = {
 
 describe("PlanActionPreview — a failed action must never read as success (backend team's own negative test)", () => {
   it("renders a FAILED action as Failed, with its error message, never as Completed", () => {
-    render(
+    renderWithProviders(
       <PlanActionPreview
         action={{
           ...baseAction,
@@ -45,7 +64,7 @@ describe("PlanActionPreview — a failed action must never read as success (back
   });
 
   it("renders a VERIFIED action as Completed, with the entity it actually touched", () => {
-    render(
+    renderWithProviders(
       <PlanActionPreview
         action={{
           ...baseAction,
@@ -61,15 +80,34 @@ describe("PlanActionPreview — a failed action must never read as success (back
   });
 
   it("renders a still-PROPOSED action as not yet approved, never implying it already ran", () => {
-    render(<PlanActionPreview action={baseAction} />);
+    renderWithProviders(<PlanActionPreview action={baseAction} />);
     expect(screen.getByText(/not yet approved/i)).toBeInTheDocument();
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
     expect(screen.queryByText("Failed")).not.toBeInTheDocument();
   });
 
   it("renders every plan parameter it was given, never hiding one behind a tooltip", () => {
-    render(<PlanActionPreview action={baseAction} />);
+    renderWithProviders(<PlanActionPreview action={baseAction} />);
     expect(screen.getByText("New Car Fund")).toBeInTheDocument();
     expect(screen.getByText(/500,000|5,00,000/)).toBeInTheDocument();
+  });
+
+  it("renders a CREATE_BUDGET action's initialAllocations as per-category rows, resolving category names", async () => {
+    renderWithProviders(
+      <PlanActionPreview
+        action={{
+          ...baseAction,
+          type: "CREATE_BUDGET",
+          parameters: {
+            name: "Organized Budget",
+            currency: "INR",
+            totalBudget: "20000",
+            initialAllocations: [{ categoryId: "cat_dining", allocatedAmount: "6000" }],
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByText("Dining Out")).toBeInTheDocument();
+    expect(screen.getByText(/6,000/)).toBeInTheDocument();
   });
 });

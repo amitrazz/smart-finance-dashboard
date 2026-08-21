@@ -2,6 +2,25 @@ import React from "react";
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from "lucide-react";
 import type { FinancePlanAction } from "../../../../types";
 import { Money } from "../../../../components/common/Money";
+import { useCategories } from "../../../../hooks/useFinanceQueries";
+
+interface InitialAllocation {
+  categoryId: string;
+  allocatedAmount: string;
+}
+
+function isInitialAllocationArray(value: unknown): value is InitialAllocation[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (v) =>
+        typeof v === "object" &&
+        v !== null &&
+        typeof (v as Record<string, unknown>).categoryId === "string" &&
+        typeof (v as Record<string, unknown>).allocatedAmount === "string",
+    )
+  );
+}
 
 const ACTION_LABELS: Record<FinancePlanAction["type"], string> = {
   CREATE_GOAL: "Create goal",
@@ -49,10 +68,16 @@ function renderParamValue(key: string, value: unknown, currency: string | undefi
  * sensibly in every `FinancePlanActionStatus`.
  */
 export const PlanActionPreview: React.FC<{ action: FinancePlanAction }> = ({ action }) => {
+  const { data: categories = [] } = useCategories();
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+
   const status = STATUS_PRESENTATION[action.status];
   const StatusIcon = status.icon;
   const currency = typeof action.parameters.currency === "string" ? action.parameters.currency : undefined;
-  const paramEntries = Object.entries(action.parameters).filter(([key]) => key !== "currency");
+  const initialAllocations = action.parameters.initialAllocations;
+  const paramEntries = Object.entries(action.parameters).filter(
+    ([key]) => key !== "currency" && key !== "initialAllocations",
+  );
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3.5">
@@ -70,6 +95,19 @@ export const PlanActionPreview: React.FC<{ action: FinancePlanAction }> = ({ act
             <div key={key} className="flex items-baseline justify-between gap-2 text-xs">
               <dt className="text-slate-500">{formatParamKey(key)}</dt>
               <dd className="font-medium text-slate-200">{renderParamValue(key, value, currency)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {isInitialAllocationArray(initialAllocations) && (
+        <dl className="mt-2.5 space-y-1 border-t border-slate-800/60 pt-2.5">
+          {initialAllocations.map((allocation) => (
+            <div key={allocation.categoryId} className="flex items-baseline justify-between gap-2 text-xs">
+              <dt className="text-slate-500">{categoryNameById.get(allocation.categoryId) ?? allocation.categoryId}</dt>
+              <dd className="font-medium text-slate-200">
+                <Money value={{ amount: allocation.allocatedAmount, currency: currency ?? "INR" }} />
+              </dd>
             </div>
           ))}
         </dl>

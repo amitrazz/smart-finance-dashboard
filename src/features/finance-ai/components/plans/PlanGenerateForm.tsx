@@ -9,14 +9,14 @@ import type {
   GenerateFinancePlanInput,
 } from "../../../../types";
 
-// Only these two objectives are generation-supported today
-// (docs/20-finance-plans.md "Confirmed v1 scope") — don't offer
-// REDUCE_DISCRETIONARY_SPENDING/ORGANIZE_BUDGET, they're modeled in the
-// domain but have no generation logic yet.
 const OBJECTIVES: { id: FinancePlanObjective; label: string; hint: string }[] = [
   { id: "SAVE_FOR_GOAL", label: "Save for a goal", hint: "A car, a trip, a down payment — anything with a target amount" },
   { id: "BUILD_EMERGENCY_FUND", label: "Build an emergency fund", hint: "A cash buffer sized to your expenses" },
+  { id: "REDUCE_DISCRETIONARY_SPENDING", label: "Cut spending in specific categories", hint: "Pick categories to trim — proposes a new budget with reduced allocations" },
+  { id: "ORGANIZE_BUDGET", label: "Organize a budget", hint: "Proposes a new budget across everything you already spend in" },
 ];
+
+const GOAL_OBJECTIVES = new Set<FinancePlanObjective>(["SAVE_FOR_GOAL", "BUILD_EMERGENCY_FUND"]);
 
 const CONSTRAINT_TYPES: { id: FinancePlanConstraintType; label: string; targetKind: "category" | "account" }[] = [
   { id: "CATEGORY_MINIMUM", label: "Keep spending at least this much in a category", targetKind: "category" },
@@ -34,19 +34,29 @@ export const PlanGenerateForm: React.FC<{
   onCancel: () => void;
 }> = ({ isSubmitting, onSubmit, onCancel }) => {
   const [objective, setObjective] = useState<FinancePlanObjective>("SAVE_FOR_GOAL");
-  const [goalName, setGoalName] = useState("");
+  const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
+  const [targetCategoryIds, setTargetCategoryIds] = useState<string[]>([]);
   const [constraints, setConstraints] = useState<DraftConstraint[]>([]);
 
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
 
+  const isGoalObjective = GOAL_OBJECTIVES.has(objective);
+  const needsTargetCategories = objective === "REDUCE_DISCRETIONARY_SPENDING";
+
   const amountValue = Number(targetAmount);
   const canSubmit =
-    targetAmount.trim().length > 0 &&
-    Number.isFinite(amountValue) &&
-    amountValue > 0 &&
+    (!isGoalObjective ||
+      (targetAmount.trim().length > 0 && Number.isFinite(amountValue) && amountValue > 0)) &&
+    (!needsTargetCategories || targetCategoryIds.length > 0) &&
     constraints.every((c) => c.targetId && c.value.trim().length > 0);
+
+  const toggleTargetCategory = (categoryId: string) => {
+    setTargetCategoryIds((prev) =>
+      prev.includes(categoryId) ? prev.filter((id) => id !== categoryId) : [...prev, categoryId],
+    );
+  };
 
   const addConstraint = () => {
     setConstraints((prev) => [
@@ -66,8 +76,10 @@ export const PlanGenerateForm: React.FC<{
     if (!canSubmit) return;
     onSubmit({
       objective,
-      targetAmount: targetAmount.trim(),
-      goalName: goalName.trim() || undefined,
+      targetAmount: isGoalObjective ? targetAmount.trim() : undefined,
+      goalName: isGoalObjective ? name.trim() || undefined : undefined,
+      budgetName: !isGoalObjective ? name.trim() || undefined : undefined,
+      targetCategoryIds: needsTargetCategories ? targetCategoryIds : undefined,
       constraints: constraints.length
         ? constraints.map(({ type, targetId, value }) => ({ type, targetId, value: value.trim() }))
         : undefined,
@@ -97,22 +109,24 @@ export const PlanGenerateForm: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <label htmlFor="plan-target-amount" className="text-xs font-semibold text-slate-300">
-            Target amount
-          </label>
-          <input
-            id="plan-target-amount"
-            type="number"
-            min={1}
-            step="0.01"
-            required
-            value={targetAmount}
-            onChange={(e) => setTargetAmount(e.target.value)}
-            placeholder="500000"
-            className="w-full rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-          />
-        </div>
+        {isGoalObjective && (
+          <div className="space-y-1.5">
+            <label htmlFor="plan-target-amount" className="text-xs font-semibold text-slate-300">
+              Target amount
+            </label>
+            <input
+              id="plan-target-amount"
+              type="number"
+              min={1}
+              step="0.01"
+              required
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder="500000"
+              className="w-full rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        )}
         <div className="space-y-1.5">
           <label htmlFor="plan-goal-name" className="text-xs font-semibold text-slate-300">
             Name <span className="font-normal text-slate-600">(optional)</span>
@@ -120,13 +134,42 @@ export const PlanGenerateForm: React.FC<{
           <input
             id="plan-goal-name"
             type="text"
-            value={goalName}
-            onChange={(e) => setGoalName(e.target.value)}
-            placeholder="New Car Fund"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={isGoalObjective ? "New Car Fund" : "Organized Budget"}
             className="w-full rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
           />
         </div>
       </div>
+
+      {needsTargetCategories && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-300">
+            Categories to cut <span className="font-normal text-slate-600">(required — there's no automatic "discretionary" detection)</span>
+          </label>
+          <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-2.5">
+            {categories.length === 0 && <span className="text-xs text-slate-600">No categories found.</span>}
+            {categories.map((category) => {
+              const selected = targetCategoryIds.includes(category.id);
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggleTargetCategory(category.id)}
+                  className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                    selected
+                      ? "border-blue-500/50 bg-blue-500/10 text-blue-300"
+                      : "border-slate-800 text-slate-400 hover:border-slate-700"
+                  }`}
+                >
+                  {category.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
