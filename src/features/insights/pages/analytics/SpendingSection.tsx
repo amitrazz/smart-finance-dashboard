@@ -13,7 +13,42 @@ import { shortDayLabel } from "../../utils/insightsFormat";
 import { BreakdownList } from "./BreakdownList";
 import { MetricValue } from "../../components/common/MetricValue";
 import { EmptyAnalyticsState } from "../../components/common/AnalyticsStates";
+import { InsightsEmptyState } from "../../components/primitives/States";
+import { ChangeIndicator } from "../../components/primitives/ChangeIndicator";
+import { TONE_CHIP } from "../../components/primitives/tone";
 import { useUIStore } from "../../../../store/useUIStore";
+import type { SpendingTrendMover } from "../../types/insightsTypes";
+
+const PATTERN_LABEL: Record<NonNullable<SpendingTrendMover["pattern"]>, string> = {
+  RECURRING: "Recurring",
+  OCCASIONAL: "Occasional",
+  ONE_TIME_LARGE_PURCHASE: "One-time",
+};
+
+const TrendMoverRow: React.FC<{ mover: SpendingTrendMover }> = ({ mover }) => (
+  <li className="flex items-center justify-between gap-3 py-2">
+    <div className="min-w-0">
+      <p className="truncate text-xs text-slate-300">{mover.name}</p>
+      {mover.pattern && (
+        <span
+          className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TONE_CHIP.neutral}`}
+        >
+          {PATTERN_LABEL[mover.pattern]}
+        </span>
+      )}
+    </div>
+    <div className="shrink-0 text-right">
+      <MetricValue value={mover.currentMonthlyAverage} money fractionDigits={0} />
+      <div className="mt-0.5">
+        {mover.changePercent !== null ? (
+          <ChangeIndicator percent={mover.changePercent} upIsGood={false} />
+        ) : (
+          <span className="text-xs text-slate-500">New</span>
+        )}
+      </div>
+    </div>
+  </li>
+);
 
 /**
  * Where the money went.
@@ -136,6 +171,47 @@ export const SpendingSection: React.FC = () => {
               )}
             </div>
           </div>
+
+          {data.trending?.coverage === "INSUFFICIENT" ? (
+            <InsightsEmptyState
+              reason="insufficient-history"
+              title="Not enough history to compare periods"
+              message="Trending needs at least two recorded periods for a category or merchant. This fills in once another period is recorded."
+            />
+          ) : data.trending &&
+            (data.trending.categories.length > 0 || data.trending.merchants.length > 0) ? (
+            <div className="space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Trending vs last period
+              </h3>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div>
+                  <h4 className="mb-1 text-[11px] text-slate-500">By category</h4>
+                  {data.trending.categories.length === 0 ? (
+                    <p className="text-xs text-slate-500">No notable category movement.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-800/70">
+                      {data.trending.categories.map((mover) => (
+                        <TrendMoverRow key={mover.id} mover={mover} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <h4 className="mb-1 text-[11px] text-slate-500">By merchant</h4>
+                  {data.trending.merchants.length === 0 ? (
+                    <p className="text-xs text-slate-500">No notable merchant movement.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-800/70">
+                      {data.trending.merchants.map((mover) => (
+                        <TrendMoverRow key={mover.id} mover={mover} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </AnalyticsSection>

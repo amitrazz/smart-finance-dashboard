@@ -23,8 +23,12 @@ import {
 } from "../insightsMappers";
 import type {
   CashFlowSnapshot,
+  CategoryTrend,
   FinancialHealthScore,
+  MerchantTrend,
   NetWorthSnapshot,
+  PeriodComparisonResult,
+  ResolvedAnalysisWindow,
   SmartActionItem,
 } from "../../../../types";
 
@@ -835,5 +839,122 @@ describe("XIRR is a rate, not a number to average", () => {
     );
 
     expect(result!.xirrPercent).toBeCloseTo(8.3, 5);
+  });
+});
+
+describe("mapSpending — trending panel", () => {
+  // mapSpending returns null outright when there's no current-period spend at
+  // all (see the categoriesRaw.length === 0 guard) — unrelated to whether
+  // trend data arrived, but every case here needs to clear that guard first.
+  const baseCategoryRows = [
+    { categoryId: "c1", categoryName: "Rent", amount: money("40000"), percentage: 100 },
+  ] as never;
+
+  const window = (coverage: ResolvedAnalysisWindow["coverage"] = "FULL"): ResolvedAnalysisWindow => ({
+    requestedWindow: "3m",
+    actualStartDate: "2026-05-01",
+    actualEndDate: "2026-08-01",
+    availableHistoryMonths: 6,
+    coverage,
+    confidence: "HIGH",
+  });
+
+  const comparison = (
+    percentageDelta: string | null,
+    direction: PeriodComparisonResult["direction"] = "INCREASE",
+  ): PeriodComparisonResult => ({
+    currentValue: "1000",
+    baselineValue: "800",
+    absoluteDelta: "200",
+    percentageDelta,
+    direction,
+    confidence: "HIGH",
+  });
+
+  const categoryTrend = (overrides: Partial<CategoryTrend> = {}): CategoryTrend => ({
+    categoryId: "c1",
+    categoryName: "Dining",
+    window: window(),
+    currentTotal: "3000",
+    currentMonthlyAverage: "1000",
+    currentMonthlyMedian: "1000",
+    monthsObserved: 3,
+    shareOfTotalExpense: "20",
+    volatility: "0.1",
+    vsPreviousPeriod: comparison("25.0"),
+    vsTwelveMonthBaseline: comparison("10.0"),
+    ...overrides,
+  });
+
+  const merchantTrend = (overrides: Partial<MerchantTrend> = {}): MerchantTrend => ({
+    merchantId: "m1",
+    merchantName: "Corner Cafe",
+    window: window(),
+    currentTotal: "3000",
+    currentMonthlyAverage: "1000",
+    currentMonthlyMedian: "1000",
+    monthsObserved: 3,
+    currentTransactionCount: 12,
+    currentAverageTransaction: "83.33",
+    volatility: "0.1",
+    vsPreviousPeriod: comparison("25.0"),
+    vsTwelveMonthBaseline: comparison("10.0"),
+    pattern: "RECURRING",
+    isPersistentIncrease: false,
+    ...overrides,
+  });
+
+  it("returns null trending when neither trend endpoint responded", () => {
+    const result = mapSpending(baseCategoryRows, [], [], [], null, null);
+    expect(result!.trending).toBeNull();
+  });
+
+  it("ranks movers by the size of the move and carries direction straight through", () => {
+    const result = mapSpending(
+      baseCategoryRows,
+      [],
+      [],
+      [],
+      [categoryTrend({ categoryId: "small", categoryName: "Small move", vsPreviousPeriod: comparison("5.0") }),
+       categoryTrend({ categoryId: "big", categoryName: "Big move", vsPreviousPeriod: comparison("-40.0", "DECREASE") })],
+      [],
+    );
+
+    expect(result!.trending!.categories.map((c) => c.id)).toEqual(["big", "small"]);
+    expect(result!.trending!.categories[0].direction).toBe("DECREASE");
+    expect(result!.trending!.categories[0].changePercent).toBe(-40);
+  });
+
+  it("drops flat movers rather than reporting a 0% change as a trend", () => {
+    const result = mapSpending(
+      baseCategoryRows,
+      [],
+      [],
+      [],
+      [categoryTrend({ vsPreviousPeriod: comparison("0.0", "FLAT") })],
+      [],
+    );
+
+    expect(result!.trending!.categories).toHaveLength(0);
+  });
+
+  it("carries the merchant's spending pattern through, categories have none", () => {
+    const result = mapSpending(baseCategoryRows, [], [], [], [], [merchantTrend({ pattern: "ONE_TIME_LARGE_PURCHASE" })]);
+
+    expect(result!.trending!.merchants[0].pattern).toBe("ONE_TIME_LARGE_PURCHASE");
+    expect(result!.trending!.categories).toEqual([]);
+  });
+
+  it("surfaces insufficient-history coverage from the resolved window, not invented locally", () => {
+    const result = mapSpending(
+      baseCategoryRows,
+      [],
+      [],
+      [],
+      [categoryTrend({ window: window("INSUFFICIENT") })],
+      [],
+    );
+
+    expect(result!.trending!.coverage).toBe("INSUFFICIENT");
   });
 });

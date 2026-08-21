@@ -1985,6 +1985,84 @@ export interface RetirementForecastResponse {
   monthlySavingsNeeded?: Money;
 }
 
+// The shared historical-window vocabulary the backend resolves every
+// GET /finance/analytics/* `?window=` param against (see
+// `resolveAnalysisWindow` server-side) — "current"/"previous" are the
+// in-progress/prior calendar month, the rest are trailing-N-months
+// (month-aligned) or lifetime.
+export type AnalyticsWindow = "current" | "previous" | "3m" | "6m" | "12m" | "24m" | "all";
+
+// Matches the backend's ResolvedAnalysisWindow exactly — embedded on every
+// windowed analytics response so a thin-history user gets honestly-clamped
+// dates instead of a fabricated window. `coverage`/`confidence` degrade
+// together: INSUFFICIENT/PARTIAL coverage always implies a lower confidence
+// than the same history length would otherwise get.
+export interface ResolvedAnalysisWindow {
+  requestedWindow: string;
+  actualStartDate: string;
+  actualEndDate: string;
+  /** Total months of history the user has, independent of the requested window. */
+  availableHistoryMonths: number;
+  coverage: "FULL" | "PARTIAL" | "INSUFFICIENT";
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+}
+
+// Matches the backend's PeriodComparisonResult exactly — `percentageDelta`
+// is `null` whenever `baselineValue` is zero (never a fabricated infinite
+// percentage); `direction` is `"NEW"` for a zero baseline with a nonzero
+// current value, `"FLAT"` for a change within ~1%.
+export interface PeriodComparisonResult {
+  currentValue: string;
+  baselineValue: string;
+  absoluteDelta: string;
+  percentageDelta: string | null;
+  direction: "INCREASE" | "DECREASE" | "FLAT" | "NEW";
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+}
+
+// Matches the backend's CategoryTrendResult exactly
+// (GET /finance/analytics/categories) — no `currency` field, unlike
+// Money-typed analytics responses; every amount here is a bare decimal
+// string in the user's base currency.
+export interface CategoryTrend {
+  categoryId: string | null;
+  categoryName: string;
+  window: ResolvedAnalysisWindow;
+  currentTotal: string;
+  currentMonthlyAverage: string;
+  currentMonthlyMedian: string;
+  monthsObserved: number;
+  /** Percentage (0-100) of the current window's total expense this category accounts for, or null when total expense is zero. */
+  shareOfTotalExpense: string | null;
+  volatility: string;
+  vsPreviousPeriod: PeriodComparisonResult;
+  vsTwelveMonthBaseline: PeriodComparisonResult;
+}
+
+// Matches the backend's MerchantTrendResult exactly
+// (GET /finance/analytics/merchants). `pattern` distinguishes a recurring
+// subscription-like merchant from an occasional one from a single one-time
+// purchase; `isPersistentIncrease` is true only when both the
+// previous-period and 12-month-baseline comparisons agree the trend is
+// upward — a merchant up only because of one large one-time transaction in
+// the current window will NOT have this set, by backend design.
+export interface MerchantTrend {
+  merchantId: string;
+  merchantName: string;
+  window: ResolvedAnalysisWindow;
+  currentTotal: string;
+  currentMonthlyAverage: string;
+  currentMonthlyMedian: string;
+  monthsObserved: number;
+  currentTransactionCount: number;
+  currentAverageTransaction: string;
+  volatility: string;
+  vsPreviousPeriod: PeriodComparisonResult;
+  vsTwelveMonthBaseline: PeriodComparisonResult;
+  pattern: "RECURRING" | "OCCASIONAL" | "ONE_TIME_LARGE_PURCHASE";
+  isPersistentIncrease: boolean;
+}
+
 export type FinancialHealthRating =
   | "EXCEPTIONAL"
   | "EXCELLENT"

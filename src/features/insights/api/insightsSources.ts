@@ -22,6 +22,7 @@
  */
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../../../services/api/endpoints";
+import type { AnalyticsWindow } from "../../../types";
 
 /** Analytics is expensive to compute and changes slowly; a minute is plenty. */
 const ANALYTICS_STALE_TIME = 60 * 1000;
@@ -117,6 +118,25 @@ export const expensesByMerchantSource = () =>
   queryOptions({
     queryKey: key("expensesByMerchant"),
     queryFn: () => api.getExpensesByMerchant(),
+    staleTime: ANALYTICS_STALE_TIME,
+  });
+
+/**
+ * Real current-window-vs-previous-window spend comparisons, per category/
+ * merchant — the backend replacement for what used to be a fake "+0.0% MoM"
+ * figure computed client-side (see `SpendingSection.tsx`'s own doc comment).
+ */
+export const categoryTrendsSource = (window: AnalyticsWindow) =>
+  queryOptions({
+    queryKey: key("categoryTrends", window),
+    queryFn: () => api.getCategoryTrends({ window }),
+    staleTime: ANALYTICS_STALE_TIME,
+  });
+
+export const merchantTrendsSource = (window: AnalyticsWindow) =>
+  queryOptions({
+    queryKey: key("merchantTrends", window),
+    queryFn: () => api.getMerchantTrends({ window }),
     staleTime: ANALYTICS_STALE_TIME,
   });
 

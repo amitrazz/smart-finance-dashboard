@@ -22,7 +22,7 @@
  * Money is the app-wide `Money` from `src/types` — this module used to declare
  * its own structurally-identical copy, which let the two drift.
  */
-import { Money } from "../../../types";
+import { AnalyticsWindow, Money } from "../../../types";
 
 export type { Money };
 
@@ -46,6 +46,25 @@ export const INSIGHTS_PERIOD_LABELS: Record<InsightsPeriod, string> = {
   "1Y": "Last 12 months",
   "3Y": "Last 3 years",
 };
+
+/**
+ * Translates the workspace's own period vocabulary into the backend's
+ * shared `AnalyticsWindow` enum, so category/merchant trend queries respect
+ * the same header period selector every other Analytics domain does,
+ * instead of introducing a second, competing time-range control. "3Y" has
+ * no exact backend equivalent (the largest named trailing window is 24
+ * months) — mapped to "24m" rather than "all", since "all" (lifetime)
+ * would silently widen the window beyond what the user actually selected.
+ */
+export function mapPeriodToAnalysisWindow(period: InsightsPeriod): AnalyticsWindow {
+  const map: Record<InsightsPeriod, AnalyticsWindow> = {
+    "3M": "3m",
+    "6M": "6m",
+    "1Y": "12m",
+    "3Y": "24m",
+  };
+  return map[period];
+}
 
 export type RiskSeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type RecommendationImpact = "HIGH_IMPACT" | "QUICK_WIN" | "LONG_TERM";
@@ -205,6 +224,23 @@ export interface SpendingAnomaly {
   amount: Money | null;
 }
 
+/**
+ * One category or merchant's real current-window-vs-previous-window change,
+ * from the backend's deterministic trend endpoints — never recomputed or
+ * estimated client-side. `changePercent`/`direction` are `null`/`"NEW"`
+ * respectively when the previous window had nothing to compare against
+ * (never a fabricated infinite percentage).
+ */
+export interface SpendingTrendMover {
+  id: string;
+  name: string;
+  currentMonthlyAverage: Money;
+  changePercent: number | null;
+  direction: "INCREASE" | "DECREASE" | "FLAT" | "NEW";
+  /** Merchant rows only — absent for categories. */
+  pattern?: "RECURRING" | "OCCASIONAL" | "ONE_TIME_LARGE_PURCHASE";
+}
+
 export interface SpendingAnalytics {
   totalSpent: Money;
   categories: CategorySpending[];
@@ -215,6 +251,18 @@ export interface SpendingAnalytics {
    * threshold. Empty when nothing was flagged.
    */
   anomalies: SpendingAnomaly[];
+  /**
+   * The real replacement for the fake "+0.0% MoM" figure a previous
+   * revision of this section showed (see `SpendingSection.tsx`). `null`
+   * when the trend endpoints didn't resolve — this is optional enrichment,
+   * not a required part of the section, and its absence is never rendered
+   * as a zero change.
+   */
+  trending: {
+    categories: SpendingTrendMover[];
+    merchants: SpendingTrendMover[];
+    coverage: "FULL" | "PARTIAL" | "INSUFFICIENT";
+  } | null;
 }
 
 // ---------------------------------------------------------------------------

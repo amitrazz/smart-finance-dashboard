@@ -41,6 +41,9 @@ import {
   RetirementForecastResponse,
   Loan,
   Transaction,
+  CategoryTrend,
+  MerchantTrend,
+  PeriodComparisonResult,
 } from "../../../types";
 import { PaginatedResponse } from "../../../services/api/endpoints";
 import { HEALTH_DIMENSION_LABELS } from "../../health/hooks/useFinancialHealth";
@@ -53,6 +56,7 @@ import {
   CashFlowPoint,
   SpendingAnalytics,
   SpendingAnomaly,
+  SpendingTrendMover,
   IncomeAnalytics,
   BudgetAnalytics,
   BudgetHealthItem,
@@ -478,11 +482,83 @@ type MerchantWire = { merchantId: string; merchantName: string; amount: Money };
  */
 const ANOMALY_PATTERN = /ANOMAL|UNUSUAL|SPIKE|DUPLICATE|OUTLIER|UNEXPECTED/i;
 
+/**
+ * Ranks the movers with the largest real backend-computed swing, largest
+ * absolute percentage change first. `FLAT` rows are excluded (noise, not a
+ * mover); `NEW` rows (nothing spent in the previous window) are kept — a
+ * category/merchant appearing from nothing is itself a real change worth
+ * surfacing.
+ */
+function rankTrendMovers<T extends { vsPreviousPeriod: PeriodComparisonResult }>(
+  rows: T[],
+  toMover: (row: T) => SpendingTrendMover,
+  limit = 5,
+): SpendingTrendMover[] {
+  return [...rows]
+    .filter((r) => r.vsPreviousPeriod.direction !== "FLAT")
+    .sort(
+      (a, b) =>
+        Math.abs(num(b.vsPreviousPeriod.percentageDelta) ?? 0) -
+        Math.abs(num(a.vsPreviousPeriod.percentageDelta) ?? 0),
+    )
+    .slice(0, limit)
+    .map(toMover);
+}
+
+function toTrendMover(
+  id: string,
+  name: string,
+  currentMonthlyAverage: string,
+  currency: string,
+  comparison: PeriodComparisonResult,
+  pattern?: SpendingTrendMover["pattern"],
+): SpendingTrendMover {
+  return {
+    id,
+    name,
+    currentMonthlyAverage: money(num(currentMonthlyAverage) ?? 0, currency),
+    changePercent: num(comparison.percentageDelta),
+    direction: comparison.direction,
+    ...(pattern ? { pattern } : {}),
+  };
+}
+
+/**
+ * The real replacement for the fake "+0.0% MoM" figure removed from this
+ * section — see `SpendingAnalytics.trending`'s own doc comment. `null` when
+ * neither trend endpoint resolved (optional queries still loading/failed);
+ * a non-null result with empty lists still carries `coverage` so the
+ * section can distinguish "nothing changed" from "not enough history yet".
+ */
+function buildSpendingTrending(
+  categoryTrendsRes: CategoryTrend[] | null | undefined,
+  merchantTrendsRes: MerchantTrend[] | null | undefined,
+  currency: string,
+): SpendingAnalytics["trending"] {
+  if (!categoryTrendsRes && !merchantTrendsRes) return null;
+
+  const categoryRows = categoryTrendsRes ?? [];
+  const merchantRows = merchantTrendsRes ?? [];
+  const coverage = categoryRows[0]?.window.coverage ?? merchantRows[0]?.window.coverage ?? "INSUFFICIENT";
+
+  return {
+    categories: rankTrendMovers(categoryRows, (t) =>
+      toTrendMover(t.categoryId ?? t.categoryName, t.categoryName, t.currentMonthlyAverage, currency, t.vsPreviousPeriod),
+    ),
+    merchants: rankTrendMovers(merchantRows, (t) =>
+      toTrendMover(t.merchantId, t.merchantName, t.currentMonthlyAverage, currency, t.vsPreviousPeriod, t.pattern),
+    ),
+    coverage,
+  };
+}
+
 export function mapSpending(
   categoriesRes: CategoryWire[] | null | undefined,
   merchantsRes: MerchantWire[] | null | undefined,
   transactionsRes: Transaction[] | PaginatedResponse<Transaction> | null | undefined,
   actions: SmartActionItem[],
+  categoryTrendsRes?: CategoryTrend[] | null,
+  merchantTrendsRes?: MerchantTrend[] | null,
 ): SpendingAnalytics | null {
   const categoriesRaw = Array.isArray(categoriesRes) ? categoriesRes : [];
   if (categoriesRaw.length === 0) return null;
@@ -541,6 +617,7 @@ export function mapSpending(
     topMerchants,
     dailyVelocity,
     anomalies,
+    trending: buildSpendingTrending(categoryTrendsRes, merchantTrendsRes, currency),
   };
 }
 

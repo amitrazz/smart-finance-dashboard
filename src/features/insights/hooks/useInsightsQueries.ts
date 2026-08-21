@@ -23,6 +23,7 @@ import {
   assetAllocationSource,
   budgetDashboardSource,
   cashFlowSource,
+  categoryTrendsSource,
   debtBreakdownSource,
   expenseTrendSource,
   expensesByCategorySource,
@@ -37,6 +38,7 @@ import {
   investmentReturnsSource,
   liabilitiesSummarySource,
   loansSource,
+  merchantTrendsSource,
   netWorthHistorySource,
   netWorthSource,
   recentOutflowsSource,
@@ -62,9 +64,10 @@ import {
 } from "../api/insightsMappers";
 import { api } from "../../../services/api/endpoints";
 import { IntelligenceItem, buildIntelligenceFeed, mapIntelligence } from "../api/intelligenceModel";
-import { useInsightsPeriodMonths } from "./useInsightsFilters";
+import { useInsightsFilters, useInsightsPeriodMonths } from "./useInsightsFilters";
 import {
   BudgetAnalytics,
+  mapPeriodToAnalysisWindow,
   CashFlowAnalytics,
   DebtAnalytics,
   FinancialHealthOverview,
@@ -178,9 +181,31 @@ export function useSpendingAnalytics(): InsightsQueryResult<SpendingAnalytics> {
   const merchants = useQuery(expensesByMerchantSource());
   const outflows = useQuery(recentOutflowsSource());
   const actions = useQuery(smartActionsSource());
+  // Real current-vs-previous-window comparisons, not the fake "+0.0% MoM"
+  // this section used to show — mapped from the same header period
+  // selector every other Analytics domain reads, so switching the period
+  // moves this section's "Trending" data too, not just its own controls.
+  const window = useInsightsFilters((s) => mapPeriodToAnalysisWindow(s.period));
+  const categoryTrends = useQuery(categoryTrendsSource(window));
+  const merchantTrends = useQuery(merchantTrendsSource(window));
   const value = useMemo(
-    () => mapSpending(categories.data, merchants.data, outflows.data, unwrapList(actions.data)),
-    [categories.data, merchants.data, outflows.data, actions.data],
+    () =>
+      mapSpending(
+        categories.data,
+        merchants.data,
+        outflows.data,
+        unwrapList(actions.data),
+        categoryTrends.data,
+        merchantTrends.data,
+      ),
+    [
+      categories.data,
+      merchants.data,
+      outflows.data,
+      actions.data,
+      categoryTrends.data,
+      merchantTrends.data,
+    ],
   );
   return combine(
     value,
@@ -188,6 +213,8 @@ export function useSpendingAnalytics(): InsightsQueryResult<SpendingAnalytics> {
     [
       { query: merchants, value: merchants.data },
       { query: outflows, value: outflows.data },
+      { query: categoryTrends, value: categoryTrends.data },
+      { query: merchantTrends, value: merchantTrends.data },
     ],
   );
 }

@@ -137,6 +137,9 @@ import {
   CreateUserSelfIdentifierInput,
   UserSettings,
   AnalyticsTrendPoint,
+  AnalyticsWindow,
+  CategoryTrend,
+  MerchantTrend,
 } from '../../types';
 import { fetchWithAuth } from './client';
 
@@ -1260,11 +1263,11 @@ export const api = {
 
   // Analytics
   getNetWorth: () => fetchWithAuth<NetWorthSnapshot>('/finance/net-worth'),
-  getNetWorthHistory: (params?: { limit?: number }) =>
+  getNetWorthHistory: (params?: { window?: AnalyticsWindow; limit?: number }) =>
     fetchWithAuth<PaginatedResponse<NetWorthSnapshot>>(
       `/finance/net-worth/history${buildQuery(params)}`,
     ),
-  getCashFlow: (params?: { limit?: number }) =>
+  getCashFlow: (params?: { window?: AnalyticsWindow; limit?: number }) =>
     fetchWithAuth<PaginatedResponse<CashFlowSnapshot>>(
       `/finance/analytics/cash-flow${buildQuery(params)}`,
     ),
@@ -1273,14 +1276,32 @@ export const api = {
   getAssetAllocation: () =>
     fetchWithAuth<AssetAllocationResponse>('/finance/analytics/asset-allocation'),
   getDebtBreakdown: () => fetchWithAuth<DebtBreakdownResponse>('/finance/analytics/debt-breakdown'),
-  getIncomeTrend: (params?: { limit?: number; dateFrom?: string; dateTo?: string }) =>
+  getIncomeTrend: (params?: {
+    window?: AnalyticsWindow;
+    limit?: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }) =>
     fetchWithAuth<PaginatedResponse<AnalyticsTrendPoint>>(
       `/finance/analytics/income-trend${buildQuery(params)}`,
     ),
-  getExpenseTrendAnalytics: (params?: { limit?: number; dateFrom?: string; dateTo?: string }) =>
+  getExpenseTrendAnalytics: (params?: {
+    window?: AnalyticsWindow;
+    limit?: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }) =>
     fetchWithAuth<PaginatedResponse<AnalyticsTrendPoint>>(
       `/finance/analytics/expense-trend${buildQuery(params)}`,
     ),
+  // Per-category/merchant historical spend trends: current-window average,
+  // share of total expense, and comparisons vs. the previous window and the
+  // 12-month baseline. Bare arrays, not paginated (backend returns one row
+  // per category/merchant with any activity in the relevant windows).
+  getCategoryTrends: (params?: { window?: AnalyticsWindow }) =>
+    fetchWithAuth<CategoryTrend[]>(`/finance/analytics/categories${buildQuery(params)}`),
+  getMerchantTrends: (params?: { window?: AnalyticsWindow }) =>
+    fetchWithAuth<MerchantTrend[]>(`/finance/analytics/merchants${buildQuery(params)}`),
   getRetirementForecast: (params?: {
     currentAge?: number;
     retirementAge?: number;
