@@ -749,6 +749,31 @@ export interface IncomeRecord {
   contributions: IncomeRecordContributionDto[];
 }
 
+export interface IncomeReconciliationScoreBreakdown {
+  amount: number;
+  date: number;
+  description: number;
+}
+
+// Matches GET /finance/income/records/:id/reconciliation
+// (IncomeReconciliationCandidateDto) exactly — never auto-matched, only
+// ever a ranked suggestion for the user to confirm or reject.
+export interface IncomeReconciliationCandidate {
+  transactionId: string;
+  score: number;
+  breakdown: IncomeReconciliationScoreBreakdown;
+  transactionDate: string;
+  amount: Money;
+  description: string;
+  accountId: string | null;
+}
+
+// Matches IncomeReconciliationResponseDto exactly.
+export interface IncomeReconciliation {
+  record: IncomeRecord;
+  candidates: IncomeReconciliationCandidate[];
+}
+
 export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";
 export type BudgetHealthGrade = "EXCELLENT" | "GOOD" | "FAIR" | "WARNING" | "CRITICAL";
 export type BudgetStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";

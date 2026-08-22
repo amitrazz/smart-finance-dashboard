@@ -69,8 +69,8 @@ describe("SalarySlipUploadWizard — upload validation", () => {
     mockHooks();
     render(<SalarySlipUploadWizard onConfirmed={vi.fn()} />);
     const input = screen.getByLabelText("Choose a salary slip file");
-    fireEvent.change(input, { target: { files: [file("huge.pdf", 20 * 1024 * 1024)] } });
-    expect(screen.getByText("This file is too large (max 15MB).")).toBeInTheDocument();
+    fireEvent.change(input, { target: { files: [file("huge.pdf", 6 * 1024 * 1024)] } });
+    expect(screen.getByText("This file is too large (max 5MB).")).toBeInTheDocument();
   });
 
   it("rejects an empty file client-side", () => {

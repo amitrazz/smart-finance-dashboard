@@ -87,6 +87,7 @@ export const QUERY_KEYS = {
   incomeSources: (params?: Record<string, unknown>) => ["incomeSources", params],
   incomeRecords: (params?: Record<string, unknown>) => ["incomeRecords", params],
   incomeRecord: (id: string) => ["incomeRecord", id],
+  incomeReconciliation: (id: string) => ["incomeReconciliation", id],
   budgets: (params?: Record<string, unknown>) => ["budgets", params],
   budgetProgress: (id: string) => ["budgets", id, "progress"],
   goals: (params?: Record<string, unknown>) => ["goals", params],
@@ -1720,6 +1721,45 @@ export function useRecordIncome() {
       queryClient.invalidateQueries({ queryKey: ["incomeRecords"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
       useUIStore.getState().showToast("Income recorded successfully", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+// Never auto-matched server-side — a GET here can promote UNMATCHED ->
+// SUGGESTED (see backend docs/24-salary-slip-import.md), but only an
+// explicit user confirm ever sets a transactionId.
+export function useIncomeReconciliation(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.incomeReconciliation(id),
+    queryFn: () => api.getIncomeReconciliation(id),
+    enabled: isAuth() && Boolean(id),
+  });
+}
+
+export function useReconcileIncomeRecord() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, transactionId }: { id: string; transactionId: string }) =>
+      api.reconcileIncomeRecord(id, transactionId),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.incomeReconciliation(variables.id) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.incomeRecord(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ["incomeRecords"] });
+      useUIStore.getState().showToast("Salary matched to the bank transaction", "success");
+    },
+    onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
+  });
+}
+
+export function useRejectIncomeReconciliation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.rejectIncomeReconciliation(id),
+    onSuccess: (_result, id) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.incomeReconciliation(id) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.incomeRecord(id) });
+      queryClient.invalidateQueries({ queryKey: ["incomeRecords"] });
     },
     onError: (err) => useUIStore.getState().showToast(getErrorMessage(err), "error"),
   });

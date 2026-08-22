@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { ArrowLeft, FileText, AlertTriangle, ArrowRight } from "lucide-react";
-import { useIncomeRecord } from "../../../hooks/useFinanceQueries";
+import { ArrowLeft, FileText, AlertTriangle, ArrowRight, Landmark, XCircle } from "lucide-react";
+import {
+  useIncomeRecord,
+  useIncomeReconciliation,
+  useReconcileIncomeRecord,
+  useRejectIncomeReconciliation,
+  useTransaction,
+  useAccounts,
+} from "../../../hooks/useFinanceQueries";
 import { api } from "../../../services/api";
 import { formatCurrency, formatDate } from "../../../utils/formatters";
 import { ReconciliationStatusBadge } from "./ReconciliationStatusBadge";
 import { useUIStore } from "../../../store/useUIStore";
+import { Button } from "../../../components/ui/Button";
 
 type DetailTab =
   | "overview"
@@ -260,19 +268,184 @@ function DocumentTab({ documentId }: { documentId: string | null }) {
   );
 }
 
+/**
+ * Real reconciliation UI, backed by the already-existing backend flow:
+ * GET .../reconciliation scores candidate bank transactions (amount/date/
+ * description) and, only for an UNMATCHED record, may promote it to
+ * SUGGESTED — never sets a transactionId itself. Only an explicit
+ * "Confirm Match" click (POST .../reconcile) ever links a specific
+ * transaction; only "Mark as Unmatched" (POST .../reject-reconciliation)
+ * ever rejects. Nothing here is ever auto-confirmed.
+ */
 function ReconciliationTab({ record }: { record: NonNullable<ReturnType<typeof useIncomeRecord>["data"]> }) {
+  const { data: accounts } = useAccounts();
+  const accountLabel = (accountId: string | null) => {
+    if (!accountId) return null;
+    const account = accounts?.find((a) => a.id === accountId);
+    return account?.institution?.name ?? account?.name ?? null;
+  };
+
+  const reconcileMutation = useReconcileIncomeRecord();
+  const rejectMutation = useRejectIncomeReconciliation();
+
+  if (record.transactionId) {
+    return (
+      <MatchedTransactionCard
+        record={record}
+        accountLabel={accountLabel}
+        onReject={() => rejectMutation.mutate(record.id)}
+        isRejecting={rejectMutation.isPending}
+      />
+    );
+  }
+
   return (
-    <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+    <CandidateMatchList
+      record={record}
+      accountLabel={accountLabel}
+      onConfirm={(transactionId) => reconcileMutation.mutate({ id: record.id, transactionId })}
+      onReject={() => rejectMutation.mutate(record.id)}
+      isConfirming={reconcileMutation.isPending}
+      isRejecting={rejectMutation.isPending}
+    />
+  );
+}
+
+function MatchedTransactionCard({
+  record,
+  accountLabel,
+  onReject,
+  isRejecting,
+}: {
+  record: NonNullable<ReturnType<typeof useIncomeRecord>["data"]>;
+  accountLabel: (accountId: string | null) => string | null;
+  onReject: () => void;
+  isRejecting: boolean;
+}) {
+  const { data: transaction, isLoading } = useTransaction(record.transactionId ?? "");
+
+  return (
+    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">
           Bank Transaction Reconciliation
         </h4>
         <ReconciliationStatusBadge status={record.reconciliationStatus} />
       </div>
-      <p className="text-xs text-slate-500">
-        Matching this salary record to the actual bank credit is coming in a future update. Nothing
-        is automatically matched — only a confirmed match ever links a real transaction here.
-      </p>
+      {isLoading ? (
+        <div className="h-16 bg-slate-900/40 rounded-xl animate-pulse" />
+      ) : transaction ? (
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <p className="text-[11px] text-slate-400 uppercase tracking-wide">Bank Salary Credit</p>
+          <p className="text-lg font-bold text-emerald-400">{formatCurrency(transaction.amount)}</p>
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <span>{formatDate(transaction.date)}</span>
+            {accountLabel(transaction.accountId ?? null) && (
+              <>
+                <Landmark className="w-3 h-3" aria-hidden="true" />
+                <span>{accountLabel(transaction.accountId ?? null)}</span>
+              </>
+            )}
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">Matched transaction details are unavailable.</p>
+      )}
+      <Button
+        onClick={onReject}
+        disabled={isRejecting}
+        variant="neutral"
+        hierarchy="outline"
+        size="sm"
+        leftIcon={<XCircle className="w-3.5 h-3.5" />}
+      >
+        Not This Transaction
+      </Button>
+    </div>
+  );
+}
+
+function CandidateMatchList({
+  record,
+  accountLabel,
+  onConfirm,
+  onReject,
+  isConfirming,
+  isRejecting,
+}: {
+  record: NonNullable<ReturnType<typeof useIncomeRecord>["data"]>;
+  accountLabel: (accountId: string | null) => string | null;
+  onConfirm: (transactionId: string) => void;
+  onReject: () => void;
+  isConfirming: boolean;
+  isRejecting: boolean;
+}) {
+  const { data, isLoading, isError } = useIncomeReconciliation(record.id);
+  const candidates = data?.candidates ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">
+          Bank Transaction Reconciliation
+        </h4>
+        <ReconciliationStatusBadge status={data?.record.reconciliationStatus ?? record.reconciliationStatus} />
+      </div>
+
+      {isLoading && <div className="h-24 bg-slate-900/60 rounded-2xl border border-slate-800 animate-pulse" />}
+
+      {isError && (
+        <p className="text-xs text-rose-400">Could not load reconciliation candidates.</p>
+      )}
+
+      {!isLoading && !isError && candidates.length === 0 && (
+        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
+          <p className="text-xs text-slate-500">No matching bank transaction found yet.</p>
+        </div>
+      )}
+
+      {candidates.map((candidate, index) => {
+        const isTopSuggestion =
+          index === 0 && (data?.record.reconciliationStatus ?? record.reconciliationStatus) === "SUGGESTED";
+        return (
+          <div
+            key={candidate.transactionId}
+            className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {isTopSuggestion ? "Suggested Match" : "Possible Salary Credit"}
+            </p>
+            <p className="text-lg font-bold text-slate-100">{formatCurrency(candidate.amount)}</p>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+              <span>{formatDate(candidate.transactionDate)}</span>
+              {accountLabel(candidate.accountId) && (
+                <>
+                  <Landmark className="w-3 h-3" aria-hidden="true" />
+                  <span>{accountLabel(candidate.accountId)}</span>
+                </>
+              )}
+            </p>
+            <p className="text-[11px] text-slate-500">{candidate.description}</p>
+            <Button
+              onClick={() => onConfirm(candidate.transactionId)}
+              disabled={isConfirming}
+              size="sm"
+            >
+              Confirm Match
+            </Button>
+          </div>
+        );
+      })}
+
+      {candidates.length > 0 && (
+        <button
+          onClick={onReject}
+          disabled={isRejecting}
+          className="text-xs text-slate-500 hover:text-slate-300 underline transition-colors disabled:opacity-50"
+        >
+          None of these — mark as unmatched
+        </button>
+      )}
     </div>
   );
 }

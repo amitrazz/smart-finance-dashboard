@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import React from "react";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { SalarySlipDetail } from "../SalarySlipDetail";
@@ -13,6 +13,28 @@ vi.mock("../../../../services/api", async (importOriginal) => {
 });
 
 afterEach(() => cleanup());
+
+// Every test renders through ReconciliationTab (it's mounted only when that
+// tab is active, but the hooks it calls must exist regardless) — give every
+// test a harmless default so only the reconciliation-focused tests need to
+// override these.
+beforeEach(() => {
+  vi.mocked(financeQueries.useAccounts).mockReturnValue({ data: [] } as never);
+  vi.mocked(financeQueries.useTransaction).mockReturnValue({ data: undefined, isLoading: false } as never);
+  vi.mocked(financeQueries.useIncomeReconciliation).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  } as never);
+  vi.mocked(financeQueries.useReconcileIncomeRecord).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as never);
+  vi.mocked(financeQueries.useRejectIncomeReconciliation).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as never);
+});
 
 const money = (amount: string) => ({ amount, currency: "INR" });
 
@@ -83,16 +105,181 @@ describe("SalarySlipDetail", () => {
     expect(screen.getByText(/never increase your available cash/)).toBeInTheDocument();
   });
 
-  it("shows the reconciliation status and a not-yet-built notice on the Reconciliation tab", () => {
-    vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
-      data: buildRecord({ reconciliationStatus: "SUGGESTED" }),
-      isLoading: false,
-      isError: false,
-    } as never);
-    render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+  describe("Reconciliation tab", () => {
+    it("shows a suggested candidate with amount/date/account, labeled Suggested Match only when the backend actually promoted it", () => {
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord({ reconciliationStatus: "SUGGESTED" }),
+        isLoading: false,
+        isError: false,
+      } as never);
+      vi.mocked(financeQueries.useAccounts).mockReturnValue({
+        data: [{ id: "acc-1", name: "Savings", institution: { id: "i1", name: "ICICI Bank" } }],
+      } as never);
+      vi.mocked(financeQueries.useIncomeReconciliation).mockReturnValue({
+        data: {
+          record: buildRecord({ reconciliationStatus: "SUGGESTED" }),
+          candidates: [
+            {
+              transactionId: "tx-1",
+              score: 95,
+              breakdown: { amount: 100, date: 100, description: 50 },
+              transactionDate: "2026-08-31",
+              amount: money("244975"),
+              description: "NEFT-ACME CORP-SALARY",
+              accountId: "acc-1",
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
-    expect(screen.getByText("Suggested Match")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      expect(screen.getAllByText("Suggested Match").length).toBeGreaterThan(0);
+      expect(screen.getByText("₹2,44,975.00")).toBeInTheDocument();
+      expect(screen.getByText("ICICI Bank")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm Match" })).toBeInTheDocument();
+    });
+
+    it("never labels a candidate as a Suggested Match unless the record's own reconciliationStatus is SUGGESTED — no fabricated confidence", () => {
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord({ reconciliationStatus: "UNMATCHED" }),
+        isLoading: false,
+        isError: false,
+      } as never);
+      vi.mocked(financeQueries.useIncomeReconciliation).mockReturnValue({
+        data: {
+          record: buildRecord({ reconciliationStatus: "UNMATCHED" }),
+          candidates: [
+            {
+              transactionId: "tx-1",
+              score: 40,
+              breakdown: { amount: 40, date: 40, description: 0 },
+              transactionDate: "2026-08-31",
+              amount: money("244975"),
+              description: "NEFT-UNKNOWN",
+              accountId: null,
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      expect(screen.getByText("Possible Salary Credit")).toBeInTheDocument();
+      expect(screen.queryByText("Suggested Match")).not.toBeInTheDocument();
+    });
+
+    it("confirms a specific candidate transaction on click", () => {
+      const mutate = vi.fn();
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord(),
+        isLoading: false,
+        isError: false,
+      } as never);
+      vi.mocked(financeQueries.useReconcileIncomeRecord).mockReturnValue({ mutate, isPending: false } as never);
+      vi.mocked(financeQueries.useIncomeReconciliation).mockReturnValue({
+        data: {
+          record: buildRecord(),
+          candidates: [
+            {
+              transactionId: "tx-1",
+              score: 95,
+              breakdown: { amount: 100, date: 100, description: 50 },
+              transactionDate: "2026-08-31",
+              amount: money("244975"),
+              description: "NEFT-ACME CORP-SALARY",
+              accountId: null,
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm Match" }));
+      expect(mutate).toHaveBeenCalledWith({ id: "record-1", transactionId: "tx-1" });
+    });
+
+    it("shows a 'no matching transaction' empty state rather than fabricating a candidate", () => {
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord(),
+        isLoading: false,
+        isError: false,
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      expect(screen.getByText("No matching bank transaction found yet.")).toBeInTheDocument();
+    });
+
+    it("shows the actual matched transaction (not a candidate list) once reconciliationStatus is MATCHED", () => {
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord({ reconciliationStatus: "MATCHED", transactionId: "tx-1" }),
+        isLoading: false,
+        isError: false,
+      } as never);
+      vi.mocked(financeQueries.useTransaction).mockReturnValue({
+        data: {
+          id: "tx-1",
+          amount: money("244975"),
+          direction: "INFLOW",
+          description: "NEFT-ACME CORP-SALARY",
+          date: "2026-08-31",
+          accountId: "acc-1",
+          version: 1,
+        },
+        isLoading: false,
+      } as never);
+      vi.mocked(financeQueries.useAccounts).mockReturnValue({
+        data: [{ id: "acc-1", name: "Savings", institution: { id: "i1", name: "ICICI Bank" } }],
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      expect(screen.getByText("Bank Salary Credit")).toBeInTheDocument();
+      expect(screen.getByText("₹2,44,975.00")).toBeInTheDocument();
+      expect(screen.getByText("ICICI Bank")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Not This Transaction" })).toBeInTheDocument();
+    });
+
+    it("rejects reconciliation (marks unmatched) without requiring a specific candidate", () => {
+      const mutate = vi.fn();
+      vi.mocked(financeQueries.useIncomeRecord).mockReturnValue({
+        data: buildRecord(),
+        isLoading: false,
+        isError: false,
+      } as never);
+      vi.mocked(financeQueries.useRejectIncomeReconciliation).mockReturnValue({ mutate, isPending: false } as never);
+      vi.mocked(financeQueries.useIncomeReconciliation).mockReturnValue({
+        data: {
+          record: buildRecord(),
+          candidates: [
+            {
+              transactionId: "tx-1",
+              score: 70,
+              breakdown: { amount: 70, date: 70, description: 0 },
+              transactionDate: "2026-08-31",
+              amount: money("244975"),
+              description: "NEFT-UNKNOWN",
+              accountId: null,
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      } as never);
+      render(<SalarySlipDetail incomeRecordId="record-1" onBack={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reconciliation" }));
+      fireEvent.click(screen.getByRole("button", { name: "None of these — mark as unmatched" }));
+      expect(mutate).toHaveBeenCalledWith("record-1");
+    });
   });
 
   it("shows the Planning Impact tab using net pay, and never gross", () => {

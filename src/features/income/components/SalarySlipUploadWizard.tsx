@@ -11,7 +11,11 @@ import { ImportJob, NormalizedSalarySlipRowData } from "../../../types";
 import { SalarySlipReviewPanel } from "./SalarySlipReviewPanel";
 import { Button } from "../../../components/ui/Button";
 
-const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
+// Matches the backend's actual multer limit for this endpoint exactly
+// (import.controller.ts's FileInterceptor `limits.fileSize`) — this was
+// previously out of sync (declared 15MB here), so a 6-14MB file would pass
+// this client-side check and only then fail with a late server 413/400.
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_TYPES = [".pdf", ".png", ".jpg", ".jpeg"];
 // Give the user something to look at while OCR/AI extraction runs — never
 // pretend this is instantaneous (spec §4/§6).
@@ -109,7 +113,7 @@ export const SalarySlipUploadWizard: React.FC<SalarySlipUploadWizardProps> = ({
       return "This file appears to be empty.";
     }
     if (candidate.size > MAX_FILE_SIZE_BYTES) {
-      return "This file is too large (max 15MB).";
+      return "This file is too large (max 5MB).";
     }
     return null;
   };

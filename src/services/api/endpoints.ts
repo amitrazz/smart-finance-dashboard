@@ -69,6 +69,7 @@ import {
   UpdateImportRowInput,
   IncomeSource,
   IncomeRecord,
+  IncomeReconciliation,
   InvestmentReturnsPortfolio,
   Loan,
   LoanDashboardData,
@@ -1536,6 +1537,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  getIncomeReconciliation: (id: string) =>
+    fetchWithAuth<IncomeReconciliation>(
+      `/finance/income/records/${encodeURIComponent(id)}/reconciliation`,
+    ),
+  reconcileIncomeRecord: (id: string, transactionId: string) =>
+    fetchWithAuth<IncomeRecord>(
+      `/finance/income/records/${encodeURIComponent(id)}/reconcile`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ transactionId }),
+      },
+    ),
+  rejectIncomeReconciliation: (id: string) =>
+    fetchWithAuth<IncomeRecord>(
+      `/finance/income/records/${encodeURIComponent(id)}/reject-reconciliation`,
+      { method: 'POST' },
+    ),
 
   // Budgets & Spend Platform APIs
   getBudgetDashboard: () => fetchWithAuth<BudgetDashboardData>('/finance/budgets/dashboard'),
