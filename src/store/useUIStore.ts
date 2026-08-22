@@ -16,6 +16,7 @@ export type NavTab =
   | "accounts"
   | "credit-cards"
   | "transactions"
+  | "income"
   | "imports"
   | "planning"
   | "investments"
@@ -62,6 +63,7 @@ export const VALID_TABS: NavTab[] = [
   "accounts",
   "credit-cards",
   "transactions",
+  "income",
   "imports",
   "planning",
   "investments",

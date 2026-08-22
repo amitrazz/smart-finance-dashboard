@@ -41,6 +41,9 @@ const TransactionsView = lazy(() =>
     default: m.TransactionsView,
   })),
 );
+const IncomeView = lazy(() =>
+  import('../../features/income/IncomeView').then((m) => ({ default: m.IncomeView })),
+);
 const ImportsView = lazy(() =>
   import('../../features/imports/ImportsView').then((m) => ({ default: m.ImportsView })),
 );
@@ -193,6 +196,8 @@ export const AppShell: React.FC = () => {
         return <CreditCardsView />;
       case 'transactions':
         return <TransactionsView />;
+      case 'income':
+        return <IncomeView />;
       case 'imports':
         return <ImportsView />;
       case 'planning':

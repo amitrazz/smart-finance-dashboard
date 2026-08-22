@@ -283,3 +283,139 @@ export async function fetchWithAuth<T>(
     );
   }
 }
+
+/**
+ * `fetchWithAuth`'s counterpart for binary responses (document/statement
+ * downloads) — same auth-header/401-refresh/timeout/error-classification
+ * behavior, but resolves the body as a `Blob` via `res.blob()` instead of
+ * always parsing it as JSON. A document download can never reuse
+ * `fetchWithAuth<Blob>` as its type parameter suggests: that generic is
+ * purely a compile-time cast, the function still unconditionally calls
+ * `res.json()` on success, which throws on a real PDF byte stream.
+ */
+export async function fetchBlobWithAuth(
+  endpoint: string,
+  options: RequestInit & { timeoutMs?: number; _isRetry?: boolean } = {}
+): Promise<Blob> {
+  if (typeof window !== "undefined" && !navigator.onLine) {
+    throw new ApiError(
+      "Device is offline",
+      0,
+      "OFFLINE",
+      "You are currently offline. Please check your internet connection."
+    );
+  }
+
+  const { timeoutMs = 30000, _isRetry = false, ...fetchOptions } = options;
+
+  const headers = new Headers(fetchOptions.headers || {});
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  const path = endpoint.startsWith("/api/v1")
+    ? endpoint.replace("/api/v1", "")
+    : endpoint.startsWith("/")
+      ? endpoint
+      : `/${endpoint}`;
+  const url = `${API_BASE_URL}${path}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const callerSignal = fetchOptions.signal;
+  const composedSignal = callerSignal
+    ? AbortSignal.any([controller.signal, callerSignal])
+    : controller.signal;
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      credentials: "include",
+      ...fetchOptions,
+      signal: composedSignal,
+      headers,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 401) {
+      if (!_isRetry && !NO_REFRESH_RETRY_PATHS.has(path)) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          return fetchBlobWithAuth(endpoint, { ...options, _isRetry: true });
+        }
+      }
+      setAccessToken(null);
+      if (onUnauthorizedCallback) {
+        onUnauthorizedCallback();
+      }
+    }
+
+    if (!res.ok) {
+      let errorData: Record<string, unknown> = {};
+      try {
+        errorData = (await res.json()) as Record<string, unknown>;
+      } catch {
+        // Response was not JSON (common for a failed binary download)
+      }
+
+      const rawMsg =
+        (errorData.message as string) ||
+        (errorData.error as string) ||
+        `HTTP Error ${res.status}: ${res.statusText}`;
+
+      let category: ErrorCategory = "CLIENT";
+      let userMsg = rawMsg;
+      if (res.status === 401) {
+        category = "AUTH";
+        userMsg = "Your session has expired. Please sign in again.";
+      } else if (res.status === 403) {
+        category = "AUTH";
+        userMsg = "You do not have permission to view this document.";
+      } else if (res.status === 404) {
+        category = "CLIENT";
+        userMsg = "This document is no longer available.";
+      } else if (res.status >= 500) {
+        category = "SERVER";
+        userMsg = "Server error encountered. Please try again shortly.";
+      }
+
+      throw new ApiError(
+        rawMsg,
+        res.status,
+        category,
+        userMsg,
+        errorData.error as string | undefined,
+        errorData.details as Record<string, unknown> | undefined
+      );
+    }
+
+    return await res.blob();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    if (err instanceof Error && err.name === "AbortError") {
+      if (controller.signal.aborted) {
+        throw new ApiError(
+          "Request timed out",
+          0,
+          "NETWORK",
+          "The document took too long to download. Please try again."
+        );
+      }
+      throw err;
+    }
+
+    throw new ApiError(
+      (err as Error)?.message || "Network request failed",
+      0,
+      "NETWORK",
+      "Network error encountered. Please check your connection."
+    );
+  }
+}

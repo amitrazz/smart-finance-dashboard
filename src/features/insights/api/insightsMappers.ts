@@ -357,8 +357,18 @@ export function mapNetWorth(
 interface IncomeSourceWire {
   id: string;
   name: string;
-  frequency: string;
-  expectedAmount: Money;
+  // Real backend field is `payFrequency` (IncomeSourceResponseDto) — this
+  // was previously declared as `frequency`, a field the backend never
+  // sends, so `source.frequency` in IncomeSection.tsx always read
+  // `undefined`. See packages/finance/src/income/application/mappers/
+  // income-source.mapper.ts in the backend-platform repo.
+  payFrequency: string | null;
+  // The backend sends these as two flat fields (a plain decimal string plus
+  // a separate currency code), never a nested `{amount, currency}` object —
+  // reassembled into a `Money` below for the existing `IncomeAnalytics`
+  // display contract.
+  expectedAmount: string | null;
+  expectedCurrency: string | null;
 }
 
 /**
@@ -441,8 +451,12 @@ export function mapCashFlow(
   const largestExpenseAmount = asMoney(largestExpense?.amount, currency);
 
   const largestIncome = [...unwrapList(incomeSourcesRes)].sort(
-    (a, b) => (moneyValue(b.expectedAmount) ?? 0) - (moneyValue(a.expectedAmount) ?? 0),
+    (a, b) => (num(b.expectedAmount) ?? 0) - (num(a.expectedAmount) ?? 0),
   )[0];
+  const largestIncomeAmount = asMoney(
+    largestIncome?.expectedAmount,
+    largestIncome?.expectedCurrency ?? currency,
+  );
 
   return {
     period: periodOf(latest),
@@ -459,9 +473,10 @@ export function mapCashFlow(
       largestExpense && largestExpenseAmount
         ? { name: largestExpense.categoryName, amount: largestExpenseAmount }
         : null,
-    largestIncomeSource: largestIncome
-      ? { name: largestIncome.name, amount: largestIncome.expectedAmount }
-      : null,
+    largestIncomeSource:
+      largestIncome && largestIncomeAmount
+        ? { name: largestIncome.name, amount: largestIncomeAmount }
+        : null,
     periodStart: latest.periodStart ?? null,
     periodEnd: latest.periodEnd ?? null,
   };
@@ -654,8 +669,8 @@ export function mapIncome(
     sources: sourcesRaw.map((s) => ({
       id: s.id,
       name: s.name,
-      frequency: s.frequency ?? null,
-      expectedAmount: s.expectedAmount,
+      frequency: s.payFrequency ?? null,
+      expectedAmount: { amount: s.expectedAmount ?? "0", currency: s.expectedCurrency ?? "INR" },
     })),
     history,
   };

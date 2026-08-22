@@ -516,7 +516,7 @@ describe("malformed rows never take down a section", () => {
 });
 
 describe("optional wire fields never reach a string method", () => {
-  // Regression: the wire types declare `frequency` and `billingCycle` as
+  // Regression: the wire types declare `payFrequency` and `billingCycle` as
   // required, but manually-created rows come back without them. The component
   // called `.toLowerCase()` on the value and took the section down with
   // "Cannot read properties of undefined (reading 'toLowerCase')". The mappers
@@ -524,8 +524,8 @@ describe("optional wire fields never reach a string method", () => {
   it("normalises a missing income frequency to null", () => {
     const result = mapIncome(
       [
-        { id: "s1", name: "Salary", frequency: "MONTHLY", expectedAmount: money("100000") },
-        { id: "s2", name: "Consulting", expectedAmount: money("25000") },
+        { id: "s1", name: "Salary", payFrequency: "MONTHLY", expectedAmount: "100000", expectedCurrency: "INR" },
+        { id: "s2", name: "Consulting", expectedAmount: "25000", expectedCurrency: "INR" },
       ] as never,
       null,
       null,

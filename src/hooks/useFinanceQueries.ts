@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, QueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { getAccessToken } from "../services/api/client";
-import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput, AssetRefreshResult, AssetRefreshStatus, RefreshPricesResponse, UserSelfIdentifier, CreateUserSelfIdentifierInput, AnalyticsTrendPoint } from "../types";
+import { Money, UserSettings, Account, Transaction, CreateTransactionInput, UpdateTransactionInput, Trade, Category, FinancialInstitution, ImportRowStaging, UpdateImportRowInput, Holding, Portfolio, SipPlan, RealizedGain, CreateTradeInput, PortfolioSnapshot, NetWorthSnapshot, CashFlowSnapshot, CalendarItem, SearchResultItem, ImportJob, ImportJobStatus, CashPositionData, WalletAccount, FixedDeposit, InvestmentCashPosition, Transfer, CreateTransferInput, AccountStatementItem, StatementLine, StatementLineCandidate, ReconciliationRecord, IgnoreReason, Merchant, ReviewClusterStatus, ResolveReviewClusterInput, AssetRefreshResult, AssetRefreshStatus, RefreshPricesResponse, UserSelfIdentifier, CreateUserSelfIdentifierInput, AnalyticsTrendPoint, IncomeSource, IncomeRecord } from "../types";
 import { useUIStore } from "../store/useUIStore";
 
 const getErrorMessage = (err: unknown): string => {
@@ -86,6 +86,7 @@ export const QUERY_KEYS = {
   expenseTrend: (params?: Record<string, unknown>) => ["expenseTrend", params],
   incomeSources: (params?: Record<string, unknown>) => ["incomeSources", params],
   incomeRecords: (params?: Record<string, unknown>) => ["incomeRecords", params],
+  incomeRecord: (id: string) => ["incomeRecord", id],
   budgets: (params?: Record<string, unknown>) => ["budgets", params],
   budgetProgress: (id: string) => ["budgets", id, "progress"],
   goals: (params?: Record<string, unknown>) => ["goals", params],
@@ -1648,20 +1649,27 @@ export function useExpenseTrend(params?: { limit?: number }) {
   });
 }
 
-export function useIncomeSources(params?: { limit?: number }) {
+export function useIncomeSources(params?: { search?: string; cursor?: string; limit?: number }) {
   return useQuery({
     queryKey: QUERY_KEYS.incomeSources(params),
     queryFn: () => api.getIncomeSources(params),
     enabled: isAuth(),
-    select: (res) => unwrapList<{ id: string; name: string; expectedAmount: Money; frequency: string }>(res),
+    select: (res) => unwrapList<IncomeSource>(res),
   });
 }
 
 export function useCreateIncomeSource() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<{ name: string; expectedAmount: string | Money; frequency: string }>) =>
-      api.createIncomeSource(data),
+    mutationFn: (
+      data: Partial<{
+        name: string;
+        expectedAmount: string;
+        expectedCurrency: string;
+        payFrequency: string;
+        payDay: number;
+      }>,
+    ) => api.createIncomeSource(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incomeSources"] });
       useUIStore.getState().showToast("Income source created", "success");
@@ -1670,20 +1678,44 @@ export function useCreateIncomeSource() {
   });
 }
 
-export function useIncomeRecords(params?: { limit?: number }) {
+export function useIncomeRecords(params?: {
+  incomeSourceId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  cursor?: string;
+  limit?: number;
+}) {
   return useQuery({
     queryKey: QUERY_KEYS.incomeRecords(params),
     queryFn: () => api.getIncomeRecords(params),
     enabled: isAuth(),
-    select: (res) => unwrapList<{ id: string; sourceName: string; amount: Money; date: string }>(res),
+    select: (res) => unwrapList<IncomeRecord>(res),
+  });
+}
+
+// Powers the Salary Slip detail page — the full breakdown (components/
+// deductions/contributions), a single composed fetch rather than assembling
+// it from several list responses.
+export function useIncomeRecord(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.incomeRecord(id),
+    queryFn: () => api.getIncomeRecord(id),
+    enabled: isAuth() && Boolean(id),
   });
 }
 
 export function useRecordIncome() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<{ sourceId: string; amount: string | Money; date: string }>) =>
-      api.recordIncome(data),
+    mutationFn: (data: {
+      incomeSourceId: string;
+      grossAmount: string;
+      netAmount: string;
+      currency: string;
+      payDate: string;
+      transactionId?: string;
+      documentId?: string;
+    }) => api.recordIncome(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incomeRecords"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });

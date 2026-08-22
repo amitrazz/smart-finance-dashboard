@@ -544,6 +544,51 @@ export interface NormalizedTradeRowData {
   tradeDate: string;
 }
 
+// One earnings/deduction/employer-contribution line item as extracted from a
+// salary slip — matches SalarySlipExtractionLineItem (backend) before
+// `code` normalization is even relevant client-side; the frontend only ever
+// displays `name`/`amount`, never recomputes anything from these.
+export interface SalarySlipLineItem {
+  code: string;
+  name: string;
+  amount: string;
+}
+export interface SalarySlipEarning extends SalarySlipLineItem {
+  taxable: boolean | null;
+  recurring: boolean | null;
+}
+export interface SalarySlipDeduction extends SalarySlipLineItem {
+  category: string | null;
+}
+export interface SalarySlipContribution extends SalarySlipLineItem {
+  contributor: "EMPLOYEE" | "EMPLOYER";
+}
+
+// Matches ImportRowResponseDto.normalizedData for a SALARY_SLIP import —
+// SalarySlipExtraction (backend) exactly. A salary slip stages exactly one
+// row (rowNumber: 1) — there is no per-row table for this document type.
+export interface NormalizedSalarySlipRowData {
+  documentConfidence: number;
+  salaryPeriod: string | null;
+  payDate: string | null;
+  employerName: string | null;
+  employeeName: string | null;
+  employeeIdentifier: string | null;
+  designation: string | null;
+  department: string | null;
+  currency: string;
+  grossEarnings: string | null;
+  totalDeductions: string | null;
+  netPay: string | null;
+  earnings: SalarySlipEarning[];
+  deductions: SalarySlipDeduction[];
+  employerContributions: SalarySlipContribution[];
+  invariantCheck: {
+    withinTolerance: boolean;
+    differenceMinorUnits: string | null;
+  };
+}
+
 // Matches GET /finance/imports/:id/preview and /finance/imports/review-queue
 // (ImportRowResponseDto) exactly.
 export interface ImportRowStaging {
@@ -551,11 +596,46 @@ export interface ImportRowStaging {
   importJobId: string;
   rowNumber: number;
   rawData: string[];
-  normalizedData: NormalizedTransactionRowData | NormalizedTradeRowData | null;
+  normalizedData:
+    | NormalizedTransactionRowData
+    | NormalizedTradeRowData
+    | NormalizedSalarySlipRowData
+    | null;
   status: ImportRowStatus;
   confidenceScore: string | null;
   duplicateOfTransactionId: string | null;
   rejectionReason: string | null;
+  // Set once this row is committed — e.g. `committedEntityType: "IncomeRecord"`
+  // for a confirmed salary slip, with `committedEntityId` the new record's id.
+  committedEntityId: string | null;
+  committedEntityType: string | null;
+}
+
+export interface SalarySlipLineItemCorrection {
+  code?: string;
+  name: string;
+  amount: string;
+  taxable?: boolean | null;
+  recurring?: boolean | null;
+  category?: string | null;
+  contributor?: "EMPLOYEE" | "EMPLOYER";
+}
+
+// SALARY_SLIP rows only — corrections to the extracted breakdown before
+// confirmation. Matches UpdateSalarySlipCorrectionDto exactly.
+export interface UpdateSalarySlipCorrectionInput {
+  employerName?: string;
+  employeeName?: string;
+  designation?: string;
+  department?: string;
+  salaryPeriod?: string;
+  payDate?: string;
+  grossEarnings?: string;
+  totalDeductions?: string;
+  netPay?: string;
+  earnings?: SalarySlipLineItemCorrection[];
+  deductions?: SalarySlipLineItemCorrection[];
+  employerContributions?: SalarySlipLineItemCorrection[];
 }
 
 // Body for POST /finance/imports/:id/rows/:rowId (UpdateImportRowDto) — a
@@ -565,6 +645,7 @@ export interface UpdateImportRowInput {
   direction?: "INFLOW" | "OUTFLOW";
   confirmNotDuplicate?: boolean;
   reject?: boolean;
+  salarySlip?: UpdateSalarySlipCorrectionInput;
 }
 
 export interface ColumnMappingFields {
@@ -602,6 +683,70 @@ export interface ImportJob {
   errorLog: Array<{ rowNumber: number; message: string }> | null;
   createdAt: string;
   completedAt: string | null;
+  // Only populated by GET /finance/imports/:id (not the list endpoint, and
+  // not every job has a source Document — CSV/Excel jobs don't). This is
+  // how the frontend knows the id of the PDF to preview for a PDF-sourced
+  // job (bank/CC/CAS/salary-slip).
+  documentId?: string | null;
+}
+
+// Matches IncomeSourceResponseDto (packages/finance/src/income/application/
+// mappers/income-source.mapper.ts) exactly.
+export interface IncomeSource {
+  id: string;
+  name: string;
+  isActive: boolean;
+  expectedAmount: string | null;
+  expectedCurrency: string | null;
+  payFrequency: string | null;
+  payDay: number | null;
+}
+
+export interface IncomeRecordComponentDto {
+  code: string;
+  name: string;
+  type: string | null;
+  amount: Money;
+  taxable: boolean | null;
+  recurring: boolean | null;
+}
+export interface IncomeRecordDeductionDto {
+  code: string;
+  name: string;
+  amount: Money;
+  category: string | null;
+}
+export interface IncomeRecordContributionDto {
+  code: string;
+  name: string;
+  amount: Money;
+  contributor: string;
+}
+
+// Matches IncomeRecordResponseDto (packages/finance/src/income/application/
+// mappers/income-record.mapper.ts) exactly — this is the full breakdown
+// returned by GET /finance/income/records/:id, and is also what a
+// salary-slip commit produces. `salaryPeriod`/`employerName`/etc. are null
+// for a manually-entered (non-imported) IncomeRecord.
+export interface IncomeRecord {
+  id: string;
+  incomeSourceId: string;
+  transactionId: string | null;
+  grossAmount: Money;
+  totalDeductions: Money | null;
+  netAmount: Money;
+  payDate: string;
+  documentId: string | null;
+  salaryPeriod: string | null;
+  employerName: string | null;
+  employeeName: string | null;
+  designation: string | null;
+  department: string | null;
+  reconciliationStatus: "UNMATCHED" | "SUGGESTED" | "MATCHED" | "REJECTED";
+  supersedesIncomeRecordId: string | null;
+  components: IncomeRecordComponentDto[];
+  deductions: IncomeRecordDeductionDto[];
+  contributions: IncomeRecordContributionDto[];
 }
 
 export type BudgetPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";

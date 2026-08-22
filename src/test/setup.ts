@@ -13,3 +13,13 @@ class ResizeObserverStub {
 }
 
 globalThis.ResizeObserver = globalThis.ResizeObserver ?? (ResizeObserverStub as never);
+
+/**
+ * jsdom doesn't implement these — any component that previews a downloaded
+ * file (e.g. a salary-slip/document iframe preview) via
+ * `URL.createObjectURL(blob)` would otherwise throw, which most such
+ * components swallow into a "could not load" error state, silently masking
+ * the component under test rather than the real behavior.
+ */
+globalThis.URL.createObjectURL = globalThis.URL.createObjectURL ?? (() => "blob:mock-url");
+globalThis.URL.revokeObjectURL = globalThis.URL.revokeObjectURL ?? (() => undefined);

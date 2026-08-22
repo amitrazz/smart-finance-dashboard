@@ -14,6 +14,7 @@ import {
   Sparkles,
   Target,
   UploadCloud,
+  Wallet,
 } from 'lucide-react';
 import React, { useMemo } from 'react';
 import { useOnboardingState } from '../../features/onboarding/hooks/useOnboarding';
@@ -43,6 +44,7 @@ export const Sidebar: React.FC = () => {
       { id: 'investments', label: 'Investments', icon: <PieChart className="w-5 h-5" /> },
       { id: 'accounts', label: 'Accounts & Cash', icon: <Landmark className="w-5 h-5" /> },
       { id: 'transactions', label: 'Transactions', icon: <ArrowUpRight className="w-5 h-5" /> },
+      { id: 'income', label: 'Income', icon: <Wallet className="w-5 h-5" /> },
       { id: 'credit-cards', label: 'Credit Cards', icon: <CreditCard className="w-5 h-5" /> },
       { id: 'loans', label: 'Loans & Debt', icon: <ShieldAlert className="w-5 h-5" /> },
       {
@@ -107,6 +109,9 @@ export const Sidebar: React.FC = () => {
                     break;
                   case 'transactions':
                     import('../../features/transactions/TransactionsView');
+                    break;
+                  case 'income':
+                    import('../../features/income/IncomeView');
                     break;
                   case 'credit-cards':
                     import('../../features/credit-cards/CreditCardsView');

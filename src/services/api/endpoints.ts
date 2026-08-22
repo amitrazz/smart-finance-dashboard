@@ -67,6 +67,8 @@ import {
   ImportJob,
   ImportRowStaging,
   UpdateImportRowInput,
+  IncomeSource,
+  IncomeRecord,
   InvestmentReturnsPortfolio,
   Loan,
   LoanDashboardData,
@@ -141,7 +143,7 @@ import {
   CategoryTrend,
   MerchantTrend,
 } from '../../types';
-import { fetchWithAuth } from './client';
+import { fetchWithAuth, fetchBlobWithAuth } from './client';
 
 export interface AuthResponse {
   accessToken: string;
@@ -622,8 +624,11 @@ export const api = {
         timeoutMs: 300000,
       },
     ),
+  // Real backend response is the full updated ImportJob (ImportJobResponseDto)
+  // — not the previously-declared {success, importedCount} shape, which no
+  // consumer actually read.
   commitImport: (id: string) =>
-    fetchWithAuth<{ success: boolean; importedCount: number }>(
+    fetchWithAuth<ImportJob>(
       `/finance/imports/${encodeURIComponent(id)}/commit`,
       {
         method: 'POST',
@@ -697,8 +702,13 @@ export const api = {
     fetchWithAuth<{ id: string; name: string; size: number; contentUrl?: string }>(
       `/finance/documents/${encodeURIComponent(id)}`,
     ),
+  // A binary (PDF/image) response — must not go through fetchWithAuth,
+  // which always parses the body as JSON. See fetchBlobWithAuth's own doc
+  // comment.
   downloadDocument: (id: string) =>
-    fetchWithAuth<Blob>(`/finance/documents/${encodeURIComponent(id)}/download`),
+    fetchBlobWithAuth(`/finance/documents/${encodeURIComponent(id)}/download`, {
+      timeoutMs: 60000,
+    }),
 
   // Investments
   getHoldings: (params?: { cursor?: string; limit?: number }) =>
@@ -1483,24 +1493,46 @@ export const api = {
       `/finance/expenses/trend${buildQuery(params)}`,
     ),
 
-  // Income
-  getIncomeSources: (params?: { limit?: number }) =>
-    fetchWithAuth<
-      PaginatedResponse<{ id: string; name: string; expectedAmount: Money; frequency: string }>
-    >(`/finance/income/sources${buildQuery(params)}`),
+  // Income — matches IncomeController (packages/finance/src/income/api/income.controller.ts) exactly.
+  getIncomeSources: (params?: { search?: string; cursor?: string; limit?: number }) =>
+    fetchWithAuth<PaginatedResponse<IncomeSource>>(
+      `/finance/income/sources${buildQuery(params)}`,
+    ),
   createIncomeSource: (
-    data: Partial<{ name: string; expectedAmount: string | Money; frequency: string }>,
+    data: Partial<{
+      name: string;
+      expectedAmount: string;
+      expectedCurrency: string;
+      payFrequency: string;
+      payDay: number;
+    }>,
   ) =>
-    fetchWithAuth<{ id: string; name: string }>('/finance/income/sources', {
+    fetchWithAuth<IncomeSource>('/finance/income/sources', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  getIncomeRecords: (params?: { limit?: number }) =>
-    fetchWithAuth<
-      PaginatedResponse<{ id: string; sourceName: string; amount: Money; date: string }>
-    >(`/finance/income/records${buildQuery(params)}`),
-  recordIncome: (data: Partial<{ sourceId: string; amount: string | Money; date: string }>) =>
-    fetchWithAuth<{ id: string; success: boolean }>('/finance/income/records', {
+  getIncomeRecords: (params?: {
+    incomeSourceId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    cursor?: string;
+    limit?: number;
+  }) =>
+    fetchWithAuth<PaginatedResponse<IncomeRecord>>(
+      `/finance/income/records${buildQuery(params)}`,
+    ),
+  getIncomeRecord: (id: string) =>
+    fetchWithAuth<IncomeRecord>(`/finance/income/records/${encodeURIComponent(id)}`),
+  recordIncome: (data: {
+    incomeSourceId: string;
+    grossAmount: string;
+    netAmount: string;
+    currency: string;
+    payDate: string;
+    transactionId?: string;
+    documentId?: string;
+  }) =>
+    fetchWithAuth<IncomeRecord>('/finance/income/records', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

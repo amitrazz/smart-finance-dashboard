@@ -27,6 +27,7 @@ import {
   ImportRowStaging,
   NormalizedTransactionRowData,
   NormalizedTradeRowData,
+  NormalizedSalarySlipRowData,
   ColumnMappingData,
   Account,
   Category,
@@ -52,9 +53,20 @@ import { ConfirmModal } from "../../components/common/ConfirmModal";
 import { Button } from "../../components/ui/Button";
 
 function isTradeRow(
-  data: NormalizedTransactionRowData | NormalizedTradeRowData | null | undefined
+  data: NormalizedTransactionRowData | NormalizedTradeRowData | NormalizedSalarySlipRowData | null | undefined
 ): data is NormalizedTradeRowData {
   return !!data && "tradeDate" in data;
+}
+
+// A SALARY_SLIP job never reaches this generic staged-row table in practice
+// (it's reviewed via the dedicated Income feature's SalarySlipReviewPanel),
+// but the shared `normalizedData` union still needs a defensive branch here
+// so this table degrades to something readable rather than crashing if one
+// ever does.
+function isSalarySlipRow(
+  data: NormalizedTransactionRowData | NormalizedTradeRowData | NormalizedSalarySlipRowData | null | undefined
+): data is NormalizedSalarySlipRowData {
+  return !!data && "netPay" in data;
 }
 
 // The row's `normalizedData` shape depends on whether the source routed into
@@ -77,6 +89,16 @@ function getRowDisplay(row: ImportRowStaging) {
       direction: data.tradeType,
       amount: data.amount,
       merchantName: data.isin || "—",
+      categoryId: undefined as string | undefined,
+    };
+  }
+  if (isSalarySlipRow(data)) {
+    return {
+      date: data.payDate || data.salaryPeriod || undefined,
+      description: data.employerName || "Salary Slip",
+      direction: "INFLOW" as const,
+      amount: data.netPay || undefined,
+      merchantName: undefined as string | undefined,
       categoryId: undefined as string | undefined,
     };
   }
