@@ -23,14 +23,11 @@ export const PlanVsActualTable: React.FC<PlanVsActualTableProps> = ({ plan }) =>
       actual: plan.fixedCommitments.actual,
       variance: plan.fixedCommitments.variance,
     },
-    // Unlike income/fixedCommitments/savings/investments, the backend's
-    // top-level `budget` object carries no `variance` field — showing one
-    // here would mean computing actual-minus-planned money arithmetic in
-    // React, which this app never does. Flagged as a backend gap instead.
     {
       label: "Budget Spending",
       planned: plan.budget.allocated,
       actual: plan.budget.actual,
+      variance: plan.budget.variance,
     },
     // The backend's debt-commitments projection carries no separate
     // "actually paid" figure (only what's due this month) — showing an

@@ -10,13 +10,22 @@ interface BudgetSummaryTableProps {
   onCreateBudget: () => void;
 }
 
+/**
+ * `status` ("EXCEEDED"/"WITHIN_BUDGET") is the backend's own authoritative
+ * classification — used directly, never re-derived from utilizationPercent.
+ * "On Pace to Overrun" (forecast-based, from `projectedOverspend`, the same
+ * signal behind the BUDGET_OVERRUN_RISK warning) and "Watch" (a >=80%
+ * presentation threshold, not a financial calculation) are UI-tier labels
+ * layered on top of already-authoritative numbers, not a second financial
+ * determination competing with `status`.
+ */
 function statusForLine(line: MonthlyBudgetLine): { badge: StatusType; label: string } {
   if (line.periodStatus === "PROJECTED_ONLY") return { badge: "draft", label: "Projected" };
-  const utilization = line.utilizationPercent ?? 0;
-  if ((line.projectedOverspend && parseFloat(line.projectedOverspend.amount) > 0) || utilization > 100) {
-    return { badge: "failed", label: "Exceeded" };
+  if (line.status === "EXCEEDED") return { badge: "failed", label: "Exceeded" };
+  if (line.projectedOverspend && parseFloat(line.projectedOverspend.amount) > 0) {
+    return { badge: "pending", label: "On Pace to Overrun" };
   }
-  if (utilization >= 80) return { badge: "pending", label: "Watch" };
+  if ((line.utilizationPercent ?? 0) >= 80) return { badge: "pending", label: "Watch" };
   return { badge: "completed", label: "Healthy" };
 }
 
@@ -40,6 +49,11 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({ budget, 
               {" · "}Spent <span className="font-semibold text-slate-200">{formatCurrency(budget.actual)}</span>
             </>
           )}
+          {budget.overrun && parseFloat(budget.overrun.amount) > 0 && (
+            <>
+              {" · "}Over by <span className="font-semibold text-rose-400">{formatCurrency(budget.overrun)}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -60,6 +74,7 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({ budget, 
                   <th scope="col" className="py-2.5 px-4 text-right">Allocated</th>
                   <th scope="col" className="py-2.5 px-4 text-right">Actual</th>
                   <th scope="col" className="py-2.5 px-4 text-right">Remaining</th>
+                  <th scope="col" className="py-2.5 px-4 text-right">Overrun</th>
                   <th scope="col" className="py-2.5 px-4 text-right">Utilization</th>
                   <th scope="col" className="py-2.5 px-4">Status</th>
                 </tr>
@@ -67,6 +82,7 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({ budget, 
               <tbody className="divide-y divide-slate-800/60">
                 {lines.map((line) => {
                   const status = statusForLine(line);
+                  const overrunAmount = line.overrun ? parseFloat(line.overrun.amount) : 0;
                   return (
                     <tr key={line.budgetId} className="hover:bg-slate-800/30 focus-within:bg-slate-800/30">
                       <td className="py-3 px-4">
@@ -80,6 +96,9 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({ budget, 
                       <td className="py-3 px-4 text-right text-slate-200">{formatCurrency(line.allocated)}</td>
                       <td className="py-3 px-4 text-right text-slate-200">{line.actual ? formatCurrency(line.actual) : "—"}</td>
                       <td className="py-3 px-4 text-right text-slate-200">{line.remaining ? formatCurrency(line.remaining) : "—"}</td>
+                      <td className={`py-3 px-4 text-right ${overrunAmount > 0 ? "text-rose-400 font-semibold" : "text-slate-500"}`}>
+                        {overrunAmount > 0 ? formatCurrency(line.overrun!) : "—"}
+                      </td>
                       <td className="py-3 px-4 text-right text-slate-200">
                         {line.utilizationPercent !== undefined ? `${line.utilizationPercent}%` : "—"}
                       </td>
@@ -114,6 +133,12 @@ export const BudgetSummaryTable: React.FC<BudgetSummaryTableProps> = ({ budget, 
                       {line.utilizationPercent !== undefined ? `${line.utilizationPercent}%` : "—"}
                     </span>
                   </div>
+                  {line.overrun && parseFloat(line.overrun.amount) > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Overrun</span>
+                      <span className="font-semibold text-rose-400">{formatCurrency(line.overrun)}</span>
+                    </div>
+                  )}
                 </button>
               );
             })}

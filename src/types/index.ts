@@ -2918,11 +2918,15 @@ export type PlanningWarningCode =
   | "LOW_SAFE_TO_SPEND"
   | "BUDGET_OVERALLOCATION"
   | "DEBT_PAYMENT_PRESSURE"
+  | "COMMITMENTS_EXCEED_INCOME"
+  | "OVERDUE_MANDATORY_PAYMENT"
   | "GOAL_UNDERFUNDED"
   | "INVESTMENT_OVERALLOCATION"
   | "LOW_CASH_BUFFER"
-  | "BUDGET_OVERRUN_RISK";
+  | "BUDGET_OVERRUN_RISK"
+  | "DATA_QUALITY_DEGRADED";
 export type PlanningWarningSeverity = "CRITICAL" | "WARNING" | "INFO";
+export type MonthlyBudgetStatus = "EXCEEDED" | "WITHIN_BUDGET";
 
 export interface MonthlyVarianceLine {
   planned: Money;
@@ -2940,6 +2944,12 @@ export interface MonthlyIncomeSourceLine {
 
 export interface MonthlyIncomeProjection extends MonthlyVarianceLine {
   sources: MonthlyIncomeSourceLine[];
+  /** Alias of `planned` — the full period's expected income, named explicitly since `planned`/`actual` alone reads as ambiguous for income. */
+  expectedFullPeriod: Money;
+  /** Alias of `actual`. */
+  actualToDate?: Money;
+  /** Alias of `remaining` = max(expectedFullPeriod - actualToDate, 0). Never already-received cash. */
+  remainingExpected?: Money;
 }
 
 export interface MonthlyObligationItem {
@@ -2951,10 +2961,14 @@ export interface MonthlyObligationItem {
   source: ObligationSource;
   categoryId: string | null;
   status: ObligationStatus;
+  /** Still-unpaid balance once overdue/partially posted; 0 while not yet due. */
+  outstanding: Money;
 }
 
 export interface MonthlyFixedCommitments extends MonthlyVarianceLine {
   items: MonthlyObligationItem[];
+  /** Sum of items[].outstanding. */
+  outstanding?: Money;
 }
 
 export interface MonthlyDebtLoanItem {
@@ -2964,6 +2978,8 @@ export interface MonthlyDebtLoanItem {
   principal: Money;
   interest: Money;
   total: Money;
+  /** True when this installment's own due date has passed with no payment recorded. */
+  isOverdue: boolean;
 }
 
 export interface MonthlyDebtCardItem {
@@ -2973,6 +2989,8 @@ export interface MonthlyDebtCardItem {
   minimumDue: Money;
   interestCharged: Money;
   fees: Money;
+  /** True when this statement's due date has passed with no payment recorded. */
+  isOverdue: boolean;
 }
 
 export interface MonthlyDebtCommitments {
@@ -2981,6 +2999,8 @@ export interface MonthlyDebtCommitments {
   fees: Money;
   minimumPayments: Money;
   total: Money;
+  /** False whenever any `cardItems` are due — a card's minimumDue has no principal breakdown, so `principal` only ever reflects loans. `principal` reading 0 must not be read as "no principal repaid" when this is false. */
+  principalAllocationKnown: boolean;
   loanItems: MonthlyDebtLoanItem[];
   cardItems: MonthlyDebtCardItem[];
 }
@@ -2990,8 +3010,11 @@ export interface MonthlyBudgetLine {
   name: string;
   allocated: Money;
   actual?: Money;
+  variance?: Money;
   remaining?: Money;
+  overrun?: Money;
   utilizationPercent?: number;
+  status?: MonthlyBudgetStatus;
   periodStatus: MonthlyBudgetLinePeriodStatus;
   projectedOverspend?: Money;
 }
@@ -2999,8 +3022,11 @@ export interface MonthlyBudgetLine {
 export interface MonthlyBudgetIntegration {
   allocated: Money;
   actual?: Money;
+  variance?: Money;
   remaining?: Money;
+  overrun?: Money;
   utilizationPercent?: number;
+  status?: MonthlyBudgetStatus;
   budgets: MonthlyBudgetLine[];
 }
 
@@ -3009,6 +3035,7 @@ export interface MonthlySavingsGoalLine {
   name: string;
   planned: Money;
   actual: Money;
+  remaining: Money;
 }
 
 export interface MonthlySavings extends MonthlyVarianceLine {
@@ -3040,7 +3067,16 @@ export interface MonthlySafeToSpend {
   plannedSavings: Money;
   plannedInvestments: Money;
   minimumCashBuffer: Money;
+  /** Whether the caller actually configured a minimumCashBuffer — false must never be read as "the buffer is 0 by policy." */
+  minimumCashBufferConfigured: boolean;
+  /** The raw calculation — alias of `calculated`, can be negative. Kept for backward compatibility. */
   safeToSpend: Money;
+  /** Alias of `safeToSpend` — the raw calculation, can be negative. */
+  calculated: Money;
+  /** max(calculated, 0) — never a literal negative "amount you can spend." */
+  available: Money;
+  /** max(-calculated, 0) — the size of the projected shortfall. */
+  shortfall: Money;
 }
 
 export interface MonthlyPlanningWarning {
@@ -3050,6 +3086,26 @@ export interface MonthlyPlanningWarning {
   message: string;
   amount?: Money;
   relatedEntityId?: string;
+}
+
+/**
+ * `actualPercent` is the canonical Financial Health `CashFlowSnapshot.savingsRate`,
+ * reused verbatim — never recomputed here — null only when no snapshot
+ * exists yet for the month (never a fabricated 0%). `plannedPercent`/
+ * `projectedPercent` are planning-specific, forward-looking figures with no
+ * Financial Health equivalent; both are null when income for the period is 0
+ * (never NaN/Infinity/a fabricated 0%).
+ */
+export interface MonthlySavingsRate {
+  actualPercent: number | null;
+  plannedPercent: number | null;
+  projectedPercent: number | null;
+}
+
+export interface MonthlyDataQuality {
+  complete: boolean;
+  missingSources: string[];
+  warnings: string[];
 }
 
 export interface MonthlyFinancialPlan {
@@ -3071,9 +3127,12 @@ export interface MonthlyFinancialPlan {
   investments: MonthlyInvestments;
   cashFlow?: MonthlyCashFlowProjection;
   safeToSpend?: MonthlySafeToSpend;
+  /** @deprecated Use `savingsRate.projectedPercent` — kept for backward compatibility, not guaranteed to equal it. */
   savingsRatePercent: number;
+  savingsRate: MonthlySavingsRate;
   warnings?: MonthlyPlanningWarning[];
   health: { status: string; scoreDate: string | null };
+  dataQuality: MonthlyDataQuality;
 }
 
 export interface MonthlyCloseCarryForwardResult {

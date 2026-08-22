@@ -13,17 +13,25 @@ interface ExecutiveSummaryCardProps {
 export const ExecutiveSummaryCard: React.FC<ExecutiveSummaryCardProps> = ({ plan, onNavigateBudget }) => {
   const closingCash = plan.cashFlow?.expectedClosingCash;
   const isClosingNegative = closingCash ? parseFloat(closingCash.amount) < 0 : false;
-  const safeToSpend = plan.safeToSpend?.safeToSpend;
-  const isSafeToSpendNegative = safeToSpend ? parseFloat(safeToSpend.amount) < 0 : false;
+  const isShortfall = plan.safeToSpend ? parseFloat(plan.safeToSpend.shortfall.amount) > 0 : false;
+  const isBudgetExceeded = plan.budget.status === "EXCEEDED";
+  // Prefer the canonical Financial Health actual rate when it's been
+  // computed for this month; fall back to the planner's own forward-looking
+  // projection when no snapshot exists yet (never a fabricated 0%).
+  const savingsRateValue = plan.savingsRate.actualPercent ?? plan.savingsRate.projectedPercent;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <MetricCard
         title="Expected Income"
-        value={plan.income.actual ?? plan.income.planned}
+        value={plan.income.actualToDate ?? plan.income.expectedFullPeriod}
         icon={<Wallet className="w-4 h-4" />}
         accentColor="emerald"
-        subtitle={plan.income.actual ? `Planned ${formatCurrency(plan.income.planned)}` : "Projected"}
+        subtitle={
+          plan.income.actualToDate
+            ? `${formatCurrency(plan.income.remainingExpected)} remaining of ${formatCurrency(plan.income.expectedFullPeriod)}`
+            : "Projected"
+        }
       />
       <MetricCard
         title="Planned Outflow"
@@ -34,10 +42,10 @@ export const ExecutiveSummaryCard: React.FC<ExecutiveSummaryCardProps> = ({ plan
       />
       <MetricCard
         title="Safe to Spend"
-        value={safeToSpend ?? "—"}
+        value={plan.safeToSpend ? formatCurrency(plan.safeToSpend.available) : "—"}
         icon={<ShieldCheck className="w-4 h-4" />}
-        accentColor={isSafeToSpendNegative ? "rose" : "indigo"}
-        subtitle={isSafeToSpendNegative ? "Below zero this month" : "After every commitment"}
+        accentColor={isShortfall ? "rose" : "indigo"}
+        subtitle={isShortfall ? `Shortfall ${formatCurrency(plan.safeToSpend!.shortfall)}` : "After every commitment"}
       />
       <MetricCard
         title="Expected Closing Cash"
@@ -52,15 +60,16 @@ export const ExecutiveSummaryCard: React.FC<ExecutiveSummaryCardProps> = ({ plan
         icon={<PiggyBank className="w-4 h-4" />}
         accentColor="purple"
         progressPercent={plan.budget.utilizationPercent}
-        progressBarColor={(plan.budget.utilizationPercent ?? 0) >= 90 ? "bg-rose-500" : "bg-indigo-500"}
+        progressBarColor={isBudgetExceeded ? "bg-rose-500" : "bg-indigo-500"}
+        subtitle={isBudgetExceeded && plan.budget.overrun ? `Over by ${formatCurrency(plan.budget.overrun)}` : undefined}
         onClick={onNavigateBudget}
       />
       <MetricCard
         title="Savings Rate"
-        value={formatPercent(plan.savingsRatePercent, 1)}
+        value={savingsRateValue !== null ? formatPercent(savingsRateValue, 1) : "—"}
         icon={<TrendingUp className="w-4 h-4" />}
         accentColor="emerald"
-        subtitle="Savings + investments vs. actual income"
+        subtitle={plan.savingsRate.actualPercent !== null ? "Actual (savings + investments)" : "Projected (savings + investments)"}
       />
     </div>
   );

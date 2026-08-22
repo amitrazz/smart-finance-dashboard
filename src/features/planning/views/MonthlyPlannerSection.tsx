@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { useMonthlyPlan, useCloseMonth, useRolloverMonth } from "../hooks/useMonthlyPlannerQueries";
 import { useUIStore } from "../../../store/useUIStore";
 import { LoadingSkeleton } from "../../../components/common/LoadingSkeleton";
@@ -41,7 +42,8 @@ export const MonthlyPlannerSection: React.FC<MonthlyPlannerSectionProps> = ({
   onOpenCreateBudget,
 }) => {
   const { year, month } = parseMonthParam(monthParam);
-  const [minimumCashBuffer, setMinimumCashBuffer] = useState("0");
+  // "" means "not configured" — never invented as "0" — see useMonthlyPlan's doc comment.
+  const [minimumCashBuffer, setMinimumCashBuffer] = useState("");
 
   const { data: plan, isLoading, isError, refetch, isFetching } = useMonthlyPlan(year, month, minimumCashBuffer);
   const closeMonth = useCloseMonth();
@@ -79,7 +81,17 @@ export const MonthlyPlannerSection: React.FC<MonthlyPlannerSectionProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-100">Monthly Financial Plan</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-slate-100">Monthly Financial Plan</h2>
+            {!plan.dataQuality.complete && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold uppercase tracking-wide"
+                title={plan.dataQuality.missingSources.join(", ")}
+              >
+                <AlertTriangle className="w-3 h-3" aria-hidden="true" /> Incomplete Data
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500">{timing.description}</p>
         </div>
         <MonthNavigator year={year} month={month} onChange={handleMonthChange} onRefresh={() => refetch()} isRefreshing={isFetching} />
@@ -89,7 +101,11 @@ export const MonthlyPlannerSection: React.FC<MonthlyPlannerSectionProps> = ({
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => rolloverMonth.mutate({ year, month, minimumCashBuffer })}
+            onClick={() =>
+              rolloverMonth.mutate(
+                minimumCashBuffer === "" ? { year, month } : { year, month, minimumCashBuffer },
+              )
+            }
             disabled={rolloverMonth.isPending}
             className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
           >

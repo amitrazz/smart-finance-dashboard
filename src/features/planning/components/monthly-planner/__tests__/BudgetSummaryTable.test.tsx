@@ -51,4 +51,28 @@ describe("BudgetSummaryTable", () => {
     render(<BudgetSummaryTable budget={BUDGET} onSelectBudget={() => {}} onCreateBudget={() => {}} />);
     expect(screen.getAllByText("73.3%").length).toBeGreaterThan(0);
   });
+
+  it("uses the backend's authoritative status (EXCEEDED) rather than re-deriving it from utilizationPercent", () => {
+    const exceeded: MonthlyBudgetIntegration = {
+      ...BUDGET,
+      overrun: { amount: "5000", currency: "INR" },
+      budgets: [
+        {
+          budgetId: "budget-2",
+          name: "Overspent Budget",
+          allocated: { amount: "10000", currency: "INR" },
+          actual: { amount: "15000", currency: "INR" },
+          remaining: { amount: "-5000", currency: "INR" },
+          overrun: { amount: "5000", currency: "INR" },
+          utilizationPercent: 150,
+          status: "EXCEEDED",
+          periodStatus: "ACTIVE",
+          projectedOverspend: { amount: "0", currency: "INR" },
+        },
+      ],
+    };
+    render(<BudgetSummaryTable budget={exceeded} onSelectBudget={() => {}} onCreateBudget={() => {}} />);
+    expect(screen.getAllByText("Exceeded").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("₹5,000.00").length).toBeGreaterThan(0);
+  });
 });

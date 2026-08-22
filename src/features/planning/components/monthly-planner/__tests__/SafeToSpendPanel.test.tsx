@@ -13,13 +13,19 @@ const SAFE_TO_SPEND: MonthlySafeToSpend = {
   plannedSavings: { amount: "10000", currency: "INR" },
   plannedInvestments: { amount: "5000", currency: "INR" },
   minimumCashBuffer: { amount: "0", currency: "INR" },
+  minimumCashBufferConfigured: true,
   safeToSpend: { amount: "59500", currency: "INR" },
+  calculated: { amount: "59500", currency: "INR" },
+  available: { amount: "59500", currency: "INR" },
+  shortfall: { amount: "0", currency: "INR" },
 };
 
 describe("SafeToSpendPanel", () => {
-  it("renders the headline safe-to-spend figure directly from the backend value", () => {
+  it("renders the headline safe-to-spend figure (available) directly from the backend value", () => {
     render(<SafeToSpendPanel safeToSpend={SAFE_TO_SPEND} minimumCashBuffer="0" onBufferChange={() => {}} />);
     expect(screen.getByText("₹59,500.00")).toBeDefined();
+    // Positive month: no shortfall figure shown at all.
+    expect(screen.queryByText("Projected Shortfall")).toBeNull();
   });
 
   it("shows the full breakdown only after expanding, and never before", () => {
@@ -34,13 +40,29 @@ describe("SafeToSpendPanel", () => {
     // "Minimum Cash Buffer" legitimately labels both the input control and
     // the breakdown row — assert there are two, not that there's exactly one.
     expect(screen.getAllByText("Minimum Cash Buffer").length).toBe(2);
+    expect(screen.getByText("Calculated Safe to Spend")).toBeDefined();
   });
 
-  it("renders the headline in rose/negative styling when safe-to-spend is negative", () => {
-    const negative: MonthlySafeToSpend = { ...SAFE_TO_SPEND, safeToSpend: { amount: "-500", currency: "INR" } };
+  it("shows Available (₹0) and a separate Projected Shortfall figure when the calculation is negative, never a literal negative headline", () => {
+    const negative: MonthlySafeToSpend = {
+      ...SAFE_TO_SPEND,
+      safeToSpend: { amount: "-500", currency: "INR" },
+      calculated: { amount: "-500", currency: "INR" },
+      available: { amount: "0", currency: "INR" },
+      shortfall: { amount: "500", currency: "INR" },
+    };
     render(<SafeToSpendPanel safeToSpend={negative} minimumCashBuffer="0" onBufferChange={() => {}} />);
-    const headline = screen.getByText("-₹500.00");
-    expect(headline.className).toContain("text-rose-400");
+    expect(screen.getByText("₹0.00")).toBeDefined();
+    const shortfallLabel = screen.getByText("Projected Shortfall");
+    expect(shortfallLabel).toBeDefined();
+    const shortfallValue = screen.getByText("₹500.00");
+    expect(shortfallValue.className).toContain("text-rose-400");
+  });
+
+  it("shows a hint that the buffer is not configured, distinct from an explicit ₹0", () => {
+    const notConfigured: MonthlySafeToSpend = { ...SAFE_TO_SPEND, minimumCashBufferConfigured: false };
+    render(<SafeToSpendPanel safeToSpend={notConfigured} minimumCashBuffer="" onBufferChange={() => {}} />);
+    expect(screen.getByText(/No buffer configured/)).toBeDefined();
   });
 
   it("calls onBufferChange as the user edits the cash buffer input", () => {

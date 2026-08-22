@@ -31,18 +31,26 @@ export const SavingsInvestmentsPanel: React.FC<SavingsInvestmentsPanelProps> = (
           <EmptyState title="No Goal Contributions Planned" message="Add a goal with a target date or minimum contribution to plan savings here." />
         ) : (
           <div className="space-y-2">
-            {savings.byGoal.map((g) => (
-              <button
-                key={g.goalId}
-                onClick={() => onSelectGoal(g.goalId)}
-                className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-left hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
-              >
-                <span className="text-sm font-semibold text-slate-100 truncate">{g.name}</span>
-                <span className="text-xs text-slate-400 shrink-0">
-                  {formatCurrency(g.actual)} / {formatCurrency(g.planned)}
-                </span>
-              </button>
-            ))}
+            {savings.byGoal.map((g) => {
+              const remainingAmount = parseFloat(g.remaining.amount);
+              return (
+                <button
+                  key={g.goalId}
+                  onClick={() => onSelectGoal(g.goalId)}
+                  className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-left hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+                >
+                  <span className="text-sm font-semibold text-slate-100 truncate">{g.name}</span>
+                  <span className="text-right shrink-0">
+                    <span className="block text-xs text-slate-400">
+                      {formatCurrency(g.actual)} / {formatCurrency(g.planned)}
+                    </span>
+                    {remainingAmount > 0 && (
+                      <span className="block text-[11px] text-amber-400/80">{formatCurrency(g.remaining)} remaining</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

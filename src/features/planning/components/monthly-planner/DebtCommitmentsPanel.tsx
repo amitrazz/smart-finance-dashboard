@@ -1,5 +1,5 @@
 import React from "react";
-import { Landmark, CreditCard } from "lucide-react";
+import { Landmark, CreditCard, AlertCircle } from "lucide-react";
 import { EmptyState } from "../../../../components/common/EmptyState";
 import { formatCurrency, formatDate } from "../../../../utils/formatters";
 import { MonthlyDebtCommitments } from "../../../../types";
@@ -31,6 +31,9 @@ export const DebtCommitmentsPanel: React.FC<DebtCommitmentsPanelProps> = ({
         <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/60">
           <p className="text-[10px] font-bold text-slate-500 uppercase">Debt Principal</p>
           <p className="text-lg font-extrabold text-slate-100">{formatCurrency(debtCommitments.principal)}</p>
+          {!debtCommitments.principalAllocationKnown && (
+            <p className="text-[10px] text-amber-400/80 mt-0.5">Loans only — card portion not broken out</p>
+          )}
         </div>
         <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/60">
           <p className="text-[10px] font-bold text-slate-500 uppercase">Debt Interest</p>
@@ -59,7 +62,14 @@ export const DebtCommitmentsPanel: React.FC<DebtCommitmentsPanelProps> = ({
               <span className="flex items-center gap-2 min-w-0">
                 <Landmark className="w-4 h-4 text-orange-400 shrink-0" aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-100 truncate">{loan.loanName}</span>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="block text-sm font-semibold text-slate-100 truncate">{loan.loanName}</span>
+                    {loan.isOverdue && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[10px] font-bold uppercase shrink-0">
+                        <AlertCircle className="w-2.5 h-2.5" aria-hidden="true" /> Overdue
+                      </span>
+                    )}
+                  </span>
                   <span className="block text-[11px] text-slate-500">Due {formatDate(loan.dueDate)}</span>
                 </span>
               </span>
@@ -80,7 +90,14 @@ export const DebtCommitmentsPanel: React.FC<DebtCommitmentsPanelProps> = ({
               <span className="flex items-center gap-2 min-w-0">
                 <CreditCard className="w-4 h-4 text-indigo-400 shrink-0" aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-100 truncate">{card.cardNickname}</span>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="block text-sm font-semibold text-slate-100 truncate">{card.cardNickname}</span>
+                    {card.isOverdue && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[10px] font-bold uppercase shrink-0">
+                        <AlertCircle className="w-2.5 h-2.5" aria-hidden="true" /> Overdue
+                      </span>
+                    )}
+                  </span>
                   <span className="block text-[11px] text-slate-500">Due {formatDate(card.dueDate)}</span>
                 </span>
               </span>

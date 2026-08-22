@@ -9,6 +9,7 @@ import {
   MonthlyBudgetIntegration,
   MonthlyCashFlowProjection,
   MonthlyCloseResult,
+  MonthlyDataQuality,
   MonthlyDebtCommitments,
   MonthlyFinancialPlan,
   MonthlyFixedCommitments,
@@ -17,6 +18,7 @@ import {
   MonthlyPlanningWarning,
   MonthlySafeToSpend,
   MonthlySavings,
+  MonthlySavingsRate,
 } from "../../../types";
 
 const isAuth = () => useAuthStore.getState().isAuthenticated;
@@ -34,6 +36,9 @@ const toMoney = (amount: string | undefined | null, currency: CurrencyCode): Mon
   amount === undefined || amount === null ? undefined : { amount, currency };
 
 const toMoneyRequired = (amount: string, currency: CurrencyCode): Money => ({ amount, currency });
+
+const toPercentOrNull = (value: string | null | undefined): number | null =>
+  value === null || value === undefined ? null : parseFloat(value);
 
 // --- Raw wire shapes (MonthlyFinancialPlanResponseDto) — every money field
 // is a bare decimal string on the wire; mapMonthlyPlan() below wraps each
@@ -53,6 +58,9 @@ interface RawMonthlyPlan {
   conversionApplied: boolean;
   income: RawVarianceLine & {
     sources: Array<{ incomeSourceId: string; name: string; expectedAmount: string }>;
+    expectedFullPeriod: string;
+    actualToDate?: string;
+    remainingExpected?: string;
   };
   fixedCommitments: RawVarianceLine & {
     items: Array<{
@@ -64,7 +72,9 @@ interface RawMonthlyPlan {
       source: string;
       categoryId: string | null;
       status: string;
+      outstanding: string;
     }>;
+    outstanding?: string;
   };
   debtCommitments: {
     principal: string;
@@ -72,6 +82,7 @@ interface RawMonthlyPlan {
     fees: string;
     minimumPayments: string;
     total: string;
+    principalAllocationKnown: boolean;
     loanItems: Array<{
       loanId: string;
       loanName: string;
@@ -79,6 +90,7 @@ interface RawMonthlyPlan {
       principal: string;
       interest: string;
       total: string;
+      isOverdue: boolean;
     }>;
     cardItems: Array<{
       creditCardId: string;
@@ -87,26 +99,33 @@ interface RawMonthlyPlan {
       minimumDue: string;
       interestCharged: string;
       fees: string;
+      isOverdue: boolean;
     }>;
   };
   budget: {
     allocated: string;
     actual?: string;
+    variance?: string;
     remaining?: string;
+    overrun?: string;
     utilizationPercent?: string;
+    status?: string;
     budgets: Array<{
       budgetId: string;
       name: string;
       allocated: string;
       actual?: string;
+      variance?: string;
       remaining?: string;
+      overrun?: string;
       utilizationPercent?: string;
+      status?: string;
       periodStatus: string;
       projectedOverspend?: string;
     }>;
   };
   savings: RawVarianceLine & {
-    byGoal?: Array<{ goalId: string; name: string; planned: string; actual: string }>;
+    byGoal?: Array<{ goalId: string; name: string; planned: string; actual: string; remaining: string }>;
   };
   investments: RawVarianceLine & {
     bySipPlan?: Array<{ sipPlanId: string; assetId: string; planned: string }>;
@@ -125,9 +144,18 @@ interface RawMonthlyPlan {
     plannedSavings: string;
     plannedInvestments: string;
     minimumCashBuffer: string;
+    minimumCashBufferConfigured: boolean;
     safeToSpend: string;
+    calculated: string;
+    available: string;
+    shortfall: string;
   };
   savingsRatePercent: string;
+  savingsRate: {
+    actualPercent: string | null;
+    plannedPercent: string | null;
+    projectedPercent: string | null;
+  };
   warnings?: Array<{
     code: string;
     severity: string;
@@ -137,6 +165,7 @@ interface RawMonthlyPlan {
     relatedEntityId?: string;
   }>;
   health: { status: string; scoreDate: string | null };
+  dataQuality: { complete: boolean; missingSources: string[]; warnings: string[] };
 }
 
 function mapVarianceLine(raw: RawVarianceLine, currency: CurrencyCode) {
@@ -160,6 +189,9 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
       name: s.name,
       expectedAmount: toMoneyRequired(s.expectedAmount, currency),
     })),
+    expectedFullPeriod: toMoneyRequired(raw.income.expectedFullPeriod, currency),
+    actualToDate: toMoney(raw.income.actualToDate, currency),
+    remainingExpected: toMoney(raw.income.remainingExpected, currency),
   };
 
   const fixedCommitments: MonthlyFixedCommitments = {
@@ -173,7 +205,9 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
       source: item.source as MonthlyFixedCommitments["items"][number]["source"],
       categoryId: item.categoryId,
       status: item.status as MonthlyFixedCommitments["items"][number]["status"],
+      outstanding: toMoneyRequired(item.outstanding, currency),
     })),
+    outstanding: toMoney(raw.fixedCommitments.outstanding, currency),
   };
 
   const debtCommitments: MonthlyDebtCommitments = {
@@ -182,6 +216,7 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
     fees: toMoneyRequired(raw.debtCommitments.fees, currency),
     minimumPayments: toMoneyRequired(raw.debtCommitments.minimumPayments, currency),
     total: toMoneyRequired(raw.debtCommitments.total, currency),
+    principalAllocationKnown: raw.debtCommitments.principalAllocationKnown,
     loanItems: raw.debtCommitments.loanItems.map((l) => ({
       loanId: l.loanId,
       loanName: l.loanName,
@@ -189,6 +224,7 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
       principal: toMoneyRequired(l.principal, currency),
       interest: toMoneyRequired(l.interest, currency),
       total: toMoneyRequired(l.total, currency),
+      isOverdue: l.isOverdue,
     })),
     cardItems: raw.debtCommitments.cardItems.map((c) => ({
       creditCardId: c.creditCardId,
@@ -197,24 +233,31 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
       minimumDue: toMoneyRequired(c.minimumDue, currency),
       interestCharged: toMoneyRequired(c.interestCharged, currency),
       fees: toMoneyRequired(c.fees, currency),
+      isOverdue: c.isOverdue,
     })),
   };
 
   const budget: MonthlyBudgetIntegration = {
     allocated: toMoneyRequired(raw.budget.allocated, currency),
     actual: toMoney(raw.budget.actual, currency),
+    variance: toMoney(raw.budget.variance, currency),
     remaining: toMoney(raw.budget.remaining, currency),
+    overrun: toMoney(raw.budget.overrun, currency),
     utilizationPercent:
       raw.budget.utilizationPercent !== undefined
         ? parseFloat(raw.budget.utilizationPercent)
         : undefined,
+    status: raw.budget.status as MonthlyBudgetIntegration["status"],
     budgets: raw.budget.budgets.map((b) => ({
       budgetId: b.budgetId,
       name: b.name,
       allocated: toMoneyRequired(b.allocated, currency),
       actual: toMoney(b.actual, currency),
+      variance: toMoney(b.variance, currency),
       remaining: toMoney(b.remaining, currency),
+      overrun: toMoney(b.overrun, currency),
       utilizationPercent: b.utilizationPercent !== undefined ? parseFloat(b.utilizationPercent) : undefined,
+      status: b.status as MonthlyBudgetIntegration["budgets"][number]["status"],
       periodStatus: b.periodStatus as MonthlyBudgetIntegration["budgets"][number]["periodStatus"],
       projectedOverspend: toMoney(b.projectedOverspend, currency),
     })),
@@ -227,6 +270,7 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
       name: g.name,
       planned: toMoneyRequired(g.planned, currency),
       actual: toMoneyRequired(g.actual, currency),
+      remaining: toMoneyRequired(g.remaining, currency),
     })),
   };
 
@@ -257,9 +301,25 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
         plannedSavings: toMoneyRequired(raw.safeToSpend.plannedSavings, currency),
         plannedInvestments: toMoneyRequired(raw.safeToSpend.plannedInvestments, currency),
         minimumCashBuffer: toMoneyRequired(raw.safeToSpend.minimumCashBuffer, currency),
+        minimumCashBufferConfigured: raw.safeToSpend.minimumCashBufferConfigured,
         safeToSpend: toMoneyRequired(raw.safeToSpend.safeToSpend, currency),
+        calculated: toMoneyRequired(raw.safeToSpend.calculated, currency),
+        available: toMoneyRequired(raw.safeToSpend.available, currency),
+        shortfall: toMoneyRequired(raw.safeToSpend.shortfall, currency),
       }
     : undefined;
+
+  const savingsRate: MonthlySavingsRate = {
+    actualPercent: toPercentOrNull(raw.savingsRate.actualPercent),
+    plannedPercent: toPercentOrNull(raw.savingsRate.plannedPercent),
+    projectedPercent: toPercentOrNull(raw.savingsRate.projectedPercent),
+  };
+
+  const dataQuality: MonthlyDataQuality = {
+    complete: raw.dataQuality.complete,
+    missingSources: raw.dataQuality.missingSources,
+    warnings: raw.dataQuality.warnings,
+  };
 
   const warnings: MonthlyPlanningWarning[] | undefined = raw.warnings?.map((w) => ({
     code: w.code as MonthlyPlanningWarning["code"],
@@ -290,8 +350,10 @@ export function mapMonthlyPlan(raw: RawMonthlyPlan): MonthlyFinancialPlan {
     cashFlow,
     safeToSpend,
     savingsRatePercent: parseFloat(raw.savingsRatePercent) || 0,
+    savingsRate,
     warnings,
     health: raw.health,
+    dataQuality,
   };
 }
 
@@ -301,7 +363,14 @@ export const MONTHLY_PLANNER_QUERY_KEYS = {
     ["monthly-planner", "plan", year, month, minimumCashBuffer] as const,
 };
 
-export function useMonthlyPlan(year: number, month: number, minimumCashBuffer: string = "0") {
+/**
+ * `minimumCashBuffer` is `""` (never invented as `"0"`) when the user hasn't
+ * configured one — an empty string is dropped from the request's query
+ * string entirely (see `buildQuery`), so the backend reports
+ * `safeToSpend.minimumCashBufferConfigured: false` rather than the frontend
+ * silently implying a zero-buffer policy by always sending `'0'`.
+ */
+export function useMonthlyPlan(year: number, month: number, minimumCashBuffer: string = "") {
   return useQuery({
     queryKey: MONTHLY_PLANNER_QUERY_KEYS.plan(year, month, minimumCashBuffer),
     queryFn: async (): Promise<MonthlyFinancialPlan> => {
@@ -311,7 +380,7 @@ export function useMonthlyPlan(year: number, month: number, minimumCashBuffer: s
         includeActuals: true,
         includeWarnings: true,
         includeBreakdown: true,
-        minimumCashBuffer,
+        minimumCashBuffer: minimumCashBuffer === "" ? undefined : minimumCashBuffer,
       })) as RawMonthlyPlan;
       return mapMonthlyPlan(raw);
     },

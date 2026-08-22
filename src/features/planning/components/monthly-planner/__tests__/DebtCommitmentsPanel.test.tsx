@@ -14,11 +14,28 @@ const DEBT: MonthlyDebtCommitments = {
   fees: money("0"),
   minimumPayments: money("30500"),
   total: money("30500"),
+  principalAllocationKnown: true,
   loanItems: [
-    { loanId: "loan-1", loanName: "Home Loan", dueDate: "2026-08-05", principal: money("18000"), interest: money("12000"), total: money("30000") },
+    {
+      loanId: "loan-1",
+      loanName: "Home Loan",
+      dueDate: "2026-08-05",
+      principal: money("18000"),
+      interest: money("12000"),
+      total: money("30000"),
+      isOverdue: false,
+    },
   ],
   cardItems: [
-    { creditCardId: "card-1", cardNickname: "Travel Card", dueDate: "2026-08-20", minimumDue: money("500"), interestCharged: money("0"), fees: money("0") },
+    {
+      creditCardId: "card-1",
+      cardNickname: "Travel Card",
+      dueDate: "2026-08-20",
+      minimumDue: money("500"),
+      interestCharged: money("0"),
+      fees: money("0"),
+      isOverdue: false,
+    },
   ],
 };
 
@@ -54,5 +71,31 @@ describe("DebtCommitmentsPanel", () => {
       />
     );
     expect(screen.getByText("No Debt Due This Month")).toBeDefined();
+  });
+
+  it("annotates Debt Principal when principalAllocationKnown is false, since a card's minimumDue has no principal breakdown", () => {
+    render(
+      <DebtCommitmentsPanel
+        debtCommitments={{ ...DEBT, principalAllocationKnown: false }}
+        onNavigateLoans={() => {}}
+        onNavigateCreditCards={() => {}}
+      />
+    );
+    expect(screen.getByText(/card portion not broken out/)).toBeDefined();
+  });
+
+  it("does not annotate Debt Principal when principalAllocationKnown is true", () => {
+    render(<DebtCommitmentsPanel debtCommitments={DEBT} onNavigateLoans={() => {}} onNavigateCreditCards={() => {}} />);
+    expect(screen.queryByText(/card portion not broken out/)).toBeNull();
+  });
+
+  it("shows an Overdue badge on an overdue loan or card item", () => {
+    const overdue: MonthlyDebtCommitments = {
+      ...DEBT,
+      loanItems: [{ ...DEBT.loanItems[0], isOverdue: true }],
+      cardItems: [{ ...DEBT.cardItems[0], isOverdue: true }],
+    };
+    render(<DebtCommitmentsPanel debtCommitments={overdue} onNavigateLoans={() => {}} onNavigateCreditCards={() => {}} />);
+    expect(screen.getAllByText("Overdue").length).toBe(2);
   });
 });

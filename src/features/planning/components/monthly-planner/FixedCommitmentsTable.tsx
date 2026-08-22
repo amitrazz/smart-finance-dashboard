@@ -24,6 +24,11 @@ export const FixedCommitmentsTable: React.FC<FixedCommitmentsTableProps> = ({ fi
               {" · "}Actual <span className="font-semibold text-slate-200">{formatCurrency(fixedCommitments.actual)}</span>
             </>
           )}
+          {fixedCommitments.outstanding && parseFloat(fixedCommitments.outstanding.amount) > 0 && (
+            <>
+              {" · "}Outstanding <span className="font-semibold text-rose-400">{formatCurrency(fixedCommitments.outstanding)}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -39,35 +44,40 @@ export const FixedCommitmentsTable: React.FC<FixedCommitmentsTableProps> = ({ fi
                   <th scope="col" className="py-2.5 px-4">Description</th>
                   <th scope="col" className="py-2.5 px-4">Due Date</th>
                   <th scope="col" className="py-2.5 px-4 text-right">Planned</th>
-                  <th scope="col" className="py-2.5 px-4 text-right">Actual</th>
-                  <th scope="col" className="py-2.5 px-4 text-right">Variance</th>
+                  <th scope="col" className="py-2.5 px-4 text-right">Outstanding</th>
                   <th scope="col" className="py-2.5 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="py-3 px-4 font-semibold text-slate-100">{item.description}</td>
-                    <td className="py-3 px-4 text-slate-400">{item.dueDate ? formatDate(item.dueDate) : "—"}</td>
-                    <td className="py-3 px-4 text-right text-slate-200">{formatCurrency(item.expectedAmount)}</td>
-                    <td className="py-3 px-4 text-right text-slate-400">—</td>
-                    <td className="py-3 px-4 text-right text-slate-400">—</td>
-                    <td className="py-3 px-4">
-                      <StatusBadge
-                        status={obligationStatusToBadge(item.status)}
-                        label={obligationStatusLabel(item.status)}
-                        size="sm"
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const outstandingAmount = parseFloat(item.outstanding.amount);
+                  return (
+                    <tr key={item.id}>
+                      <td className="py-3 px-4 font-semibold text-slate-100">{item.description}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.dueDate ? formatDate(item.dueDate) : "—"}</td>
+                      <td className="py-3 px-4 text-right text-slate-200">{formatCurrency(item.expectedAmount)}</td>
+                      <td className={`py-3 px-4 text-right ${outstandingAmount > 0 ? "text-rose-400 font-semibold" : "text-slate-500"}`}>
+                        {outstandingAmount > 0 ? formatCurrency(item.outstanding) : "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <StatusBadge
+                          status={obligationStatusToBadge(item.status)}
+                          label={obligationStatusLabel(item.status)}
+                          size="sm"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile */}
           <div className="sm:hidden space-y-2">
-            {items.map((item) => (
+            {items.map((item) => {
+              const outstandingAmount = parseFloat(item.outstanding.amount);
+              return (
               <div key={item.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-slate-100 text-sm truncate">{item.description}</span>
@@ -77,8 +87,15 @@ export const FixedCommitmentsTable: React.FC<FixedCommitmentsTableProps> = ({ fi
                   <span>{item.dueDate ? formatDate(item.dueDate) : "No due date"}</span>
                   <span className="font-semibold text-slate-200">{formatCurrency(item.expectedAmount)}</span>
                 </div>
+                {outstandingAmount > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Outstanding</span>
+                    <span className="font-semibold text-rose-400">{formatCurrency(item.outstanding)}</span>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
