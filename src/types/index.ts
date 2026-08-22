@@ -2898,6 +2898,194 @@ export interface AccountSettingsConfig {
   hideInDashboardAccounts: string[];
 }
 
+// ============================================================
+// Monthly Financial Planner
+// GET /finance/planning/monthly — a composed, read-only orchestration
+// over Budget v2 / loans / credit cards / income / recurring / goals /
+// investments / accounts / financial health. Every money field on the
+// wire is a bare decimal string; the query hook (useMonthlyPlannerQueries)
+// maps each one into a `Money` here, the same raw->mapped boundary
+// convention useBudgetQueries.ts uses for `Budget`.
+// ============================================================
+
+export type MonthlyPlanTiming = "PAST" | "CURRENT" | "FUTURE";
+export type ObligationStatus = "PLANNED" | "SCHEDULED" | "POSTED" | "OVERDUE";
+export type ObligationSource = "SUBSCRIPTION" | "RECURRING_PATTERN";
+export type MonthlyBudgetLinePeriodStatus = "ACTIVE" | "CLOSED" | "UPCOMING" | "PROJECTED_ONLY";
+export type OpeningCashBasis = "LIVE_BALANCE" | "PROJECTED_FORWARD" | "NOT_AVAILABLE";
+export type PlanningWarningCode =
+  | "PROJECTED_DEFICIT"
+  | "LOW_SAFE_TO_SPEND"
+  | "BUDGET_OVERALLOCATION"
+  | "DEBT_PAYMENT_PRESSURE"
+  | "GOAL_UNDERFUNDED"
+  | "INVESTMENT_OVERALLOCATION"
+  | "LOW_CASH_BUFFER"
+  | "BUDGET_OVERRUN_RISK";
+export type PlanningWarningSeverity = "CRITICAL" | "WARNING" | "INFO";
+
+export interface MonthlyVarianceLine {
+  planned: Money;
+  actual?: Money;
+  variance?: Money;
+  remaining?: Money;
+  utilizationPercent?: number;
+}
+
+export interface MonthlyIncomeSourceLine {
+  incomeSourceId: string;
+  name: string;
+  expectedAmount: Money;
+}
+
+export interface MonthlyIncomeProjection extends MonthlyVarianceLine {
+  sources: MonthlyIncomeSourceLine[];
+}
+
+export interface MonthlyObligationItem {
+  id: string;
+  type: "FIXED_COMMITMENT";
+  description: string;
+  expectedAmount: Money;
+  dueDate: string | null;
+  source: ObligationSource;
+  categoryId: string | null;
+  status: ObligationStatus;
+}
+
+export interface MonthlyFixedCommitments extends MonthlyVarianceLine {
+  items: MonthlyObligationItem[];
+}
+
+export interface MonthlyDebtLoanItem {
+  loanId: string;
+  loanName: string;
+  dueDate: string;
+  principal: Money;
+  interest: Money;
+  total: Money;
+}
+
+export interface MonthlyDebtCardItem {
+  creditCardId: string;
+  cardNickname: string;
+  dueDate: string;
+  minimumDue: Money;
+  interestCharged: Money;
+  fees: Money;
+}
+
+export interface MonthlyDebtCommitments {
+  principal: Money;
+  interest: Money;
+  fees: Money;
+  minimumPayments: Money;
+  total: Money;
+  loanItems: MonthlyDebtLoanItem[];
+  cardItems: MonthlyDebtCardItem[];
+}
+
+export interface MonthlyBudgetLine {
+  budgetId: string;
+  name: string;
+  allocated: Money;
+  actual?: Money;
+  remaining?: Money;
+  utilizationPercent?: number;
+  periodStatus: MonthlyBudgetLinePeriodStatus;
+  projectedOverspend?: Money;
+}
+
+export interface MonthlyBudgetIntegration {
+  allocated: Money;
+  actual?: Money;
+  remaining?: Money;
+  utilizationPercent?: number;
+  budgets: MonthlyBudgetLine[];
+}
+
+export interface MonthlySavingsGoalLine {
+  goalId: string;
+  name: string;
+  planned: Money;
+  actual: Money;
+}
+
+export interface MonthlySavings extends MonthlyVarianceLine {
+  byGoal: MonthlySavingsGoalLine[];
+}
+
+export interface MonthlySipPlanLine {
+  sipPlanId: string;
+  assetId: string;
+  planned: Money;
+}
+
+export interface MonthlyInvestments extends MonthlyVarianceLine {
+  bySipPlan: MonthlySipPlanLine[];
+}
+
+export interface MonthlyCashFlowProjection {
+  openingCash: Money;
+  openingCashBasis: OpeningCashBasis;
+  expectedIncome: Money;
+  expectedOutflow: Money;
+  expectedClosingCash: Money;
+}
+
+export interface MonthlySafeToSpend {
+  expectedIncome: Money;
+  mandatoryCommitments: Money;
+  debtPayments: Money;
+  plannedSavings: Money;
+  plannedInvestments: Money;
+  minimumCashBuffer: Money;
+  safeToSpend: Money;
+}
+
+export interface MonthlyPlanningWarning {
+  code: PlanningWarningCode;
+  severity: PlanningWarningSeverity;
+  title: string;
+  message: string;
+  amount?: Money;
+  relatedEntityId?: string;
+}
+
+export interface MonthlyFinancialPlan {
+  period: {
+    year: number;
+    month: number;
+    startDate: string;
+    endDate: string;
+    timing: MonthlyPlanTiming;
+  };
+  baseCurrency: CurrencyCode;
+  sourceCurrency: CurrencyCode;
+  conversionApplied: boolean;
+  income: MonthlyIncomeProjection;
+  fixedCommitments: MonthlyFixedCommitments;
+  debtCommitments: MonthlyDebtCommitments;
+  budget: MonthlyBudgetIntegration;
+  savings: MonthlySavings;
+  investments: MonthlyInvestments;
+  cashFlow?: MonthlyCashFlowProjection;
+  safeToSpend?: MonthlySafeToSpend;
+  savingsRatePercent: number;
+  warnings?: MonthlyPlanningWarning[];
+  health: { status: string; scoreDate: string | null };
+}
+
+export interface MonthlyCloseCarryForwardResult {
+  budgetId: string;
+  outcome: "CARRIED" | "SKIPPED";
+  reason?: string;
+}
+
+export interface MonthlyCloseResult {
+  plan: MonthlyFinancialPlan;
+  carryForwardResults: MonthlyCloseCarryForwardResult[];
+}
 
 
 

@@ -1,7 +1,7 @@
 import React from "react";
-import { LayoutDashboard, Target, Wallet, Lightbulb, FileBarChart, Sparkles } from "lucide-react";
+import { LayoutDashboard, Target, Wallet, Lightbulb, FileBarChart, Sparkles, CalendarClock } from "lucide-react";
 
-export type PlanningSection = "overview" | "goals" | "budgets" | "ai-plans" | "insights" | "reports";
+export type PlanningSection = "overview" | "monthly-plan" | "goals" | "budgets" | "ai-plans" | "insights" | "reports";
 
 export interface SecondaryTab {
   id: string;
@@ -18,6 +18,12 @@ export interface PrimaryTab {
 
 export const PLANNING_TABS: PrimaryTab[] = [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="w-3.5 h-3.5" />, defaultSub: null },
+  {
+    id: "monthly-plan",
+    label: "Monthly Plan",
+    icon: <CalendarClock className="w-3.5 h-3.5" />,
+    defaultSub: null,
+  },
   {
     id: "goals",
     label: "Goals",

@@ -17,6 +17,7 @@ import { AdjustBudgetModal } from "./components/AdjustBudgetModal";
 import { NewTransferModal as TransferMoneyModal } from "../accounts/components/NewTransferModal";
 
 import { OverviewSection } from "./views/OverviewSection";
+import { MonthlyPlannerSection } from "./views/MonthlyPlannerSection";
 import { GoalsSection } from "./views/GoalsSection";
 import { BudgetsSection } from "./views/BudgetsSection";
 import { InsightsSection } from "./views/InsightsSection";
@@ -29,7 +30,9 @@ import { BudgetWizardModal } from "../budgets/components/BudgetWizardModal";
 function parseSubTab(subTab: string | null): { section: PlanningSection; subsection: string | null; detailId: string | null } {
   const parts = (subTab ?? "").split("/").filter(Boolean);
   const section = (
-    ["overview", "goals", "budgets", "ai-plans", "insights", "reports"].includes(parts[0]) ? parts[0] : "overview"
+    ["overview", "monthly-plan", "goals", "budgets", "ai-plans", "insights", "reports"].includes(parts[0])
+      ? parts[0]
+      : "overview"
   ) as PlanningSection;
 
   if (parts[1] === "detail" && parts[2]) {
@@ -98,6 +101,17 @@ export const PlanningView: React.FC = () => {
 
   const renderSection = () => {
     switch (section) {
+      case "monthly-plan":
+        return (
+          <MonthlyPlannerSection
+            monthParam={subsection}
+            onNavigateMonth={(yyyymm) => setActiveSubTab(`monthly-plan/${yyyymm}`)}
+            onSelectBudget={handleSelectBudget}
+            onSelectGoal={handleSelectGoal}
+            onNavigateBudgets={() => navigate("budgets", "active")}
+            onOpenCreateBudget={() => setBudgetWizardOpen(true)}
+          />
+        );
       case "goals":
         return (
           <GoalsSection
@@ -161,7 +175,7 @@ export const PlanningView: React.FC = () => {
         isDetail={isDetail}
       />
 
-      {!isDetail && section !== "reports" && (
+      {!isDetail && section !== "reports" && section !== "monthly-plan" && (
         <PlanningGlobalToolbar onExport={() => navigate("reports", "planning-summary")} onRefresh={handleRefresh} />
       )}
 

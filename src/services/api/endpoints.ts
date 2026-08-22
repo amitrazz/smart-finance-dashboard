@@ -2051,4 +2051,44 @@ export const api = {
     fetchWithAuth<PaginatedResponse<SearchResultItem> | SearchResultItem[]>(
       `/finance/search${buildQuery({ q })}`,
     ),
+
+  // Monthly Financial Planner — a composed, read-only orchestration over
+  // Budget v2/loans/credit cards/income/recurring/goals/investments/
+  // accounts/financial health. `getMonthlyPlan` is the single primary
+  // request the page uses; the sub-path GETs exist for future drill-down
+  // reuse (not called from the Monthly Planner page itself, which composes
+  // everything from one response to avoid N+1 dashboard requests).
+  getMonthlyPlan: (params: {
+    year: number;
+    month: number;
+    currency?: string;
+    includeActuals?: boolean;
+    includeWarnings?: boolean;
+    includeBreakdown?: boolean;
+    minimumCashBuffer?: string;
+  }) => fetchWithAuth<unknown>(`/finance/planning/monthly${buildQuery(params)}`),
+
+  getMonthlySummary: (params: { year: number; month: number; minimumCashBuffer?: string }) =>
+    fetchWithAuth<unknown>(`/finance/planning/monthly/summary${buildQuery(params)}`),
+
+  getMonthlyCashFlow: (params: { year: number; month: number; minimumCashBuffer?: string }) =>
+    fetchWithAuth<unknown>(`/finance/planning/monthly/cash-flow${buildQuery(params)}`),
+
+  getMonthlySafeToSpend: (params: { year: number; month: number; minimumCashBuffer?: string }) =>
+    fetchWithAuth<unknown>(`/finance/planning/monthly/safe-to-spend${buildQuery(params)}`),
+
+  getMonthlyWarnings: (params: { year: number; month: number; minimumCashBuffer?: string }) =>
+    fetchWithAuth<unknown>(`/finance/planning/monthly/warnings${buildQuery(params)}`),
+
+  closeMonth: (data: { year: number; month: number }) =>
+    fetchWithAuth<unknown>('/finance/planning/monthly/close', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  rolloverMonth: (data: { year: number; month: number; minimumCashBuffer?: string }) =>
+    fetchWithAuth<unknown>('/finance/planning/monthly/rollover', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
